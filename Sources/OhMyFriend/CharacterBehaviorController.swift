@@ -12,7 +12,7 @@ public final class CharacterBehaviorController {
     public enum State {
         case idle(timeLeft: TimeInterval)
         case lookAround(timeLeft: TimeInterval, targetYaw: CGFloat)
-        case walk(direction: CGFloat, targetX: CGFloat)
+        case walk(direction: CGFloat, targetX: CGFloat, duration: TimeInterval, lastX: CGFloat, stuckTime: TimeInterval)
         case sit(timeLeft: TimeInterval)
         case poke(timeLeft: TimeInterval, label: String)
         case fall
@@ -24,8 +24,7 @@ public final class CharacterBehaviorController {
     public var mode: BehaviorMode = .autonomous
 
     // Tuning parameters
-    public var walkSpeed: CGFloat = 80.0 // points/sec
-    private var stateTimer: TimeInterval = 0
+    public var walkSpeed: CGFloat = 85.0 // points/sec
     private var wasAirborne: Bool = false
 
     public init() {}
@@ -121,7 +120,7 @@ public final class CharacterBehaviorController {
                 state = .lookAround(timeLeft: timeLeft, targetYaw: targetYaw)
             }
 
-        case .walk(let direction, let targetX):
+        case .walk(let direction, let targetX, var duration, _, var stuckTime):
             characterNode.isSitting = false
             characterNode.isPoking = false
             characterNode.walkSpeed = 1.0
@@ -131,33 +130,66 @@ public final class CharacterBehaviorController {
             characterNode.modelRoot.eulerAngles.y = targetBodyYaw
 
             // Move
+            let prevX = physics.position.x
             let step = direction * walkSpeed * CGFloat(dt)
             physics.position.x += step
 
-            // Check if reached destination or platform edge
+            duration += dt
+
+            // Check if position was blocked/clamped (stuck check)
+            let actualMove = abs(physics.position.x - prevX)
+            if actualMove < 0.2 {
+                stuckTime += dt
+            } else {
+                stuckTime = 0
+            }
+
+            // Screen boundary check (with comfortable 35pt margin from physical screen edges)
+            let screenMinX = screen.frame.minX + 35.0
+            let screenMaxX = screen.frame.maxX - 35.0
+            let hitScreenLeft = (physics.position.x <= screenMinX) && (direction < 0)
+            let hitScreenRight = (physics.position.x >= screenMaxX) && (direction > 0)
+
+            // Platform boundary check
+            var hitPlatformLeft = false
+            var hitPlatformRight = false
+            if let p = currentPlatform {
+                hitPlatformLeft = (physics.position.x <= p.xMin + 30.0) && (direction < 0)
+                hitPlatformRight = (physics.position.x >= p.xMax - 30.0) && (direction > 0)
+            }
+
             let reachedTarget = direction > 0 ? (physics.position.x >= targetX) : (physics.position.x <= targetX)
+            let isStuck = stuckTime > 0.6 || duration > 6.0
 
-            if let platform = currentPlatform {
-                // If reached edge of platform
-                let isAtLeftEdge = physics.position.x <= platform.xMin + 15
-                let isAtRightEdge = physics.position.x >= platform.xMax - 15
-
-                if reachedTarget || (direction < 0 && isAtLeftEdge) || (direction > 0 && isAtRightEdge) {
-                    // Decide what to do at edge
-                    if isAtLeftEdge || isAtRightEdge {
-                        handleReachedPlatformEdge(
-                            isLeft: isAtLeftEdge,
-                            platform: platform,
-                            characterNode: characterNode,
-                            physics: physics
-                        )
-                    } else {
-                        chooseNextState(physics: physics, platforms: platforms, screen: screen, cursorPos: cursorPos)
-                    }
-                    return
-                }
-            } else if reachedTarget {
+            if hitScreenLeft || hitPlatformLeft {
+                // Reached left edge
+                handleReachedEdge(
+                    isLeft: true,
+                    platform: currentPlatform,
+                    screen: screen,
+                    characterNode: characterNode,
+                    physics: physics
+                )
+            } else if hitScreenRight || hitPlatformRight {
+                // Reached right edge
+                handleReachedEdge(
+                    isLeft: false,
+                    platform: currentPlatform,
+                    screen: screen,
+                    characterNode: characterNode,
+                    physics: physics
+                )
+            } else if reachedTarget || isStuck {
+                // Reached destination or stuck -> choose next state
                 chooseNextState(physics: physics, platforms: platforms, screen: screen, cursorPos: cursorPos)
+            } else {
+                state = .walk(
+                    direction: direction,
+                    targetX: targetX,
+                    duration: duration,
+                    lastX: physics.position.x,
+                    stuckTime: stuckTime
+                )
             }
 
         case .sit(var timeLeft):
@@ -214,8 +246,12 @@ public final class CharacterBehaviorController {
             let dist = cursorPos.x - physics.position.x
             if abs(dist) > 40 {
                 let dir: CGFloat = dist > 0 ? 1.0 : -1.0
-                let targetX = min(platform.xMax - 20, max(platform.xMin + 20, cursorPos.x))
-                state = .walk(direction: dir, targetX: targetX)
+                let screenMinX = screen.frame.minX + 45
+                let screenMaxX = screen.frame.maxX - 45
+                let minBound = max(platform.xMin + 35, screenMinX)
+                let maxBound = min(platform.xMax - 35, screenMaxX)
+                let targetX = min(maxBound, max(minBound, cursorPos.x))
+                state = .walk(direction: dir, targetX: targetX, duration: 0, lastX: physics.position.x, stuckTime: 0)
             } else {
                 state = .idle(timeLeft: 1.5)
             }
@@ -228,66 +264,81 @@ public final class CharacterBehaviorController {
         // Autonomous Decision
         let roll = Double.random(in: 0...100)
 
-        // If on Dock or Window, poke interaction is fun!
-        if roll < 20 {
+        // Calculate safe walkable bounds
+        let screenMinX = screen.frame.minX + 45
+        let screenMaxX = screen.frame.maxX - 45
+        let minX = max(platform.xMin + 35, screenMinX)
+        let maxX = min(platform.xMax - 35, screenMaxX)
+
+        if roll < 22 {
             // Poke Dock icon or window titlebar
-            let label = (platform.kind == .dock) ? "Dock 아이콘 툭툭 건드리기" : "윈도우 창 노크하기"
+            let label = (platform.kind == .dock) ? "Dock 아이콘 툭툭 건드리기" : "창문 노크하기"
             state = .poke(timeLeft: Double.random(in: 1.5...3.0), label: label)
         } else if roll < 45 {
-            // Idle & Look around
-            state = .idle(timeLeft: Double.random(in: 2.0...4.0))
+            // Sit down and rest
+            state = .sit(timeLeft: Double.random(in: 3.5...7.0))
         } else if roll < 65 {
-            // Look around specifically
+            // Look around
             let randomYaw = CGFloat.random(in: -0.8...0.8)
             state = .lookAround(timeLeft: Double.random(in: 1.5...3.0), targetYaw: randomYaw)
-        } else if roll < 85 {
+        } else {
             // Walk to a random spot on the current platform
-            let margin: CGFloat = 25
-            let minX = platform.xMin + margin
-            let maxX = platform.xMax - margin
             if maxX > minX {
                 let destX = CGFloat.random(in: minX...maxX)
                 let dir: CGFloat = destX > physics.position.x ? 1.0 : -1.0
-                state = .walk(direction: dir, targetX: destX)
+                state = .walk(direction: dir, targetX: destX, duration: 0, lastX: physics.position.x, stuckTime: 0)
             } else {
                 state = .idle(timeLeft: 2.0)
             }
-        } else {
-            // Walk all the way to an edge to sit!
-            let targetEdgeX = Bool.random() ? (platform.xMin + 15) : (platform.xMax - 15)
-            let dir: CGFloat = targetEdgeX > physics.position.x ? 1.0 : -1.0
-            state = .walk(direction: dir, targetX: targetEdgeX)
         }
     }
 
-    private func handleReachedPlatformEdge(
+    /// Called when the character reaches the screen edge or window platform edge
+    private func handleReachedEdge(
         isLeft: Bool,
-        platform: Platform,
+        platform: Platform?,
+        screen: NSScreen,
         characterNode: MinecraftCharacterNode,
         physics: PhysicsEngine
     ) {
         let roll = Double.random(in: 0...100)
 
-        if roll < 50 {
-            // Sit on edge and dangle legs!
+        // 1. If reached edge, 45% chance: Sit down and relax (dangle legs)
+        if roll < 45 {
             state = .sit(timeLeft: Double.random(in: 4.0...8.0))
-        } else if roll < 75 {
-            // Look over the cliff (poke/peek)
-            state = .poke(timeLeft: 2.5, label: "아래 내려다보기")
-        } else if roll < 90 {
-            // Turn around and walk back
-            let destX = isLeft ? (platform.xMin + 100) : (platform.xMax - 100)
-            state = .walk(direction: isLeft ? 1.0 : -1.0, targetX: destX)
-        } else {
-            // Little jump off or turn around
-            if platform.kind != .floor {
-                // Jump off window!
-                physics.jump(impulse: 200)
-                physics.velocity.x = isLeft ? -100 : 100
-                state = .fall
+            return
+        }
+
+        // 2. 40% chance: Turn around and walk back towards screen center!
+        if roll < 85 {
+            let turnDirection: CGFloat = isLeft ? 1.0 : -1.0
+            let screenMidX = screen.frame.midX
+            let safeTargetX: CGFloat
+            if let p = platform {
+                let pMid = (p.xMin + p.xMax) / 2.0
+                safeTargetX = isLeft ? min(screenMidX, pMid + 80) : max(screenMidX, pMid - 80)
             } else {
-                state = .idle(timeLeft: 2.0)
+                safeTargetX = isLeft ? (physics.position.x + 150) : (physics.position.x - 150)
             }
+
+            state = .walk(
+                direction: turnDirection,
+                targetX: safeTargetX,
+                duration: 0,
+                lastX: physics.position.x,
+                stuckTime: 0
+            )
+            return
+        }
+
+        // 3. 15% chance: Stand and look around or peek over cliff
+        if let p = platform, p.kind != .floor && p.kind != .dock {
+            // On a floating window edge: peek over cliff
+            state = .poke(timeLeft: 2.5, label: "아래 내려다보기")
+        } else {
+            // On floor/dock edge: stand and look around
+            let lookAway = isLeft ? CGFloat(0.7) : CGFloat(-0.7)
+            state = .lookAround(timeLeft: 2.5, targetYaw: lookAway)
         }
     }
 
