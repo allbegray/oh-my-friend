@@ -3,7 +3,7 @@
   "1": "SkinGalleryView",
   "2": "PhysicsEngine",
   "3": "SkinTexture",
-  "4": "CharacterWindow",
+  "4": "State",
   "5": "SkinDownloadError",
   "6": "AppKit",
   "7": "Oh My Friend: 마인크래프트 스타일의 macOS 데스크톱 컴패니언 🎮⛏️",
@@ -17,5 +17,5 @@
   "15": "프로젝트 요약",
   "16": "보안 정책",
   "17": "백로그",
-  "18": "[v0.1.0] - 2026-09-09"
+  "18": "변경 이력"
 }

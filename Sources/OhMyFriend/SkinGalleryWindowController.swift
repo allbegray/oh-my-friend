@@ -8,7 +8,7 @@ public final class SkinGalleryWindowController: NSWindowController {
 
     private init() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 720, height: 580),
+            contentRect: NSRect(x: 0, y: 0, width: 740, height: 600),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
@@ -25,12 +25,20 @@ public final class SkinGalleryWindowController: NSWindowController {
         fatalError("init(coder:) has not been implemented")
     }
 
-    public func show(onApply: @escaping (SkinTexture, String) -> Void) {
+    public func show(
+        currentScale: CGFloat,
+        onApply: @escaping (SkinTexture, String) -> Void,
+        onScaleChange: @escaping (CGFloat) -> Void
+    ) {
         self.onApplySkinHandler = onApply
 
-        let view = SkinGalleryView { [weak self] skin, name in
-            self?.onApplySkinHandler?(skin, name)
-        }
+        let view = SkinGalleryView(
+            initialScale: currentScale,
+            onApplySkin: { [weak self] skin, name in
+                self?.onApplySkinHandler?(skin, name)
+            },
+            onScaleChange: onScaleChange
+        )
         window?.contentView = NSHostingView(rootView: view)
 
         window?.makeKeyAndOrderFront(nil)

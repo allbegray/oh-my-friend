@@ -265,10 +265,18 @@ public final class AppController: NSObject, CharacterViewDelegate, NSMenuDelegat
         // 4. Scale Submenu
         let scaleMenu = NSMenu()
         let scales: [(String, CGFloat)] = [
+            ("아주 작게 (50%)", 0.5),
             ("작게 (70%)", 0.7),
-            ("보통 (100%)", 1.0),
-            ("크게 (150%)", 1.5)
+            ("약간 작게 (85%)", 0.85),
+            ("기본 (100%)", 1.0),
+            ("약간 크게 (125%)", 1.25),
+            ("크게 (150%)", 1.5),
+            ("매우 크게 (175%)", 1.75),
+            ("거대하게 (200%)", 2.0),
+            ("초거대 (250%)", 2.5)
         ]
+
+        var matchedPreset = false
         for (name, scaleVal) in scales {
             let item = NSMenuItem(
                 title: name,
@@ -277,11 +285,35 @@ public final class AppController: NSObject, CharacterViewDelegate, NSMenuDelegat
             )
             item.target = self
             item.representedObject = scaleVal
-            if abs(window.currentScale - scaleVal) < 0.05 {
+            if abs(window.currentScale - scaleVal) < 0.02 {
                 item.state = .on
+                matchedPreset = true
             }
             scaleMenu.addItem(item)
         }
+
+        scaleMenu.addItem(NSMenuItem.separator())
+
+        if !matchedPreset {
+            let currentPct = Int(round(window.currentScale * 100))
+            let customCurrentItem = NSMenuItem(
+                title: "현재 지정: \(currentPct)%",
+                action: nil,
+                keyEquivalent: ""
+            )
+            customCurrentItem.state = .on
+            customCurrentItem.isEnabled = false
+            scaleMenu.addItem(customCurrentItem)
+            scaleMenu.addItem(NSMenuItem.separator())
+        }
+
+        let customScaleItem = NSMenuItem(
+            title: "✏️ 크기 직접 입력 (Custom Size)...",
+            action: #selector(didSelectCustomScale),
+            keyEquivalent: "s"
+        )
+        customScaleItem.target = self
+        scaleMenu.addItem(customScaleItem)
         let scaleSubmenuItem = NSMenuItem(title: "📏 캐릭터 크기", action: nil, keyEquivalent: "")
         scaleSubmenuItem.submenu = scaleMenu
         menu.addItem(scaleSubmenuItem)
@@ -348,11 +380,17 @@ public final class AppController: NSObject, CharacterViewDelegate, NSMenuDelegat
             applyCustomSkin(skin, name: url.deletingPathExtension().lastPathComponent)
         }
     }
-
     @objc private func didSelectOpenSkinGallery() {
-        SkinGalleryWindowController.shared.show { [weak self] skin, name in
-            self?.applyCustomSkin(skin, name: name)
-        }
+        SkinGalleryWindowController.shared.show(
+            currentScale: window.currentScale,
+            onApply: { [weak self] skin, name in
+                self?.applyCustomSkin(skin, name: name)
+            },
+            onScaleChange: { [weak self] newScale in
+                self?.window.setScale(newScale)
+                self?.statusItem?.menu = self?.buildContextMenu()
+            }
+        )
     }
 
     private func applyCustomSkin(_ skin: SkinTexture, name: String) {
@@ -371,6 +409,33 @@ public final class AppController: NSObject, CharacterViewDelegate, NSMenuDelegat
         guard let scale = sender.representedObject as? CGFloat else { return }
         window.setScale(scale)
         statusItem?.menu = buildContextMenu()
+    }
+
+    @objc private func didSelectCustomScale() {
+        let alert = NSAlert()
+        alert.messageText = "캐릭터 크기 직접 입력"
+        alert.informativeText = "원하는 크기 배율을 퍼센트(%) 단위의 숫자로 입력하세요.\n(추천 범위: 30% ~ 300%)"
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "적용")
+        alert.addButton(withTitle: "취소")
+
+        let input = NSTextField(frame: NSRect(x: 0, y: 0, width: 200, height: 24))
+        let currentPct = Int(round(window.currentScale * 100))
+        input.stringValue = "\(currentPct)"
+        input.placeholderString = "예: 120"
+        alert.accessoryView = input
+
+        NSApp.activate(ignoringOtherApps: true)
+        if alert.runModal() == .alertFirstButtonReturn {
+            let rawText = input.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                .replacingOccurrences(of: "%", with: "")
+            if let num = Double(rawText), num > 0 {
+                let clamped = max(20.0, min(400.0, num))
+                let scale = CGFloat(clamped / 100.0)
+                window.setScale(scale)
+                statusItem?.menu = buildContextMenu()
+            }
+        }
     }
 
     @objc private func didSelectJump() {

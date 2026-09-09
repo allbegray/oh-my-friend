@@ -1988,9 +1988,9 @@
       "label": "\ud574\uacb0",
       "file_type": "document",
       "source_file": "SOLUTION.md",
-      "source_location": "L59",
+      "source_location": "L60",
       "_origin": "ast",
-      "id": "solution_\ud574\uacb0_59",
+      "id": "solution_\ud574\uacb0_60",
       "community": 13,
       "community_name": "[CommandLineTools\uc640 SPM \ub9e4\ub2c8\ud398\uc2a4\ud2b8 \ub9c1\ucee4 \ubd88\uc77c\uce58 \uc624\ub958]",
       "norm_label": "\u1112\u1162\u1100\u1167\u11af"
@@ -2252,7 +2252,7 @@
       "label": "[v0.1.0] - 2026-09-09",
       "file_type": "document",
       "source_file": "CHANGELOG.md",
-      "source_location": "L14",
+      "source_location": "L16",
       "_origin": "ast",
       "id": "changelog_v0_1_0_2026_09_09",
       "community": 18,
@@ -2296,9 +2296,9 @@
       "label": "\uc218\uc815",
       "file_type": "document",
       "source_file": "CHANGELOG.md",
-      "source_location": "L27",
+      "source_location": "L29",
       "_origin": "ast",
-      "id": "changelog_\uc218\uc815_27",
+      "id": "changelog_\uc218\uc815_29",
       "community": 18,
       "community_name": "[v0.1.0] - 2026-09-09",
       "norm_label": "\u1109\u116e\u110c\u1165\u11bc"
@@ -2318,9 +2318,9 @@
       "label": "\ucd94\uac00",
       "file_type": "document",
       "source_file": "CHANGELOG.md",
-      "source_location": "L16",
+      "source_location": "L18",
       "_origin": "ast",
-      "id": "changelog_\ucd94\uac00_16",
+      "id": "changelog_\ucd94\uac00_18",
       "community": 18,
       "community_name": "[v0.1.0] - 2026-09-09",
       "norm_label": "\u110e\u116e\u1100\u1161"
@@ -7441,22 +7441,22 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "CHANGELOG.md",
-      "source_location": "L16",
+      "source_location": "L18",
       "weight": 1.0,
       "_origin": "ast",
       "source": "changelog_v0_1_0_2026_09_09",
-      "target": "changelog_\ucd94\uac00_16",
+      "target": "changelog_\ucd94\uac00_18",
       "confidence_score": 1.0
     },
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "CHANGELOG.md",
-      "source_location": "L27",
+      "source_location": "L29",
       "weight": 1.0,
       "_origin": "ast",
       "source": "changelog_v0_1_0_2026_09_09",
-      "target": "changelog_\uc218\uc815_27",
+      "target": "changelog_\uc218\uc815_29",
       "confidence_score": 1.0
     },
     {
@@ -7485,7 +7485,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "CHANGELOG.md",
-      "source_location": "L14",
+      "source_location": "L16",
       "weight": 1.0,
       "_origin": "ast",
       "source": "changelog_\ubcc0\uacbd_\uc774\ub825",
@@ -7793,11 +7793,11 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "SOLUTION.md",
-      "source_location": "L59",
+      "source_location": "L60",
       "weight": 1.0,
       "_origin": "ast",
       "source": "solution_laby_net_\uc2a4\ud0a8_\ud398\uc774\uc9c0_url_\ub2e4\uc6b4\ub85c\ub4dc_\uc2dc_cloudflare_403_forbidden_\uc624\ub958",
-      "target": "solution_\ud574\uacb0_59",
+      "target": "solution_\ud574\uacb0_60",
       "confidence_score": 1.0
     },
     {
@@ -9632,5 +9632,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "d86d3ef8067e0232707fb66742212ee7c7a9431d"
+  "built_at_commit": "0e72901ed7fd3e0dbaab92fcd1e5f0a158e81582"
 }

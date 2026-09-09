@@ -23,11 +23,24 @@ public struct SkinGalleryView: View {
 
     // Saved skins list
     @State private var savedSkins: [URL] = []
+    // Character Scale states
+    @State private var characterScale: CGFloat
+    @State private var scaleText: String
 
+    public let initialScale: CGFloat
     public let onApplySkin: (SkinTexture, String) -> Void
+    public let onScaleChange: (CGFloat) -> Void
 
-    public init(onApplySkin: @escaping (SkinTexture, String) -> Void) {
+    public init(
+        initialScale: CGFloat = 1.0,
+        onApplySkin: @escaping (SkinTexture, String) -> Void,
+        onScaleChange: @escaping (CGFloat) -> Void = { _ in }
+    ) {
+        self.initialScale = initialScale
+        self._characterScale = State(initialValue: initialScale)
+        self._scaleText = State(initialValue: "\(Int(round(initialScale * 100)))")
         self.onApplySkin = onApplySkin
+        self.onScaleChange = onScaleChange
     }
 
     public var body: some View {
@@ -92,7 +105,7 @@ public struct SkinGalleryView: View {
 
     // MARK: - Header
     private var headerView: some View {
-        HStack {
+        HStack(alignment: .center) {
             Image(systemName: "tshirt.fill")
                 .font(.system(size: 20))
                 .foregroundColor(.accentColor)
@@ -103,10 +116,49 @@ public struct SkinGalleryView: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
+
             Spacer()
+
+            // Real-time Character Scale Controller
+            HStack(spacing: 8) {
+                Text("크기:")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.secondary)
+
+                Slider(value: Binding(
+                    get: { characterScale },
+                    set: { newVal in
+                        characterScale = newVal
+                        scaleText = "\(Int(round(newVal * 100)))"
+                        onScaleChange(newVal)
+                    }
+                ), in: 0.3...2.5, step: 0.05)
+                .frame(width: 80)
+
+                HStack(spacing: 1) {
+                    TextField("100", text: $scaleText)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.system(size: 11))
+                        .frame(width: 44)
+                        .multilineTextAlignment(.trailing)
+                        .onSubmit {
+                            applyScaleText()
+                        }
+                    Text("%")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+
+                Button("적용") {
+                    applyScaleText()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            }
+            .padding(.leading, 8)
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(.vertical, 10)
     }
 
     // MARK: - Tab 1: Popular Gallery
@@ -607,6 +659,18 @@ public struct SkinGalleryView: View {
             if toastMessage == msg {
                 toastMessage = nil
             }
+        }
+    }
+
+    private func applyScaleText() {
+        let clean = scaleText.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: "%", with: "")
+        if let val = Double(clean), val > 0 {
+            let clamped = max(20.0, min(400.0, val))
+            let newScale = CGFloat(clamped / 100.0)
+            characterScale = newScale
+            scaleText = "\(Int(round(clamped)))"
+            onScaleChange(newScale)
+            showToast("캐릭터 크기를 \(Int(round(clamped)))%로 변경했습니다.")
         }
     }
 }

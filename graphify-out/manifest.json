@@ -5,9 +5,9 @@
     "semantic_hash": "69032b2d00fd5512663217390c05fc29"
   },
   "Sources/OhMyFriend/AppController.swift": {
-    "mtime": 1788941955.282008,
-    "ast_hash": "b59ba321a536a8cbbc2ed9eb9c29b5fe",
-    "semantic_hash": "b59ba321a536a8cbbc2ed9eb9c29b5fe"
+    "mtime": 1788943005.117476,
+    "ast_hash": "f4cdf209685484fc3049bb6a2da718db",
+    "semantic_hash": ""
   },
   "Sources/OhMyFriend/CharacterBehaviorController.swift": {
     "mtime": 1788940415.5468595,
@@ -45,14 +45,14 @@
     "semantic_hash": ""
   },
   "Sources/OhMyFriend/SkinGalleryView.swift": {
-    "mtime": 1788942672.1945708,
-    "ast_hash": "1f9ccaf83040fd3942d035339940c0e3",
+    "mtime": 1788943043.7561624,
+    "ast_hash": "295ee1a44804ffe07dd1a7d5857b48c6",
     "semantic_hash": ""
   },
   "Sources/OhMyFriend/SkinGalleryWindowController.swift": {
-    "mtime": 1788941936.5230913,
-    "ast_hash": "98c356e400e4a650d99311294828aabc",
-    "semantic_hash": "98c356e400e4a650d99311294828aabc"
+    "mtime": 1788943013.100132,
+    "ast_hash": "48da144a23b3e2397066a01f9e82f9ae",
+    "semantic_hash": ""
   },
   "Sources/OhMyFriend/SkinTexture.swift": {
     "mtime": 1788940371.538094,
@@ -80,8 +80,8 @@
     "semantic_hash": ""
   },
   "AGENTS.md": {
-    "mtime": 1788942919.6409478,
-    "ast_hash": "6a7587dd7dfeb03a12f8c21dab29cc8f",
+    "mtime": 1788943081.2923243,
+    "ast_hash": "4372cd1df4a7b8ea985d852276d97ec3",
     "semantic_hash": ""
   },
   "BACKLOG.md": {
@@ -90,13 +90,13 @@
     "semantic_hash": ""
   },
   "CHANGELOG.md": {
-    "mtime": 1788942928.2158325,
-    "ast_hash": "21a587a5f046f1ba9596cde9801f419f",
+    "mtime": 1788943088.2572024,
+    "ast_hash": "f1614b27bdca506c24e2a32b67942d14",
     "semantic_hash": ""
   },
   "README.md": {
-    "mtime": 1788942443.5361757,
-    "ast_hash": "5942ba302d6e9302844ca5438665c9fa",
+    "mtime": 1788943096.1730251,
+    "ast_hash": "62801ea200e53bb00a1945002b00a7dd",
     "semantic_hash": ""
   },
   "SECURITY.md": {
