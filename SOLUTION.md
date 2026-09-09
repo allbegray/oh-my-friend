@@ -54,12 +54,12 @@ binary operator '-' cannot be applied to operands of type 'Float' and 'CGFloat'
 `https://laby.net/skins/<hash>` 웹페이지 주소를 입력하여 스킨 다운로드 시도 시 `HTTP 403: Forbidden` 또는 올바르지 않은 스킨 이미지 오류 발생.
 
 ### 원인
-- Laby.net의 웹페이지(`laby.net/skins/...`)는 Cloudflare Bot Management(`cf-mitigated: challenge`)로 보호되고 있어 일반 HTTP 클라이언트의 HTML 요청을 403으로 차단함.
+1. Laby.net의 웹페이지(`laby.net/skins/...`)는 Cloudflare Bot Management(`cf-mitigated: challenge`)로 보호되고 있어 일반 HTTP 요청 시 403 Forbidden 차단이 발생함.
+2. 또한 요청 헤더에 크롬 User-Agent(`Mozilla/5.0 ... Chrome/120.0`)를 설정할 경우, Apple URLSession의 TLS 핸드셰이크 지문(JA3/JA4)과 크롬 UA 간의 불일치로 인해 Cloudflare의 봇 스푸핑 방지 필터가 작동하여 공개 CDN 이미지 요청까지 403으로 차단됨.
 
 ### 해결
-- Laby.net의 원본 64×64 PNG 스킨 텍스처는 별도의 보호 없는 공개 CDN 엔드포인트(`https://laby.net/texture/<hash>.png`)에서 직접 호스팅되고 있음을 확인.
-- `SkinDownloaderService`에서 Laby.net URL이 입력되면 HTML 페이지 요청을 건너뛰고, URL 경로에서 32자리 hex 해시를 정규식으로 추출하여 즉시 `https://laby.net/texture/<hash>.png` 다이렉트 주소로 변환하여 다운로드하도록 개선.
-- 사용자가 32자리 해시만 입력하거나 `https://`를 생략하더라도 자동 보정하도록 UI 로직 보강.
-
+1. Laby.net의 원본 64×64 PNG 스킨 텍스처는 공개 CDN 엔드포인트(`https://laby.net/texture/<hash>.png`)에서 직접 호스팅되고 있음을 확인하고, URL에서 32자리 해시를 추출하여 CDN 주소로 다이렉트 변환.
+2. User-Agent를 위조 크롬 대신 네이티브 식별자인 `OhMyFriend/1.0 (Macintosh; Mac OS X)`로 변경하여 Cloudflare의 TLS 지문 불일치 검사를 통과(200 OK)하도록 수정.
+3. `scripts/run.sh`에 기존에 실행 중이던 이전 버전 앱 프로세스를 자동으로 종료(`killall OhMyFriend`)하고 새 버전으로 재실행하도록 갱신.
 ### 재발 방지
 - 외부 스킨 사이트의 웹페이지 스크래핑 시 Cloudflare 차단 위험이 있는 사이트는 HTML 파싱 대신 정적 텍스처 CDN 엔드포인트 규칙을 분석하여 다이렉트 변환을 우선 적용합니다.

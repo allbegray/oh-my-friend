@@ -10,6 +10,8 @@
 
 ### 수정
 - Laby.net 웹페이지 HTML 요청 시 Cloudflare 403 Forbidden 오류를 해결하기 위해, URL에서 32자리 해시를 추출하여 `https://laby.net/texture/<hash>.png` 공개 CDN 주소로 다이렉트 변환 다운로드하도록 개선.
+- User-Agent 헤더를 네이티브 `OhMyFriend/1.0 (Macintosh; Mac OS X)`로 변경하여 Cloudflare의 TLS 지문(JA3/JA4) 불일치 차단 버그를 해결.
+- `scripts/run.sh`에 기존 실행 중인 이전 버전 앱을 자동으로 종료하고 새 버전으로 재실행하도록 개선.
 
 ## [v0.1.0] - 2026-09-09
 
