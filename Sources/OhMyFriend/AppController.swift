@@ -1,0 +1,411 @@
+import AppKit
+import CoreGraphics
+import SceneKit
+import UniformTypeIdentifiers
+
+public final class AppController: NSObject, CharacterViewDelegate, NSMenuDelegate {
+    private var window: CharacterWindow!
+    private var physics: PhysicsEngine!
+    private var behavior = CharacterBehaviorController()
+    private var currentSkinType: BuiltinSkinType = .steve
+
+    private var statusItem: NSStatusItem?
+    private var statusMenuItem: NSMenuItem?
+
+    private var gameTimer: Timer?
+    private var scanCounter: Int = 0
+    private var cachedPlatforms: [Platform] = []
+    private var lastUpdateTime: TimeInterval = 0
+
+    public override init() {
+        super.init()
+    }
+
+    public func start() {
+        // 1. Initial Skin
+        let skinImage = BuiltinSkinGenerator.makeSkin(type: currentSkinType)
+        guard let skin = SkinTexture(image: skinImage) else {
+            fatalError("Failed to create default skin")
+        }
+
+        // 2. Determine initial position (above Dock or floor)
+        let mainScreen = NSScreen.main ?? NSScreen.screens[0]
+        let platforms = ScreenEnvironment.shared.scanPlatforms(for: mainScreen)
+        self.cachedPlatforms = platforms
+
+        let initialY = mainScreen.visibleFrame.minY + 20
+        let initialX = mainScreen.frame.midX
+        let initialPos = CGPoint(x: initialX, y: initialY)
+
+        // 3. Physics & Window Setup
+        self.physics = PhysicsEngine(initialPosition: initialPos)
+        self.window = CharacterWindow(skin: skin)
+        self.window.characterView.characterDelegate = self
+        self.window.setFeetPosition(x: initialPos.x, y: initialPos.y)
+        self.window.orderFrontRegardless()
+
+        // 4. Status Bar Menu Setup
+        setupStatusBar()
+
+        // 5. Start 60 FPS Game Loop
+        self.lastUpdateTime = ProcessInfo.processInfo.systemUptime
+        self.gameTimer = Timer.scheduledTimer(
+            timeInterval: 1.0 / 60.0,
+            target: self,
+            selector: #selector(gameLoopTick),
+            userInfo: nil,
+            repeats: true
+        )
+        RunLoop.main.add(self.gameTimer!, forMode: .common)
+    }
+
+    // MARK: - Game Loop
+    @objc private func gameLoopTick() {
+        let now = ProcessInfo.processInfo.systemUptime
+        var dt = now - lastUpdateTime
+        lastUpdateTime = now
+
+        // Clamp dt to avoid huge jumps if app pauses
+        if dt > 0.1 { dt = 0.1 }
+        if dt <= 0 { dt = 1.0 / 60.0 }
+
+        let screen = ScreenEnvironment.shared.screen(for: physics.position)
+
+        // Periodic Platform Rescan (every ~30 frames = 0.5s)
+        scanCounter += 1
+        if scanCounter >= 30 {
+            scanCounter = 0
+            cachedPlatforms = ScreenEnvironment.shared.scanPlatforms(for: screen)
+        }
+
+        let cursorPos = NSEvent.mouseLocation
+
+        // 1. Behavior AI Decision
+        behavior.update(
+            deltaTime: dt,
+            physics: physics,
+            characterNode: window.characterView.characterNode,
+            platforms: cachedPlatforms,
+            screen: screen,
+            cursorPos: cursorPos
+        )
+
+        // 2. Physics Update
+        physics.update(
+            deltaTime: CGFloat(dt),
+            platforms: cachedPlatforms,
+            screenFrame: screen.frame
+        )
+
+        // 3. 3D Character Node Animation Update
+        window.characterView.characterNode.update(deltaTime: CGFloat(dt))
+
+        // 4. Sync Window Position with Feet
+        window.setFeetPosition(x: physics.position.x, y: physics.position.y)
+
+        // 5. Update Status Menu Text
+        updateStatusMenuItemText()
+    }
+
+    private func updateStatusMenuItemText() {
+        guard let item = statusMenuItem else { return }
+
+        let desc: String
+        switch behavior.state {
+        case .idle:
+            if let p = physics.currentPlatform {
+                desc = "휴식 중 (\(p.title) 위)"
+            } else {
+                desc = "휴식 중"
+            }
+        case .lookAround:
+            desc = "주변 둘러보는 중 👀"
+        case .walk:
+            if let p = physics.currentPlatform {
+                desc = "산책 중 (\(p.title))"
+            } else {
+                desc = "걷는 중"
+            }
+        case .sit:
+            if let p = physics.currentPlatform {
+                desc = "\(p.title)에 걸터앉아 쉬는 중 🪑"
+            } else {
+                desc = "걸터앉아 다리 흔들기"
+            }
+        case .poke(_, let label):
+            desc = label.isEmpty ? "툭툭 건드려보기 ⛏️" : "\(label) ⛏️"
+        case .fall:
+            desc = "으악! 떨어지는 중! 🪂"
+        case .dragged:
+            desc = "사용자에게 잡혀 버둥거리는 중 ✋"
+        case .landedCrouch:
+            desc = "착지! 쿵 💥"
+        }
+
+        item.title = "현재 상태: \(desc)"
+    }
+
+    // MARK: - CharacterViewDelegate
+    public func characterViewDidStartDrag(_ view: CharacterView, at screenPoint: CGPoint) {
+        physics.setDragged(at: screenPoint)
+    }
+
+    public func characterViewDidDrag(_ view: CharacterView, to screenPoint: CGPoint) {
+        physics.setDragged(at: screenPoint)
+    }
+
+    public func characterViewDidEndDrag(_ view: CharacterView, throwVelocity: CGPoint) {
+        physics.releaseDrag(throwVelocity: throwVelocity)
+    }
+
+    public func characterViewDidRequestMenu(_ view: CharacterView, at event: NSEvent) {
+        let menu = buildContextMenu()
+        menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
+    }
+
+    public func characterViewDidLoadSkinFile(_ view: CharacterView, url: URL) {
+        loadCustomSkin(from: url)
+    }
+
+    // MARK: - Status Bar & Menus
+    private func setupStatusBar() {
+        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        self.statusItem = item
+
+        if let button = item.button {
+            button.image = makeMiniSteveIcon()
+            button.toolTip = "마인크래프트 데스크톱 친구 (Oh My Friend)"
+        }
+
+        item.menu = buildContextMenu()
+    }
+
+    private func buildContextMenu() -> NSMenu {
+        let menu = NSMenu()
+        menu.delegate = self
+
+        // 1. Status Display
+        let status = NSMenuItem(title: "마인크래프트 친구", action: nil, keyEquivalent: "")
+        status.isEnabled = false
+        menu.addItem(status)
+        self.statusMenuItem = status
+
+        menu.addItem(NSMenuItem.separator())
+
+        // 2. Skin Selection Submenu
+        let skinMenu = NSMenu()
+        for skin in BuiltinSkinType.allCases {
+            let item = NSMenuItem(
+                title: skin.displayName,
+                action: #selector(didSelectBuiltinSkin(_:)),
+                keyEquivalent: ""
+            )
+            item.target = self
+            item.representedObject = skin
+            if skin == currentSkinType {
+                item.state = .on
+            }
+            skinMenu.addItem(item)
+        }
+
+        skinMenu.addItem(NSMenuItem.separator())
+        let customSkinItem = NSMenuItem(
+            title: "📁 커스텀 스킨 PNG 열기...",
+            action: #selector(didSelectOpenCustomSkin),
+            keyEquivalent: "o"
+        )
+        customSkinItem.target = self
+        skinMenu.addItem(customSkinItem)
+
+        let skinSubmenuItem = NSMenuItem(title: "👕 스킨 변경", action: nil, keyEquivalent: "")
+        skinSubmenuItem.submenu = skinMenu
+        menu.addItem(skinSubmenuItem)
+
+        // 3. Behavior Mode Submenu
+        let modeMenu = NSMenu()
+        for mode in BehaviorMode.allCases {
+            let item = NSMenuItem(
+                title: mode.rawValue,
+                action: #selector(didSelectBehaviorMode(_:)),
+                keyEquivalent: ""
+            )
+            item.target = self
+            item.representedObject = mode
+            if mode == behavior.mode {
+                item.state = .on
+            }
+            modeMenu.addItem(item)
+        }
+        let modeSubmenuItem = NSMenuItem(title: "🎭 행동 모드", action: nil, keyEquivalent: "")
+        modeSubmenuItem.submenu = modeMenu
+        menu.addItem(modeSubmenuItem)
+
+        // 4. Scale Submenu
+        let scaleMenu = NSMenu()
+        let scales: [(String, CGFloat)] = [
+            ("작게 (70%)", 0.7),
+            ("보통 (100%)", 1.0),
+            ("크게 (150%)", 1.5)
+        ]
+        for (name, scaleVal) in scales {
+            let item = NSMenuItem(
+                title: name,
+                action: #selector(didSelectScale(_:)),
+                keyEquivalent: ""
+            )
+            item.target = self
+            item.representedObject = scaleVal
+            if abs(window.currentScale - scaleVal) < 0.05 {
+                item.state = .on
+            }
+            scaleMenu.addItem(item)
+        }
+        let scaleSubmenuItem = NSMenuItem(title: "📏 캐릭터 크기", action: nil, keyEquivalent: "")
+        scaleSubmenuItem.submenu = scaleMenu
+        menu.addItem(scaleSubmenuItem)
+
+        menu.addItem(NSMenuItem.separator())
+
+        // 5. Actions
+        let jumpItem = NSMenuItem(
+            title: "🦘 폴짝 뛰기 (Jump)",
+            action: #selector(didSelectJump),
+            keyEquivalent: "j"
+        )
+        jumpItem.target = self
+        menu.addItem(jumpItem)
+
+        let resetItem = NSMenuItem(
+            title: "🪟 바닥으로 소환 (Reset to Floor)",
+            action: #selector(didSelectResetFloor),
+            keyEquivalent: "r"
+        )
+        resetItem.target = self
+        menu.addItem(resetItem)
+
+        menu.addItem(NSMenuItem.separator())
+
+        // 6. Quit
+        let quitItem = NSMenuItem(
+            title: "종료 (Quit)",
+            action: #selector(didSelectQuit),
+            keyEquivalent: "q"
+        )
+        quitItem.target = self
+        menu.addItem(quitItem)
+
+        return menu
+    }
+
+    // MARK: - Actions
+    @objc private func didSelectBuiltinSkin(_ sender: NSMenuItem) {
+        guard let skinType = sender.representedObject as? BuiltinSkinType else { return }
+        self.currentSkinType = skinType
+        let img = BuiltinSkinGenerator.makeSkin(type: skinType)
+        if let skin = SkinTexture(image: img) {
+            window.characterView.characterNode.applySkin(skin)
+        }
+        statusItem?.menu = buildContextMenu()
+    }
+
+    @objc private func didSelectOpenCustomSkin() {
+        let openPanel = NSOpenPanel()
+        openPanel.allowedContentTypes = [.png]
+        openPanel.allowsMultipleSelection = false
+        openPanel.canChooseDirectories = false
+        openPanel.message = "마인크래프트 64x64 스킨 PNG 파일을 선택하세요"
+
+        if openPanel.runModal() == .OK, let url = openPanel.url {
+            loadCustomSkin(from: url)
+        }
+    }
+
+    private func loadCustomSkin(from url: URL) {
+        if let skin = SkinTexture.load(from: url) {
+            window.characterView.characterNode.applySkin(skin)
+        }
+    }
+
+    @objc private func didSelectBehaviorMode(_ sender: NSMenuItem) {
+        guard let mode = sender.representedObject as? BehaviorMode else { return }
+        behavior.mode = mode
+        statusItem?.menu = buildContextMenu()
+    }
+
+    @objc private func didSelectScale(_ sender: NSMenuItem) {
+        guard let scale = sender.representedObject as? CGFloat else { return }
+        window.setScale(scale)
+        statusItem?.menu = buildContextMenu()
+    }
+
+    @objc private func didSelectJump() {
+        physics.jump(impulse: 500)
+    }
+
+    @objc private func didSelectResetFloor() {
+        let mainScreen = NSScreen.main ?? NSScreen.screens[0]
+        physics.position = CGPoint(
+            x: mainScreen.frame.midX,
+            y: mainScreen.visibleFrame.minY + 20
+        )
+        physics.velocity = .zero
+    }
+
+    @objc private func didSelectQuit() {
+        NSApplication.shared.terminate(nil)
+    }
+
+    // MARK: - Mini Steve Pixel Icon for Status Bar
+    private func makeMiniSteveIcon() -> NSImage {
+        let size = NSSize(width: 18, height: 18)
+        let img = NSImage(size: size)
+        img.lockFocus()
+
+        // 8x8 Steve face scaled into 16x16 with 1pt border
+        let facePixels: [[UInt32]] = [
+            // Hair row 1
+            [0x452A14, 0x452A14, 0x452A14, 0x452A14, 0x452A14, 0x452A14, 0x452A14, 0x452A14],
+            // Hair row 2
+            [0x452A14, 0x452A14, 0x452A14, 0x452A14, 0x452A14, 0x452A14, 0x452A14, 0x452A14],
+            // Forehead
+            [0x452A14, 0xC48E6C, 0xC48E6C, 0xC48E6C, 0xC48E6C, 0xC48E6C, 0xC48E6C, 0x452A14],
+            // Eyes
+            [0xC48E6C, 0xFFFFFF, 0x3B43A3, 0xC48E6C, 0xC48E6C, 0x3B43A3, 0xFFFFFF, 0xC48E6C],
+            // Nose
+            [0xC48E6C, 0xC48E6C, 0xC48E6C, 0x9E6E53, 0x9E6E53, 0xC48E6C, 0xC48E6C, 0xC48E6C],
+            // Mouth / Beard
+            [0xC48E6C, 0xC48E6C, 0x452A14, 0x452A14, 0x452A14, 0x452A14, 0xC48E6C, 0xC48E6C],
+            // Chin
+            [0xC48E6C, 0x452A14, 0xC48E6C, 0xC48E6C, 0xC48E6C, 0xC48E6C, 0x452A14, 0xC48E6C],
+            // Neck
+            [0x452A14, 0x452A14, 0xC48E6C, 0xC48E6C, 0xC48E6C, 0xC48E6C, 0x452A14, 0x452A14],
+        ]
+
+        let pixelSize: CGFloat = 2.0
+        let startX: CGFloat = 1.0
+        let startY: CGFloat = 1.0
+
+        for row in 0..<8 {
+            for col in 0..<8 {
+                let hex = facePixels[7 - row][col]
+                let r = CGFloat((hex >> 16) & 0xFF) / 255.0
+                let g = CGFloat((hex >> 8) & 0xFF) / 255.0
+                let b = CGFloat(hex & 0xFF) / 255.0
+                let color = NSColor(red: r, green: g, blue: b, alpha: 1.0)
+                color.setFill()
+
+                let rect = NSRect(
+                    x: startX + CGFloat(col) * pixelSize,
+                    y: startY + CGFloat(row) * pixelSize,
+                    width: pixelSize,
+                    height: pixelSize
+                )
+                rect.fill()
+            }
+        }
+
+        img.unlockFocus()
+        img.isTemplate = false
+        return img
+    }
+}

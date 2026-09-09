@@ -1,0 +1,9 @@
+.DS_Store
+/.build
+/OhMyFriend.app
+*.xcodeproj
+*.xcworkspace
+xcuserdata/
+DerivedData/
+.swiftpm/
+/.omo/
