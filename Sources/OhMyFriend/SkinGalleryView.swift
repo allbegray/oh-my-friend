@@ -548,9 +548,18 @@ public struct SkinGalleryView: View {
     }
 
     private func downloadFromCustomURL() {
-        let urlStr = customURLString.trimmingCharacters(in: .whitespaces)
-        guard let url = URL(string: urlStr) else {
-            urlError = "올바른 URL 주소를 입력하세요."
+        var raw = customURLString.trimmingCharacters(in: .whitespacesAndNewlines)
+        if raw.isEmpty { return }
+
+        // If entered just a 32-char hex hash (e.g. from Laby.net or Mojang)
+        if raw.count == 32 && raw.range(of: "^[a-f0-9]{32}$", options: .regularExpression) != nil {
+            raw = "https://laby.net/texture/\(raw).png"
+        } else if !raw.hasPrefix("http://") && !raw.hasPrefix("https://") {
+            raw = "https://" + raw
+        }
+
+        guard let url = URL(string: raw) else {
+            urlError = "올바른 웹 주소 또는 스킨 해시를 입력하세요."
             return
         }
 

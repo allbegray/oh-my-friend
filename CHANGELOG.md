@@ -5,8 +5,11 @@
 ## [v0.1.1] - 2026-09-09
 
 ### 추가
-- Laby.net(laby.net/skins) 스킨 사이트 지원: 스킨 상세 페이지 주소(`https://laby.net/skins/<hash>`) 및 프로필 주소(`https://laby.net/@username`) 입력 시 내부 Mojang 텍스처를 자동 추출하여 다운로드하는 기능 추가.
+- Laby.net(laby.net/skins) 스킨 사이트 지원: 스킨 상세 페이지 주소(`https://laby.net/skins/<hash>`) 및 프로필 주소(`https://laby.net/@username`) 입력 지원.
 - 스킨 갤러리 추천 사이트 목록에 Laby.net 바로가기 버튼 추가.
+
+### 수정
+- Laby.net 웹페이지 HTML 요청 시 Cloudflare 403 Forbidden 오류를 해결하기 위해, URL에서 32자리 해시를 추출하여 `https://laby.net/texture/<hash>.png` 공개 CDN 주소로 다이렉트 변환 다운로드하도록 개선.
 
 ## [v0.1.0] - 2026-09-09
 

@@ -76,12 +76,24 @@ public final class SkinDownloaderService {
 
     /// Download Minecraft skin from any arbitrary direct image URL or web skin page (Laby.net, NameMC, Skindex, etc.)
     public func downloadSkin(from url: URL) async throws -> (skin: SkinTexture, image: NSImage, rawData: Data) {
-        // 1. Handle Laby.net profile URLs: e.g. https://laby.net/@Username
+        // 1. Handle Laby.net URLs
         if let host = url.host?.lowercased(), host.contains("laby.net") {
+            // A) laby.net/@Username
             if url.path.hasPrefix("/@") {
                 let username = String(url.path.dropFirst(2))
                 if !username.isEmpty {
                     return try await downloadSkinByUsername(username)
+                }
+            }
+
+            // B) laby.net/skins/<hash> -> Convert directly to https://laby.net/texture/<hash>.png
+            // Bypasses Cloudflare HTML challenge on web pages
+            for comp in url.pathComponents {
+                let clean = comp.replacingOccurrences(of: ".png", with: "")
+                if clean.count == 32 && clean.range(of: "^[a-f0-9]{32}$", options: .regularExpression) != nil {
+                    if let directURL = URL(string: "https://laby.net/texture/\(clean).png"), directURL != url {
+                        return try await downloadSkin(from: directURL)
+                    }
                 }
             }
         }
