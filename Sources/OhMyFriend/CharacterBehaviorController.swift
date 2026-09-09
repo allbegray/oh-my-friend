@@ -15,6 +15,12 @@ public final class CharacterBehaviorController {
         case walk(direction: CGFloat, targetX: CGFloat, duration: TimeInterval, lastX: CGFloat, stuckTime: TimeInterval)
         case sit(timeLeft: TimeInterval)
         case poke(timeLeft: TimeInterval, label: String)
+        case wave(timeLeft: TimeInterval)
+        case sneakDance(repsLeft: Int, isDown: Bool, timer: TimeInterval)
+        case placeAndMineBlock(timeLeft: TimeInterval, isMining: Bool)
+        case eating(timeLeft: TimeInterval)
+        case sleep(duration: TimeInterval, zzzTimer: TimeInterval)
+        case backflip(progress: CGFloat)
         case fall
         case dragged
         case landedCrouch(timeLeft: TimeInterval)
@@ -27,8 +33,74 @@ public final class CharacterBehaviorController {
     public var walkSpeed: CGFloat = 85.0 // points/sec
     private var wasAirborne: Bool = false
 
+    // System Cursor Inactivity Tracking for Sleep
+    private var lastCursorPos: CGPoint = .zero
+    private var userIdleTime: TimeInterval = 0
+    private let idleSleepThreshold: TimeInterval = 45.0 // Sleep after 45s of no mouse movement
+
+    // Near Cursor Proximity Tracking for Wave
+    private var cursorHoverTimer: TimeInterval = 0
+
     public init() {}
 
+    // MARK: - Direct Triggers (Called by View, Menu or Shortcuts)
+    public func triggerBackflip(physics: PhysicsEngine, characterNode: MinecraftCharacterNode) {
+        physics.jump(impulse: 560)
+        SoundAndEffectsManager.shared.play(.jump)
+        characterNode.showOverheadEmoji("🤸‍♂️", duration: 1.5)
+        state = .backflip(progress: 0)
+    }
+
+    public func triggerSneakDance(characterNode: MinecraftCharacterNode) {
+        characterNode.showOverheadEmoji("🕺", duration: 2.0)
+        SoundAndEffectsManager.shared.play(.pop)
+        state = .sneakDance(repsLeft: 4, isDown: true, timer: 0.15)
+    }
+
+    public func triggerWave(characterNode: MinecraftCharacterNode) {
+        characterNode.showOverheadEmoji("👋", duration: 2.0)
+        SoundAndEffectsManager.shared.play(.heart)
+        state = .wave(timeLeft: 2.5)
+    }
+
+    public func triggerSleep(characterNode: MinecraftCharacterNode) {
+        characterNode.showOverheadEmoji("💤", duration: 2.5)
+        state = .sleep(duration: 30.0, zzzTimer: 1.5)
+    }
+
+    public func triggerEating(characterNode: MinecraftCharacterNode) {
+        characterNode.showOverheadEmoji("🍎", duration: 2.5)
+        state = .eating(timeLeft: 2.8)
+    }
+
+    public func triggerPlaceAndMine(characterNode: MinecraftCharacterNode) {
+        characterNode.showOverheadEmoji("⛏️", duration: 2.5)
+        characterNode.placedBlockNode.isHidden = false
+        SoundAndEffectsManager.shared.play(.pop)
+        state = .placeAndMineBlock(timeLeft: 3.0, isMining: false)
+    }
+
+    public func handleCharacterClicked(characterNode: MinecraftCharacterNode) {
+        SoundAndEffectsManager.shared.play(.heart)
+        characterNode.showOverheadEmoji("❤️", duration: 1.8)
+
+        // Wake up if sleeping
+        if case .sleep = state {
+            wakeUp(characterNode: characterNode)
+        } else {
+            // Little playful hop
+            triggerSneakDance(characterNode: characterNode)
+        }
+    }
+
+    private func wakeUp(characterNode: MinecraftCharacterNode) {
+        characterNode.isSleeping = false
+        characterNode.showOverheadEmoji("❗", duration: 1.5)
+        SoundAndEffectsManager.shared.play(.alert)
+        state = .idle(timeLeft: 1.5)
+    }
+
+    // MARK: - Main Update Loop
     public func update(
         deltaTime dt: TimeInterval,
         physics: PhysicsEngine,
@@ -40,31 +112,92 @@ public final class CharacterBehaviorController {
         let charPos = physics.position
         let currentPlatform = physics.currentPlatform
 
-        // 1. Update Look-At Cursor (Head Orientation)
+        // 1. Mouse Activity & Proximity Tracking
+        let cursorDelta = hypot(cursorPos.x - lastCursorPos.x, cursorPos.y - lastCursorPos.y)
+        if cursorDelta > 2.0 {
+            userIdleTime = 0
+            // If sleeping and user moves mouse significantly, wake up!
+            if case .sleep = state {
+                wakeUp(characterNode: characterNode)
+            }
+        } else {
+            userIdleTime += dt
+        }
+        lastCursorPos = cursorPos
+
+        // Automatic Nap after long inactivity
+        if userIdleTime >= idleSleepThreshold {
+            if case .sleep = state {
+                // already sleeping
+            } else if case .onGround = physics.state {
+                triggerSleep(characterNode: characterNode)
+                userIdleTime = 0
+            }
+        }
+
+        // Proximity detection for greeting wave (within 45pt of head)
+        let headScreenPos = CGPoint(x: charPos.x, y: charPos.y + 65)
+        let distToHead = hypot(cursorPos.x - headScreenPos.x, cursorPos.y - headScreenPos.y)
+        if distToHead < 48.0 && !characterNode.isSleeping && !characterNode.isBeingDragged {
+            cursorHoverTimer += dt
+            if cursorHoverTimer > 0.6 {
+                cursorHoverTimer = 0
+                if case .wave = state {} else {
+                    triggerWave(characterNode: characterNode)
+                }
+            }
+        } else {
+            cursorHoverTimer = 0
+        }
+
+        // 2. Head Orientation
         updateHeadLookAt(
             charPos: charPos,
             cursorPos: cursorPos,
             characterNode: characterNode
         )
 
-        // 2. Check Physics Dragged or Falling overrides
+        // 3. Physics Overrides (Dragged / Airborne)
         if case .dragged = physics.state {
             state = .dragged
             characterNode.isBeingDragged = true
             characterNode.isFalling = false
             characterNode.isSitting = false
             characterNode.isPoking = false
+            characterNode.isWaving = false
+            characterNode.isSneaking = false
+            characterNode.isSleeping = false
+            characterNode.isBackflipping = false
+            characterNode.isEating = false
+            characterNode.placedBlockNode.isHidden = true
             characterNode.walkSpeed = 0
             wasAirborne = true
             return
         }
 
         if case .airborne = physics.state {
+            if case .backflip(var progress) = state {
+                // Keep backflip rotating
+                progress += CGFloat(dt) * 4.2
+                characterNode.backflipAngle = -progress * CGFloat.pi * 2.0
+                characterNode.isBackflipping = true
+                characterNode.isFalling = false
+                state = .backflip(progress: progress)
+                wasAirborne = true
+                return
+            }
+
             state = .fall
             characterNode.isBeingDragged = false
             characterNode.isFalling = true
             characterNode.isSitting = false
             characterNode.isPoking = false
+            characterNode.isWaving = false
+            characterNode.isSneaking = false
+            characterNode.isSleeping = false
+            characterNode.isBackflipping = false
+            characterNode.isEating = false
+            characterNode.placedBlockNode.isHidden = true
             characterNode.walkSpeed = 0
             wasAirborne = true
             return
@@ -73,24 +206,31 @@ public final class CharacterBehaviorController {
         // Just landed!
         if wasAirborne {
             wasAirborne = false
-            state = .landedCrouch(timeLeft: 0.4)
+            state = .landedCrouch(timeLeft: 0.35)
             characterNode.isFalling = false
+            characterNode.isBackflipping = false
             characterNode.walkSpeed = 0
+            SoundAndEffectsManager.shared.play(.land)
         }
 
-        // 3. Finite State Machine when onGround
+        // 4. Reset general flags
         characterNode.isBeingDragged = false
         characterNode.isFalling = false
 
+        // 5. Finite State Machine
         switch state {
         case .landedCrouch(var timeLeft):
             timeLeft -= dt
             characterNode.walkSpeed = 0
-            characterNode.isSitting = true // slight crouch
+            characterNode.isSitting = true
             characterNode.isPoking = false
+            characterNode.isWaving = false
+            characterNode.isSneaking = false
+            characterNode.isSleeping = false
+            characterNode.isEating = false
             if timeLeft <= 0 {
                 characterNode.isSitting = false
-                chooseNextState(physics: physics, platforms: platforms, screen: screen, cursorPos: cursorPos)
+                chooseNextState(physics: physics, platforms: platforms, screen: screen, cursorPos: cursorPos, characterNode: characterNode)
             } else {
                 state = .landedCrouch(timeLeft: timeLeft)
             }
@@ -100,9 +240,13 @@ public final class CharacterBehaviorController {
             characterNode.walkSpeed = 0
             characterNode.isSitting = false
             characterNode.isPoking = false
+            characterNode.isWaving = false
+            characterNode.isSneaking = false
+            characterNode.isSleeping = false
+            characterNode.isEating = false
 
             if timeLeft <= 0 {
-                chooseNextState(physics: physics, platforms: platforms, screen: screen, cursorPos: cursorPos)
+                chooseNextState(physics: physics, platforms: platforms, screen: screen, cursorPos: cursorPos, characterNode: characterNode)
             } else {
                 state = .idle(timeLeft: timeLeft)
             }
@@ -112,31 +256,127 @@ public final class CharacterBehaviorController {
             characterNode.walkSpeed = 0
             characterNode.isSitting = false
             characterNode.isPoking = false
+            characterNode.isWaving = false
+            characterNode.isSneaking = false
+            characterNode.isSleeping = false
+            characterNode.isEating = false
             characterNode.targetHeadYaw = targetYaw
 
             if timeLeft <= 0 {
-                chooseNextState(physics: physics, platforms: platforms, screen: screen, cursorPos: cursorPos)
+                chooseNextState(physics: physics, platforms: platforms, screen: screen, cursorPos: cursorPos, characterNode: characterNode)
             } else {
                 state = .lookAround(timeLeft: timeLeft, targetYaw: targetYaw)
             }
 
+        case .wave(var timeLeft):
+            timeLeft -= dt
+            characterNode.walkSpeed = 0
+            characterNode.isWaving = true
+            characterNode.isPoking = false
+            characterNode.isSneaking = false
+
+            if timeLeft <= 0 {
+                characterNode.isWaving = false
+                chooseNextState(physics: physics, platforms: platforms, screen: screen, cursorPos: cursorPos, characterNode: characterNode)
+            } else {
+                state = .wave(timeLeft: timeLeft)
+            }
+
+        case .sneakDance(var repsLeft, var isDown, var timer):
+            timer -= dt
+            characterNode.walkSpeed = 0
+            characterNode.isSneaking = isDown
+
+            if timer <= 0 {
+                if isDown {
+                    isDown = false
+                    timer = 0.15
+                } else {
+                    repsLeft -= 1
+                    isDown = true
+                    timer = 0.15
+                    SoundAndEffectsManager.shared.play(.pop)
+                }
+
+                if repsLeft <= 0 {
+                    characterNode.isSneaking = false
+                    chooseNextState(physics: physics, platforms: platforms, screen: screen, cursorPos: cursorPos, characterNode: characterNode)
+                    return
+                }
+            }
+            state = .sneakDance(repsLeft: repsLeft, isDown: isDown, timer: timer)
+
+        case .eating(var timeLeft):
+            timeLeft -= dt
+            characterNode.walkSpeed = 0
+            characterNode.isEating = true
+
+            if timeLeft <= 0 {
+                characterNode.isEating = false
+                characterNode.showOverheadEmoji("😋", duration: 1.5)
+                chooseNextState(physics: physics, platforms: platforms, screen: screen, cursorPos: cursorPos, characterNode: characterNode)
+            } else {
+                state = .eating(timeLeft: timeLeft)
+            }
+
+        case .placeAndMineBlock(var timeLeft, var isMining):
+            timeLeft -= dt
+            characterNode.walkSpeed = 0
+            characterNode.isPoking = isMining
+
+            if timeLeft < 2.0 && !isMining {
+                isMining = true
+                SoundAndEffectsManager.shared.play(.pop)
+            }
+
+            if timeLeft <= 0 {
+                characterNode.placedBlockNode.isHidden = true
+                characterNode.isPoking = false
+                SoundAndEffectsManager.shared.play(.pop)
+                characterNode.showOverheadEmoji("✨", duration: 1.5)
+                chooseNextState(physics: physics, platforms: platforms, screen: screen, cursorPos: cursorPos, characterNode: characterNode)
+            } else {
+                state = .placeAndMineBlock(timeLeft: timeLeft, isMining: isMining)
+            }
+
+        case .sleep(var duration, var zzzTimer):
+            duration -= dt
+            zzzTimer -= dt
+            characterNode.walkSpeed = 0
+            characterNode.isSleeping = true
+
+            if zzzTimer <= 0 {
+                zzzTimer = 2.0
+                characterNode.showOverheadEmoji("💤", duration: 1.8)
+            }
+
+            if duration <= 0 {
+                wakeUp(characterNode: characterNode)
+            } else {
+                state = .sleep(duration: duration, zzzTimer: zzzTimer)
+            }
+
+        case .backflip:
+            break
+
         case .walk(let direction, let targetX, var duration, _, var stuckTime):
             characterNode.isSitting = false
             characterNode.isPoking = false
+            characterNode.isWaving = false
+            characterNode.isSneaking = false
+            characterNode.isSleeping = false
+            characterNode.isEating = false
             characterNode.walkSpeed = 1.0
 
-            // Face the direction of movement
             let targetBodyYaw: CGFloat = direction > 0 ? (CGFloat.pi / 2.0) : (-CGFloat.pi / 2.0)
             characterNode.modelRoot.eulerAngles.y = targetBodyYaw
 
-            // Move
             let prevX = physics.position.x
             let step = direction * walkSpeed * CGFloat(dt)
             physics.position.x += step
 
             duration += dt
 
-            // Check if position was blocked/clamped (stuck check)
             let actualMove = abs(physics.position.x - prevX)
             if actualMove < 0.2 {
                 stuckTime += dt
@@ -144,13 +384,11 @@ public final class CharacterBehaviorController {
                 stuckTime = 0
             }
 
-            // Screen boundary check (with comfortable 35pt margin from physical screen edges)
             let screenMinX = screen.frame.minX + 35.0
             let screenMaxX = screen.frame.maxX - 35.0
             let hitScreenLeft = (physics.position.x <= screenMinX) && (direction < 0)
             let hitScreenRight = (physics.position.x >= screenMaxX) && (direction > 0)
 
-            // Platform boundary check
             var hitPlatformLeft = false
             var hitPlatformRight = false
             if let p = currentPlatform {
@@ -162,7 +400,6 @@ public final class CharacterBehaviorController {
             let isStuck = stuckTime > 0.6 || duration > 6.0
 
             if hitScreenLeft || hitPlatformLeft {
-                // Reached left edge
                 handleReachedEdge(
                     isLeft: true,
                     platform: currentPlatform,
@@ -171,7 +408,6 @@ public final class CharacterBehaviorController {
                     physics: physics
                 )
             } else if hitScreenRight || hitPlatformRight {
-                // Reached right edge
                 handleReachedEdge(
                     isLeft: false,
                     platform: currentPlatform,
@@ -180,8 +416,7 @@ public final class CharacterBehaviorController {
                     physics: physics
                 )
             } else if reachedTarget || isStuck {
-                // Reached destination or stuck -> choose next state
-                chooseNextState(physics: physics, platforms: platforms, screen: screen, cursorPos: cursorPos)
+                chooseNextState(physics: physics, platforms: platforms, screen: screen, cursorPos: cursorPos, characterNode: characterNode)
             } else {
                 state = .walk(
                     direction: direction,
@@ -197,13 +432,13 @@ public final class CharacterBehaviorController {
             characterNode.walkSpeed = 0
             characterNode.isSitting = true
             characterNode.isPoking = false
+            characterNode.isSleeping = false
 
-            // Face forward while sitting
             characterNode.modelRoot.eulerAngles.y = 0
 
             if timeLeft <= 0 {
                 characterNode.isSitting = false
-                chooseNextState(physics: physics, platforms: platforms, screen: screen, cursorPos: cursorPos)
+                chooseNextState(physics: physics, platforms: platforms, screen: screen, cursorPos: cursorPos, characterNode: characterNode)
             } else {
                 state = .sit(timeLeft: timeLeft)
             }
@@ -215,7 +450,7 @@ public final class CharacterBehaviorController {
 
             if timeLeft <= 0 {
                 characterNode.isPoking = false
-                chooseNextState(physics: physics, platforms: platforms, screen: screen, cursorPos: cursorPos)
+                chooseNextState(physics: physics, platforms: platforms, screen: screen, cursorPos: cursorPos, characterNode: characterNode)
             } else {
                 state = .poke(timeLeft: timeLeft, label: "")
             }
@@ -229,7 +464,8 @@ public final class CharacterBehaviorController {
         physics: PhysicsEngine,
         platforms: [Platform],
         screen: NSScreen,
-        cursorPos: CGPoint
+        cursorPos: CGPoint,
+        characterNode: MinecraftCharacterNode
     ) {
         guard let platform = physics.currentPlatform else {
             state = .idle(timeLeft: 1.5)
@@ -242,7 +478,6 @@ public final class CharacterBehaviorController {
             return
 
         case .followCursor:
-            // Walk toward cursor X position if on same horizontal area
             let dist = cursorPos.x - physics.position.x
             if abs(dist) > 40 {
                 let dir: CGFloat = dist > 0 ? 1.0 : -1.0
@@ -261,28 +496,36 @@ public final class CharacterBehaviorController {
             break
         }
 
-        // Autonomous Decision
+        // Autonomous Decisions (Rich Variety!)
         let roll = Double.random(in: 0...100)
 
-        // Calculate safe walkable bounds
         let screenMinX = screen.frame.minX + 45
         let screenMaxX = screen.frame.maxX - 45
         let minX = max(platform.xMin + 35, screenMinX)
         let maxX = min(platform.xMax - 35, screenMaxX)
 
-        if roll < 22 {
-            // Poke Dock icon or window titlebar
+        if roll < 15 {
+            // Place and mine a block!
+            triggerPlaceAndMine(characterNode: characterNode)
+        } else if roll < 26 {
+            // Eat snack / apple
+            triggerEating(characterNode: characterNode)
+        } else if roll < 38 {
+            // Minecraft Sneak Twerk Dance!
+            triggerSneakDance(characterNode: characterNode)
+        } else if roll < 52 {
+            // Poke Dock or window
             let label = (platform.kind == .dock) ? "Dock 아이콘 툭툭 건드리기" : "창문 노크하기"
             state = .poke(timeLeft: Double.random(in: 1.5...3.0), label: label)
-        } else if roll < 45 {
+        } else if roll < 68 {
             // Sit down and rest
             state = .sit(timeLeft: Double.random(in: 3.5...7.0))
-        } else if roll < 65 {
+        } else if roll < 82 {
             // Look around
             let randomYaw = CGFloat.random(in: -0.8...0.8)
             state = .lookAround(timeLeft: Double.random(in: 1.5...3.0), targetYaw: randomYaw)
         } else {
-            // Walk to a random spot on the current platform
+            // Walk
             if maxX > minX {
                 let destX = CGFloat.random(in: minX...maxX)
                 let dir: CGFloat = destX > physics.position.x ? 1.0 : -1.0
@@ -293,7 +536,6 @@ public final class CharacterBehaviorController {
         }
     }
 
-    /// Called when the character reaches the screen edge or window platform edge
     private func handleReachedEdge(
         isLeft: Bool,
         platform: Platform?,
@@ -303,7 +545,7 @@ public final class CharacterBehaviorController {
     ) {
         let roll = Double.random(in: 0...100)
 
-        // 1. If reached edge, 45% chance: Sit down and relax (dangle legs)
+        // 1. 45% chance: Sit down and relax (dangle legs)
         if roll < 45 {
             state = .sit(timeLeft: Double.random(in: 4.0...8.0))
             return
@@ -333,10 +575,8 @@ public final class CharacterBehaviorController {
 
         // 3. 15% chance: Stand and look around or peek over cliff
         if let p = platform, p.kind != .floor && p.kind != .dock {
-            // On a floating window edge: peek over cliff
             state = .poke(timeLeft: 2.5, label: "아래 내려다보기")
         } else {
-            // On floor/dock edge: stand and look around
             let lookAway = isLeft ? CGFloat(0.7) : CGFloat(-0.7)
             state = .lookAround(timeLeft: 2.5, targetYaw: lookAway)
         }
@@ -352,23 +592,16 @@ public final class CharacterBehaviorController {
         let dy = cursorPos.y - headScreenPos.y
         let distance = hypot(dx, dy)
 
-        // Only track cursor if reasonably close (within 1000 pt)
         if distance < 1000 && distance > 10 {
-            // Compute Yaw (Horizontal angle)
-            // Note: If modelRoot is turned, we adjust relative to body yaw
             let bodyYaw = characterNode.modelRoot.eulerAngles.y
             var rawYaw = CGFloat(atan2(dx, 150)) - bodyYaw
-
-            // Clamp yaw to natural head rotation range (-70 deg ~ +70 deg)
             rawYaw = max(-1.2, min(1.2, rawYaw))
             characterNode.targetHeadYaw = rawYaw
 
-            // Compute Pitch (Vertical angle: looking up or down)
-            var rawPitch = CGFloat(-atan2(dy, 150)) // Looking up dy > 0 -> pitch negative (SceneKit)
+            var rawPitch = CGFloat(-atan2(dy, 150))
             rawPitch = max(-0.8, min(0.8, rawPitch))
             characterNode.targetHeadPitch = rawPitch
         } else {
-            // Return to forward
             characterNode.targetHeadYaw = 0
             characterNode.targetHeadPitch = 0
         }

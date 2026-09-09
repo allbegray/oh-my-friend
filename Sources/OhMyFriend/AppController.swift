@@ -135,6 +135,18 @@ public final class AppController: NSObject, CharacterViewDelegate, NSMenuDelegat
             }
         case .poke(_, let label):
             desc = label.isEmpty ? "툭툭 건드려보기 ⛏️" : "\(label) ⛏️"
+        case .wave:
+            desc = "반갑게 손 흔드는 중 👋"
+        case .sneakDance:
+            desc = "마인크래프트 쉬프트 댄스 🕺"
+        case .eating:
+            desc = "우물우물 사과 먹는 중 🍎"
+        case .placeAndMineBlock:
+            desc = "블록 캐는 중 ⛏️"
+        case .sleep:
+            desc = "쿨쿨 낮잠 자는 중... 💤"
+        case .backflip:
+            desc = "공중제비 도는 중! 🤸‍♂️"
         case .fall:
             desc = "으악! 떨어지는 중! 🪂"
         case .dragged:
@@ -163,11 +175,17 @@ public final class AppController: NSObject, CharacterViewDelegate, NSMenuDelegat
         let menu = buildContextMenu()
         menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
     }
-
     public func characterViewDidLoadSkinFile(_ view: CharacterView, url: URL) {
         loadCustomSkin(from: url)
     }
 
+    public func characterViewDidClick(_ view: CharacterView) {
+        behavior.handleCharacterClicked(characterNode: window.characterView.characterNode)
+    }
+
+    public func characterViewDidDoubleClick(_ view: CharacterView) {
+        behavior.triggerBackflip(physics: physics, characterNode: window.characterView.characterNode)
+    }
     // MARK: - Status Bar & Menus
     private func setupStatusBar() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -262,6 +280,54 @@ public final class AppController: NSObject, CharacterViewDelegate, NSMenuDelegat
         modeSubmenuItem.submenu = modeMenu
         menu.addItem(modeSubmenuItem)
 
+        // 4. Held Item Submenu
+        let itemMenu = NSMenu()
+        for item in HeldItem.allCases {
+            let mItem = NSMenuItem(
+                title: item.rawValue,
+                action: #selector(didSelectHeldItem(_:)),
+                keyEquivalent: ""
+            )
+            mItem.target = self
+            mItem.representedObject = item
+            if window.characterView.characterNode.currentHeldItem == item {
+                mItem.state = .on
+            }
+            itemMenu.addItem(mItem)
+        }
+        let itemSubmenuItem = NSMenuItem(title: "🗡️ 손에 아이템 들기", action: nil, keyEquivalent: "")
+        itemSubmenuItem.submenu = itemMenu
+        menu.addItem(itemSubmenuItem)
+
+        // 5. Fun Interactions Submenu
+        let actMenu = NSMenu()
+        let backflipItem = NSMenuItem(title: "🤸‍♂️ 공중제비 (Backflip)", action: #selector(didSelectBackflip), keyEquivalent: "b")
+        backflipItem.target = self
+        actMenu.addItem(backflipItem)
+
+        let sneakItem = NSMenuItem(title: "🕺 쉬프트 댄스 (Sneak Dance)", action: #selector(didSelectSneakDance), keyEquivalent: "t")
+        sneakItem.target = self
+        actMenu.addItem(sneakItem)
+
+        let waveItem = NSMenuItem(title: "👋 손 흔들기 (Wave)", action: #selector(didSelectWave), keyEquivalent: "w")
+        waveItem.target = self
+        actMenu.addItem(waveItem)
+
+        let mineItem = NSMenuItem(title: "⛏️ 블록 설치하고 캐기", action: #selector(didSelectPlaceAndMine), keyEquivalent: "")
+        mineItem.target = self
+        actMenu.addItem(mineItem)
+
+        let eatItem = NSMenuItem(title: "🍎 사과 냠냠 먹기", action: #selector(didSelectEating), keyEquivalent: "")
+        eatItem.target = self
+        actMenu.addItem(eatItem)
+
+        let sleepItem = NSMenuItem(title: "💤 지금 낮잠자기 (Sleep)", action: #selector(didSelectSleep), keyEquivalent: "z")
+        sleepItem.target = self
+        actMenu.addItem(sleepItem)
+
+        let actSubmenuItem = NSMenuItem(title: "✨ 재미있는 모션 실행", action: nil, keyEquivalent: "")
+        actSubmenuItem.submenu = actMenu
+        menu.addItem(actSubmenuItem)
         // 4. Scale Submenu
         let scaleMenu = NSMenu()
         let scales: [(String, CGFloat)] = [
@@ -337,6 +403,15 @@ public final class AppController: NSObject, CharacterViewDelegate, NSMenuDelegat
         resetItem.target = self
         menu.addItem(resetItem)
 
+        // Sound SFX Toggle
+        let soundItem = NSMenuItem(
+            title: "🔊 효과음 (Sound SFX)",
+            action: #selector(didToggleSoundSFX(_:)),
+            keyEquivalent: ""
+        )
+        soundItem.target = self
+        soundItem.state = SoundAndEffectsManager.shared.isSoundEnabled ? .on : .off
+        menu.addItem(soundItem)
         menu.addItem(NSMenuItem.separator())
 
         // 6. Quit
@@ -507,5 +582,43 @@ public final class AppController: NSObject, CharacterViewDelegate, NSMenuDelegat
         img.unlockFocus()
         img.isTemplate = false
         return img
+    }
+
+    // MARK: - New Interaction Action Handlers
+    @objc private func didSelectHeldItem(_ sender: NSMenuItem) {
+        guard let item = sender.representedObject as? HeldItem else { return }
+        window.characterView.characterNode.currentHeldItem = item
+        statusItem?.menu = buildContextMenu()
+        SoundAndEffectsManager.shared.play(.pop)
+    }
+
+    @objc private func didToggleSoundSFX(_ sender: NSMenuItem) {
+        SoundAndEffectsManager.shared.isSoundEnabled.toggle()
+        sender.state = SoundAndEffectsManager.shared.isSoundEnabled ? .on : .off
+        statusItem?.menu = buildContextMenu()
+    }
+
+    @objc private func didSelectBackflip() {
+        behavior.triggerBackflip(physics: physics, characterNode: window.characterView.characterNode)
+    }
+
+    @objc private func didSelectSneakDance() {
+        behavior.triggerSneakDance(characterNode: window.characterView.characterNode)
+    }
+
+    @objc private func didSelectWave() {
+        behavior.triggerWave(characterNode: window.characterView.characterNode)
+    }
+
+    @objc private func didSelectPlaceAndMine() {
+        behavior.triggerPlaceAndMine(characterNode: window.characterView.characterNode)
+    }
+
+    @objc private func didSelectEating() {
+        behavior.triggerEating(characterNode: window.characterView.characterNode)
+    }
+
+    @objc private func didSelectSleep() {
+        behavior.triggerSleep(characterNode: window.characterView.characterNode)
     }
 }

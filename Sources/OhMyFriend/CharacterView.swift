@@ -8,6 +8,8 @@ public protocol CharacterViewDelegate: AnyObject {
     func characterViewDidEndDrag(_ view: CharacterView, throwVelocity: CGPoint)
     func characterViewDidRequestMenu(_ view: CharacterView, at event: NSEvent)
     func characterViewDidLoadSkinFile(_ view: CharacterView, url: URL)
+    func characterViewDidClick(_ view: CharacterView)
+    func characterViewDidDoubleClick(_ view: CharacterView)
 }
 
 public final class CharacterView: SCNView {
@@ -76,6 +78,12 @@ public final class CharacterView: SCNView {
 
     // MARK: - Mouse Drag & Interactivity
     public override func mouseDown(with event: NSEvent) {
+        if event.clickCount >= 2 {
+            characterDelegate?.characterViewDidDoubleClick(self)
+        } else {
+            characterDelegate?.characterViewDidClick(self)
+        }
+
         let mouseScreen = NSEvent.mouseLocation
         isDraggingCharacter = true
         dragStartMousePos = mouseScreen
