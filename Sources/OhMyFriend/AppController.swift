@@ -8,6 +8,7 @@ public final class AppController: NSObject, CharacterViewDelegate, NSMenuDelegat
     private var physics: PhysicsEngine!
     private var behavior = CharacterBehaviorController()
     private var currentSkinType: BuiltinSkinType = .steve
+    private var currentCustomSkinName: String?
 
     private var statusItem: NSStatusItem?
     private var statusMenuItem: NSMenuItem?
@@ -193,6 +194,15 @@ public final class AppController: NSObject, CharacterViewDelegate, NSMenuDelegat
         menu.addItem(NSMenuItem.separator())
 
         // 2. Skin Selection Submenu
+        // 2. Skin Gallery & Selection
+        let galleryItem = NSMenuItem(
+            title: "🌐 스킨 갤러리 & 다운로더...",
+            action: #selector(didSelectOpenSkinGallery),
+            keyEquivalent: "g"
+        )
+        galleryItem.target = self
+        menu.addItem(galleryItem)
+
         let skinMenu = NSMenu()
         for skin in BuiltinSkinType.allCases {
             let item = NSMenuItem(
@@ -202,22 +212,34 @@ public final class AppController: NSObject, CharacterViewDelegate, NSMenuDelegat
             )
             item.target = self
             item.representedObject = skin
-            if skin == currentSkinType {
+            if currentCustomSkinName == nil && skin == currentSkinType {
                 item.state = .on
             }
             skinMenu.addItem(item)
         }
 
+        if let customName = currentCustomSkinName {
+            skinMenu.addItem(NSMenuItem.separator())
+            let currentCustomItem = NSMenuItem(
+                title: "현재 착용: \(customName)",
+                action: nil,
+                keyEquivalent: ""
+            )
+            currentCustomItem.state = .on
+            currentCustomItem.isEnabled = false
+            skinMenu.addItem(currentCustomItem)
+        }
+
         skinMenu.addItem(NSMenuItem.separator())
         let customSkinItem = NSMenuItem(
-            title: "📁 커스텀 스킨 PNG 열기...",
+            title: "📁 로컬 스킨 파일(PNG) 열기...",
             action: #selector(didSelectOpenCustomSkin),
             keyEquivalent: "o"
         )
         customSkinItem.target = self
         skinMenu.addItem(customSkinItem)
 
-        let skinSubmenuItem = NSMenuItem(title: "👕 스킨 변경", action: nil, keyEquivalent: "")
+        let skinSubmenuItem = NSMenuItem(title: "👕 기본 스킨 빠른 선택", action: nil, keyEquivalent: "")
         skinSubmenuItem.submenu = skinMenu
         menu.addItem(skinSubmenuItem)
 
@@ -301,6 +323,7 @@ public final class AppController: NSObject, CharacterViewDelegate, NSMenuDelegat
     @objc private func didSelectBuiltinSkin(_ sender: NSMenuItem) {
         guard let skinType = sender.representedObject as? BuiltinSkinType else { return }
         self.currentSkinType = skinType
+        self.currentCustomSkinName = nil
         let img = BuiltinSkinGenerator.makeSkin(type: skinType)
         if let skin = SkinTexture(image: img) {
             window.characterView.characterNode.applySkin(skin)
@@ -322,8 +345,20 @@ public final class AppController: NSObject, CharacterViewDelegate, NSMenuDelegat
 
     private func loadCustomSkin(from url: URL) {
         if let skin = SkinTexture.load(from: url) {
-            window.characterView.characterNode.applySkin(skin)
+            applyCustomSkin(skin, name: url.deletingPathExtension().lastPathComponent)
         }
+    }
+
+    @objc private func didSelectOpenSkinGallery() {
+        SkinGalleryWindowController.shared.show { [weak self] skin, name in
+            self?.applyCustomSkin(skin, name: name)
+        }
+    }
+
+    private func applyCustomSkin(_ skin: SkinTexture, name: String) {
+        self.currentCustomSkinName = name
+        window.characterView.characterNode.applySkin(skin)
+        statusItem?.menu = buildContextMenu()
     }
 
     @objc private func didSelectBehaviorMode(_ sender: NSMenuItem) {
