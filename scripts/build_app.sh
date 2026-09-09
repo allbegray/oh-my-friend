@@ -1,13 +1,28 @@
 #!/usr/bin/env bash
 set -e
 
-echo "🔨 Building OhMyFriend..."
-swift build -c release
+DIR="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$DIR"
 
+echo "🔨 Building OhMyFriend..."
+
+mkdir -p .build/release
 APP_NAME="OhMyFriend"
 APP_BUNDLE="${APP_NAME}.app"
 MACOS_DIR="${APP_BUNDLE}/Contents/MacOS"
 RESOURCES_DIR="${APP_BUNDLE}/Contents/Resources"
+
+# Try swift build first, fallback to direct swiftc compilation if CommandLineTools SPM manifest fails
+if ! swift build -c release; then
+    echo ""
+    echo "⚠️ 'swift build' encountered an environment/CommandLineTools manifest link issue."
+    echo "🔄 Switching to fallback: Compiling directly with swiftc..."
+    ARCH="$(uname -m)"
+    swiftc -O -target "${ARCH}-apple-macosx13.0" Sources/OhMyFriend/*.swift \
+        -o ".build/release/${APP_NAME}" \
+        -framework AppKit -framework SceneKit -framework SwiftUI -framework CoreGraphics
+    echo "✅ Direct compilation succeeded!"
+fi
 
 echo "📦 Packaging into ${APP_BUNDLE}..."
 rm -rf "${APP_BUNDLE}"

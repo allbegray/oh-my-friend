@@ -1,4 +1,4 @@
-// swift-tools-version: 5.9
+// swift-tools-version: 5.7
 import PackageDescription
 
 let package = Package(
@@ -7,7 +7,10 @@ let package = Package(
         .macOS(.v13)
     ],
     products: [
-        .executable(name: "OhMyFriend", targets: ["OhMyFriend"])
+        .executable(
+            name: "OhMyFriend",
+            targets: ["OhMyFriend"]
+        )
     ],
     targets: [
         .executableTarget(
