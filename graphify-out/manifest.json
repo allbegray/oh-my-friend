@@ -1,0 +1,112 @@
+{
+  "Package.swift": {
+    "mtime": 1788942156.0824206,
+    "ast_hash": "69032b2d00fd5512663217390c05fc29",
+    "semantic_hash": "69032b2d00fd5512663217390c05fc29"
+  },
+  "Sources/OhMyFriend/AppController.swift": {
+    "mtime": 1788941955.282008,
+    "ast_hash": "b59ba321a536a8cbbc2ed9eb9c29b5fe",
+    "semantic_hash": "b59ba321a536a8cbbc2ed9eb9c29b5fe"
+  },
+  "Sources/OhMyFriend/CharacterBehaviorController.swift": {
+    "mtime": 1788940415.5468595,
+    "ast_hash": "84979ca86989d02b41b3910b9f7f7b60",
+    "semantic_hash": "84979ca86989d02b41b3910b9f7f7b60"
+  },
+  "Sources/OhMyFriend/CharacterView.swift": {
+    "mtime": 1788940383.888534,
+    "ast_hash": "a8d2a612657b6adcf0dac282ab565d59",
+    "semantic_hash": "a8d2a612657b6adcf0dac282ab565d59"
+  },
+  "Sources/OhMyFriend/CharacterWindow.swift": {
+    "mtime": 1788940289.7654257,
+    "ast_hash": "71c960e7741b4096927d85a3059fd4ba",
+    "semantic_hash": "71c960e7741b4096927d85a3059fd4ba"
+  },
+  "Sources/OhMyFriend/MinecraftCharacterNode.swift": {
+    "mtime": 1788940399.4283547,
+    "ast_hash": "e6e32318cfa9abfc9eee87152571168c",
+    "semantic_hash": "e6e32318cfa9abfc9eee87152571168c"
+  },
+  "Sources/OhMyFriend/PhysicsAndEnvironment.swift": {
+    "mtime": 1788940375.866664,
+    "ast_hash": "4a27dab622ac312939babe7bfd106e00",
+    "semantic_hash": "4a27dab622ac312939babe7bfd106e00"
+  },
+  "Sources/OhMyFriend/SkinCatalogManager.swift": {
+    "mtime": 1788941914.8138752,
+    "ast_hash": "e355c926f8da16fe71a2a904cb5448cc",
+    "semantic_hash": "e355c926f8da16fe71a2a904cb5448cc"
+  },
+  "Sources/OhMyFriend/SkinDownloaderService.swift": {
+    "mtime": 1788941903.2219417,
+    "ast_hash": "11a2789ec0facec90a4e13a30a3710ff",
+    "semantic_hash": "11a2789ec0facec90a4e13a30a3710ff"
+  },
+  "Sources/OhMyFriend/SkinGalleryView.swift": {
+    "mtime": 1788941932.8077974,
+    "ast_hash": "48f6a7044e245b23b2fda00237ee2f61",
+    "semantic_hash": "48f6a7044e245b23b2fda00237ee2f61"
+  },
+  "Sources/OhMyFriend/SkinGalleryWindowController.swift": {
+    "mtime": 1788941936.5230913,
+    "ast_hash": "98c356e400e4a650d99311294828aabc",
+    "semantic_hash": "98c356e400e4a650d99311294828aabc"
+  },
+  "Sources/OhMyFriend/SkinTexture.swift": {
+    "mtime": 1788940371.538094,
+    "ast_hash": "6a429b58457512b16dc4c44b4859be46",
+    "semantic_hash": "6a429b58457512b16dc4c44b4859be46"
+  },
+  "Sources/OhMyFriend/main.swift": {
+    "mtime": 1788940307.554235,
+    "ast_hash": "28cec81fecd699c5fd3c188662828cf9",
+    "semantic_hash": "28cec81fecd699c5fd3c188662828cf9"
+  },
+  "scripts/build_app.sh": {
+    "mtime": 1788942174.3045065,
+    "ast_hash": "11f48bb10e62087a8eca92a6ef076bd7",
+    "semantic_hash": "11f48bb10e62087a8eca92a6ef076bd7"
+  },
+  "scripts/install.sh": {
+    "mtime": 1788941044.5742476,
+    "ast_hash": "4ac4f238f68ce618f3f0f46a9821ac9d",
+    "semantic_hash": "4ac4f238f68ce618f3f0f46a9821ac9d"
+  },
+  "scripts/run.sh": {
+    "mtime": 1788940441.8065844,
+    "ast_hash": "17359b78065043765dd68c3c97be42d6",
+    "semantic_hash": "17359b78065043765dd68c3c97be42d6"
+  },
+  "AGENTS.md": {
+    "mtime": 1788942229.3061254,
+    "ast_hash": "fb0c406bebc7d03e7257086e9329eebe",
+    "semantic_hash": ""
+  },
+  "BACKLOG.md": {
+    "mtime": 1788942237.3768632,
+    "ast_hash": "ebe17daf21230adabde3ee4e410d3db1",
+    "semantic_hash": ""
+  },
+  "CHANGELOG.md": {
+    "mtime": 1788942242.978078,
+    "ast_hash": "b05ad7464f56bde167c2f2ed2408ee91",
+    "semantic_hash": ""
+  },
+  "README.md": {
+    "mtime": 1788942253.655848,
+    "ast_hash": "2f4bba80229b72b9c96c9215b788ad2f",
+    "semantic_hash": ""
+  },
+  "SECURITY.md": {
+    "mtime": 1788942263.7438014,
+    "ast_hash": "dd211488d9c45897b5f0c4045b28186e",
+    "semantic_hash": ""
+  },
+  "SOLUTION.md": {
+    "mtime": 1788942274.7542238,
+    "ast_hash": "002c9b9c52021b86660089ad443cdc76",
+    "semantic_hash": ""
+  }
+}

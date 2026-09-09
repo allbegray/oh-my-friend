@@ -1,0 +1,444 @@
+{
+  "communities": {
+    "0": [
+      "notification",
+      "nsapplication",
+      "nsapplicationdelegate",
+      "nsmenu",
+      "nsmenudelegate",
+      "nsmenuitem",
+      "nsobject",
+      "nsstatusitem",
+      "sources_ohmyfriend_appcontroller_appcontroller",
+      "sources_ohmyfriend_appcontroller_appcontroller_applycustomskin",
+      "sources_ohmyfriend_appcontroller_appcontroller_buildcontextmenu",
+      "sources_ohmyfriend_appcontroller_appcontroller_characterviewdiddrag",
+      "sources_ohmyfriend_appcontroller_appcontroller_characterviewdidenddrag",
+      "sources_ohmyfriend_appcontroller_appcontroller_characterviewdidloadskinfile",
+      "sources_ohmyfriend_appcontroller_appcontroller_characterviewdidrequestmenu",
+      "sources_ohmyfriend_appcontroller_appcontroller_characterviewdidstartdrag",
+      "sources_ohmyfriend_appcontroller_appcontroller_didselectbehaviormode",
+      "sources_ohmyfriend_appcontroller_appcontroller_didselectbuiltinskin",
+      "sources_ohmyfriend_appcontroller_appcontroller_didselectopencustomskin",
+      "sources_ohmyfriend_appcontroller_appcontroller_didselectopenskingallery",
+      "sources_ohmyfriend_appcontroller_appcontroller_didselectquit",
+      "sources_ohmyfriend_appcontroller_appcontroller_didselectresetfloor",
+      "sources_ohmyfriend_appcontroller_appcontroller_didselectscale",
+      "sources_ohmyfriend_appcontroller_appcontroller_init",
+      "sources_ohmyfriend_appcontroller_appcontroller_loadcustomskin",
+      "sources_ohmyfriend_appcontroller_appcontroller_makeministeveicon",
+      "sources_ohmyfriend_appcontroller_appcontroller_setupstatusbar",
+      "sources_ohmyfriend_appcontroller_swift_cgpoint",
+      "sources_ohmyfriend_appcontroller_swift_int",
+      "sources_ohmyfriend_appcontroller_swift_nsevent",
+      "sources_ohmyfriend_appcontroller_swift_nsimage",
+      "sources_ohmyfriend_appcontroller_swift_string",
+      "sources_ohmyfriend_appcontroller_swift_timeinterval",
+      "sources_ohmyfriend_appcontroller_swift_url",
+      "sources_ohmyfriend_main",
+      "sources_ohmyfriend_main_appdelegate",
+      "sources_ohmyfriend_main_appdelegate_applicationdidfinishlaunching",
+      "sources_ohmyfriend_main_appdelegate_applicationshouldterminateafterlastwindowclosed",
+      "sources_ohmyfriend_main_swift_bool",
+      "sources_ohmyfriend_physicsandenvironment_physicsengine_setdragged",
+      "timer"
+    ],
+    "1": [
+      "hashable",
+      "identifiable",
+      "sources_ohmyfriend_skincatalogmanager",
+      "sources_ohmyfriend_skincatalogmanager_catalogskinitem",
+      "sources_ohmyfriend_skincatalogmanager_catalogskinitem_init",
+      "sources_ohmyfriend_skincatalogmanager_skincatalogmanager",
+      "sources_ohmyfriend_skincatalogmanager_skinstoragemanager",
+      "sources_ohmyfriend_skincatalogmanager_skinstoragemanager_init",
+      "sources_ohmyfriend_skincatalogmanager_skinstoragemanager_listsavedskins",
+      "sources_ohmyfriend_skincatalogmanager_skinstoragemanager_saveskin",
+      "sources_ohmyfriend_skincatalogmanager_swift_data",
+      "sources_ohmyfriend_skincatalogmanager_swift_string",
+      "sources_ohmyfriend_skincatalogmanager_swift_url",
+      "sources_ohmyfriend_skingalleryview_skingalleryview",
+      "sources_ohmyfriend_skingalleryview_skingalleryview_applyskinfromcatalog",
+      "sources_ohmyfriend_skingalleryview_skingalleryview_body",
+      "sources_ohmyfriend_skingalleryview_skingalleryview_downloadfromcustomurl",
+      "sources_ohmyfriend_skingalleryview_skingalleryview_exporttodownloads",
+      "sources_ohmyfriend_skingalleryview_skingalleryview_headerview",
+      "sources_ohmyfriend_skingalleryview_skingalleryview_init",
+      "sources_ohmyfriend_skingalleryview_skingalleryview_performusernamesearch",
+      "sources_ohmyfriend_skingalleryview_skingalleryview_populargallerytab",
+      "sources_ohmyfriend_skingalleryview_skingalleryview_reloadsavedskins",
+      "sources_ohmyfriend_skingalleryview_skingalleryview_savedlibrarytab",
+      "sources_ohmyfriend_skingalleryview_skingalleryview_savedskinrow",
+      "sources_ohmyfriend_skingalleryview_skingalleryview_saveskintodownloads",
+      "sources_ohmyfriend_skingalleryview_skingalleryview_showtoast",
+      "sources_ohmyfriend_skingalleryview_skingalleryview_sitebutton",
+      "sources_ohmyfriend_skingalleryview_skingalleryview_skincard",
+      "sources_ohmyfriend_skingalleryview_skingalleryview_usernamesearchtab",
+      "sources_ohmyfriend_skingalleryview_skingalleryview_webandurltab",
+      "sources_ohmyfriend_skingalleryview_swift_bool",
+      "sources_ohmyfriend_skingalleryview_swift_data",
+      "sources_ohmyfriend_skingalleryview_swift_int",
+      "sources_ohmyfriend_skingalleryview_swift_nsimage",
+      "sources_ohmyfriend_skingalleryview_swift_string",
+      "sources_ohmyfriend_skingalleryview_swift_url",
+      "sources_ohmyfriend_skingalleryview_swift_void",
+      "view"
+    ],
+    "2": [
+      "cgwindowid",
+      "equatable",
+      "pid_t",
+      "sources_ohmyfriend_appcontroller_appcontroller_didselectjump",
+      "sources_ohmyfriend_appcontroller_appcontroller_gamelooptick",
+      "sources_ohmyfriend_appcontroller_appcontroller_updatestatusmenuitemtext",
+      "sources_ohmyfriend_physicsandenvironment",
+      "sources_ohmyfriend_physicsandenvironment_kind",
+      "sources_ohmyfriend_physicsandenvironment_kind_dock",
+      "sources_ohmyfriend_physicsandenvironment_kind_floor",
+      "sources_ohmyfriend_physicsandenvironment_kind_window",
+      "sources_ohmyfriend_physicsandenvironment_physicsengine",
+      "sources_ohmyfriend_physicsandenvironment_physicsengine_currentplatform",
+      "sources_ohmyfriend_physicsandenvironment_physicsengine_init",
+      "sources_ohmyfriend_physicsandenvironment_physicsengine_jump",
+      "sources_ohmyfriend_physicsandenvironment_physicsengine_releasedrag",
+      "sources_ohmyfriend_physicsandenvironment_physicsengine_update",
+      "sources_ohmyfriend_physicsandenvironment_physicsstate",
+      "sources_ohmyfriend_physicsandenvironment_physicsstate_airborne",
+      "sources_ohmyfriend_physicsandenvironment_physicsstate_dragged",
+      "sources_ohmyfriend_physicsandenvironment_physicsstate_onground",
+      "sources_ohmyfriend_physicsandenvironment_platform",
+      "sources_ohmyfriend_physicsandenvironment_platform_contains",
+      "sources_ohmyfriend_physicsandenvironment_screenenvironment",
+      "sources_ohmyfriend_physicsandenvironment_screenenvironment_dockrect",
+      "sources_ohmyfriend_physicsandenvironment_screenenvironment_init",
+      "sources_ohmyfriend_physicsandenvironment_screenenvironment_scanplatforms",
+      "sources_ohmyfriend_physicsandenvironment_screenenvironment_screen",
+      "sources_ohmyfriend_physicsandenvironment_swift_bool",
+      "sources_ohmyfriend_physicsandenvironment_swift_cgfloat",
+      "sources_ohmyfriend_physicsandenvironment_swift_cgpoint",
+      "sources_ohmyfriend_physicsandenvironment_swift_cgrect",
+      "sources_ohmyfriend_physicsandenvironment_swift_nsscreen",
+      "sources_ohmyfriend_physicsandenvironment_swift_string"
+    ],
+    "3": [
+      "cgimage",
+      "scnmaterial",
+      "scnnode",
+      "sources_ohmyfriend_appcontroller_appcontroller_start",
+      "sources_ohmyfriend_characterview_characterview_init",
+      "sources_ohmyfriend_characterview_characterview_setupscene",
+      "sources_ohmyfriend_characterview_swift_nscoder",
+      "sources_ohmyfriend_minecraftcharacternode_minecraftcharacternode",
+      "sources_ohmyfriend_minecraftcharacternode_minecraftcharacternode_applyskin",
+      "sources_ohmyfriend_minecraftcharacternode_minecraftcharacternode_init",
+      "sources_ohmyfriend_minecraftcharacternode_minecraftcharacternode_setuphierarchy",
+      "sources_ohmyfriend_minecraftcharacternode_minecraftcharacternode_update",
+      "sources_ohmyfriend_minecraftcharacternode_swift_bool",
+      "sources_ohmyfriend_minecraftcharacternode_swift_cgfloat",
+      "sources_ohmyfriend_minecraftcharacternode_swift_nscoder",
+      "sources_ohmyfriend_skintexture_bodypart",
+      "sources_ohmyfriend_skintexture_bodypart_head",
+      "sources_ohmyfriend_skintexture_bodypart_leftarm",
+      "sources_ohmyfriend_skintexture_bodypart_leftleg",
+      "sources_ohmyfriend_skintexture_bodypart_rightarm",
+      "sources_ohmyfriend_skintexture_bodypart_rightleg",
+      "sources_ohmyfriend_skintexture_bodypart_torso",
+      "sources_ohmyfriend_skintexture_builtinskingenerator_makeskin",
+      "sources_ohmyfriend_skintexture_skintexture",
+      "sources_ohmyfriend_skintexture_skintexture_crop",
+      "sources_ohmyfriend_skintexture_skintexture_init",
+      "sources_ohmyfriend_skintexture_skintexture_load",
+      "sources_ohmyfriend_skintexture_skintexture_materials",
+      "sources_ohmyfriend_skintexture_skintexture_rects",
+      "sources_ohmyfriend_skintexture_swift_bool",
+      "sources_ohmyfriend_skintexture_swift_cgrect",
+      "sources_ohmyfriend_skintexture_swift_nsimage",
+      "sources_ohmyfriend_skintexture_swift_url"
+    ],
+    "4": [
+      "appkit",
+      "caseiterable",
+      "coregraphics",
+      "scenekit",
+      "sources_ohmyfriend_appcontroller",
+      "sources_ohmyfriend_characterbehaviorcontroller",
+      "sources_ohmyfriend_characterbehaviorcontroller_behaviormode",
+      "sources_ohmyfriend_characterbehaviorcontroller_behaviormode_autonomous",
+      "sources_ohmyfriend_characterbehaviorcontroller_behaviormode_chill",
+      "sources_ohmyfriend_characterbehaviorcontroller_behaviormode_followcursor",
+      "sources_ohmyfriend_minecraftcharacternode",
+      "sources_ohmyfriend_skingalleryview",
+      "sources_ohmyfriend_skingallerywindowcontroller",
+      "sources_ohmyfriend_skintexture",
+      "sources_ohmyfriend_skintexture_builtinskingenerator",
+      "sources_ohmyfriend_skintexture_builtinskintype",
+      "sources_ohmyfriend_skintexture_builtinskintype_alex",
+      "sources_ohmyfriend_skintexture_builtinskintype_displayname",
+      "sources_ohmyfriend_skintexture_builtinskintype_steve",
+      "sources_ohmyfriend_skintexture_builtinskintype_zombie",
+      "string",
+      "swiftui",
+      "uniformtypeidentifiers"
+    ],
+    "5": [
+      "foundation",
+      "localizederror",
+      "sources_ohmyfriend_skindownloaderservice",
+      "sources_ohmyfriend_skindownloaderservice_skindownloaderror",
+      "sources_ohmyfriend_skindownloaderservice_skindownloaderror_errordescription",
+      "sources_ohmyfriend_skindownloaderservice_skindownloaderror_invalidskinimage",
+      "sources_ohmyfriend_skindownloaderservice_skindownloaderror_invalidurl",
+      "sources_ohmyfriend_skindownloaderservice_skindownloaderror_invalidusername",
+      "sources_ohmyfriend_skindownloaderservice_skindownloaderror_networkerror",
+      "sources_ohmyfriend_skindownloaderservice_skindownloaderror_notfound",
+      "sources_ohmyfriend_skindownloaderservice_skindownloaderservice",
+      "sources_ohmyfriend_skindownloaderservice_skindownloaderservice_avatarpreviewurl",
+      "sources_ohmyfriend_skindownloaderservice_skindownloaderservice_downloadskin",
+      "sources_ohmyfriend_skindownloaderservice_skindownloaderservice_downloadskinbyusername",
+      "sources_ohmyfriend_skindownloaderservice_skindownloaderservice_init",
+      "sources_ohmyfriend_skindownloaderservice_swift_data",
+      "sources_ohmyfriend_skindownloaderservice_swift_nsimage",
+      "sources_ohmyfriend_skindownloaderservice_swift_string",
+      "sources_ohmyfriend_skindownloaderservice_swift_url",
+      "urlsession"
+    ],
+    "6": [
+      "sources_ohmyfriend_characterbehaviorcontroller_characterbehaviorcontroller",
+      "sources_ohmyfriend_characterbehaviorcontroller_characterbehaviorcontroller_choosenextstate",
+      "sources_ohmyfriend_characterbehaviorcontroller_characterbehaviorcontroller_handlereachedplatformedge",
+      "sources_ohmyfriend_characterbehaviorcontroller_characterbehaviorcontroller_init",
+      "sources_ohmyfriend_characterbehaviorcontroller_characterbehaviorcontroller_update",
+      "sources_ohmyfriend_characterbehaviorcontroller_characterbehaviorcontroller_updateheadlookat",
+      "sources_ohmyfriend_characterbehaviorcontroller_state",
+      "sources_ohmyfriend_characterbehaviorcontroller_state_dragged",
+      "sources_ohmyfriend_characterbehaviorcontroller_state_fall",
+      "sources_ohmyfriend_characterbehaviorcontroller_state_idle",
+      "sources_ohmyfriend_characterbehaviorcontroller_state_landedcrouch",
+      "sources_ohmyfriend_characterbehaviorcontroller_state_lookaround",
+      "sources_ohmyfriend_characterbehaviorcontroller_state_poke",
+      "sources_ohmyfriend_characterbehaviorcontroller_state_sit",
+      "sources_ohmyfriend_characterbehaviorcontroller_state_walk",
+      "sources_ohmyfriend_characterbehaviorcontroller_swift_bool",
+      "sources_ohmyfriend_characterbehaviorcontroller_swift_cgfloat",
+      "sources_ohmyfriend_characterbehaviorcontroller_swift_cgpoint",
+      "sources_ohmyfriend_characterbehaviorcontroller_swift_nsscreen",
+      "sources_ohmyfriend_characterbehaviorcontroller_swift_timeinterval"
+    ],
+    "7": [
+      "nspanel",
+      "nsrect",
+      "nswindowcontroller",
+      "sources_ohmyfriend_characterwindow",
+      "sources_ohmyfriend_characterwindow_characterwindow",
+      "sources_ohmyfriend_characterwindow_characterwindow_canbecomekey",
+      "sources_ohmyfriend_characterwindow_characterwindow_canbecomemain",
+      "sources_ohmyfriend_characterwindow_characterwindow_init",
+      "sources_ohmyfriend_characterwindow_characterwindow_setfeetposition",
+      "sources_ohmyfriend_characterwindow_characterwindow_setscale",
+      "sources_ohmyfriend_characterwindow_swift_bool",
+      "sources_ohmyfriend_characterwindow_swift_cgfloat",
+      "sources_ohmyfriend_skingallerywindowcontroller_skingallerywindowcontroller",
+      "sources_ohmyfriend_skingallerywindowcontroller_skingallerywindowcontroller_init",
+      "sources_ohmyfriend_skingallerywindowcontroller_skingallerywindowcontroller_show",
+      "sources_ohmyfriend_skingallerywindowcontroller_swift_nscoder",
+      "sources_ohmyfriend_skingallerywindowcontroller_swift_string",
+      "sources_ohmyfriend_skingallerywindowcontroller_swift_void"
+    ],
+    "8": [
+      "anyobject",
+      "nsdragginginfo",
+      "nsdragoperation",
+      "scnview",
+      "sources_ohmyfriend_characterview",
+      "sources_ohmyfriend_characterview_characterview",
+      "sources_ohmyfriend_characterview_characterview_draggingentered",
+      "sources_ohmyfriend_characterview_characterview_mousedown",
+      "sources_ohmyfriend_characterview_characterview_mousedragged",
+      "sources_ohmyfriend_characterview_characterview_mouseup",
+      "sources_ohmyfriend_characterview_characterview_performdragoperation",
+      "sources_ohmyfriend_characterview_characterview_rightmousedown",
+      "sources_ohmyfriend_characterview_characterviewdelegate",
+      "sources_ohmyfriend_characterview_swift_bool",
+      "sources_ohmyfriend_characterview_swift_cgpoint",
+      "sources_ohmyfriend_characterview_swift_nsevent",
+      "sources_ohmyfriend_characterview_swift_timeinterval"
+    ],
+    "9": [
+      "package",
+      "packagedescription"
+    ],
+    "10": [
+      "scripts_build_app",
+      "scripts_build_app_sh__entry"
+    ],
+    "11": [
+      "scripts_install",
+      "scripts_install_sh__entry"
+    ],
+    "12": [
+      "scripts_run",
+      "scripts_run_sh__entry"
+    ]
+  },
+  "cohesion": {
+    "0": 0.07682926829268293,
+    "1": 0.1106612685560054,
+    "2": 0.0944741532976827,
+    "3": 0.09090909090909091,
+    "4": 0.11857707509881422,
+    "5": 0.1368421052631579,
+    "6": 0.15789473684210525,
+    "7": 0.1437908496732026,
+    "8": 0.21323529411764705,
+    "9": 1.0,
+    "10": 1.0,
+    "11": 1.0,
+    "12": 1.0
+  },
+  "gods": [
+    {
+      "id": "sources_ohmyfriend_appcontroller_appcontroller",
+      "label": "AppController",
+      "degree": 39
+    },
+    {
+      "id": "sources_ohmyfriend_skingalleryview_skingalleryview",
+      "label": "SkinGalleryView",
+      "degree": 28
+    },
+    {
+      "id": "sources_ohmyfriend_skintexture_skintexture",
+      "label": "SkinTexture",
+      "degree": 22
+    },
+    {
+      "id": "sources_ohmyfriend_characterview_characterview",
+      "label": "CharacterView",
+      "degree": 22
+    },
+    {
+      "id": "sources_ohmyfriend_physicsandenvironment_physicsengine",
+      "label": "PhysicsEngine",
+      "degree": 16
+    },
+    {
+      "id": "sources_ohmyfriend_physicsandenvironment_platform",
+      "label": "Platform",
+      "degree": 13
+    },
+    {
+      "id": "sources_ohmyfriend_minecraftcharacternode_minecraftcharacternode",
+      "label": "MinecraftCharacterNode",
+      "degree": 13
+    },
+    {
+      "id": "sources_ohmyfriend_characterbehaviorcontroller_characterbehaviorcontroller",
+      "label": "CharacterBehaviorController",
+      "degree": 12
+    },
+    {
+      "id": "sources_ohmyfriend_characterbehaviorcontroller_state",
+      "label": "State",
+      "degree": 12
+    },
+    {
+      "id": "sources_ohmyfriend_characterwindow_characterwindow",
+      "label": "CharacterWindow",
+      "degree": 12
+    }
+  ],
+  "surprises": [
+    {
+      "source": "AppController",
+      "target": "CharacterBehaviorController",
+      "source_files": [
+        "Sources/OhMyFriend/AppController.swift",
+        "Sources/OhMyFriend/CharacterBehaviorController.swift"
+      ],
+      "confidence": "INFERRED",
+      "relation": "calls",
+      "why": "inferred connection - not explicitly stated in source; bridges separate communities"
+    },
+    {
+      "source": "CharacterView",
+      "target": "MinecraftCharacterNode",
+      "source_files": [
+        "Sources/OhMyFriend/CharacterView.swift",
+        "Sources/OhMyFriend/MinecraftCharacterNode.swift"
+      ],
+      "confidence": "INFERRED",
+      "relation": "calls",
+      "why": "inferred connection - not explicitly stated in source; bridges separate communities"
+    },
+    {
+      "source": "AppController",
+      "target": "CharacterViewDelegate",
+      "source_files": [
+        "Sources/OhMyFriend/AppController.swift",
+        "Sources/OhMyFriend/CharacterView.swift"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "implements",
+      "why": "bridges separate communities"
+    },
+    {
+      "source": "AppController",
+      "target": "CharacterWindow",
+      "source_files": [
+        "Sources/OhMyFriend/AppController.swift",
+        "Sources/OhMyFriend/CharacterWindow.swift"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "references",
+      "why": "bridges separate communities"
+    },
+    {
+      "source": "AppController",
+      "target": "PhysicsEngine",
+      "source_files": [
+        "Sources/OhMyFriend/AppController.swift",
+        "Sources/OhMyFriend/PhysicsAndEnvironment.swift"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "references",
+      "why": "bridges separate communities"
+    }
+  ],
+  "questions": [
+    {
+      "type": "bridge_node",
+      "question": "Why does `SkinTexture` connect `Community 3` to `Community 0`, `Community 1`, `Community 4`, `Community 5`, `Community 7`?",
+      "why": "High betweenness centrality (0.301) - this node is a cross-community bridge."
+    },
+    {
+      "type": "bridge_node",
+      "question": "Why does `AppController` connect `Community 0` to `Community 2`, `Community 3`, `Community 4`, `Community 6`, `Community 7`, `Community 8`?",
+      "why": "High betweenness centrality (0.291) - this node is a cross-community bridge."
+    },
+    {
+      "type": "bridge_node",
+      "question": "Why does `SkinGalleryView` connect `Community 1` to `Community 3`, `Community 4`, `Community 7`?",
+      "why": "High betweenness centrality (0.157) - this node is a cross-community bridge."
+    },
+    {
+      "type": "isolated_nodes",
+      "question": "What connects `.headerView`, `build_app.sh script`, `install.sh script` to the rest of the system?",
+      "why": "40 weakly-connected nodes found - possible documentation gaps or missing edges."
+    },
+    {
+      "type": "low_cohesion",
+      "question": "Should `Community 0` be split into smaller, more focused modules?",
+      "why": "Cohesion score 0.07682926829268293 - nodes in this community are weakly interconnected."
+    },
+    {
+      "type": "low_cohesion",
+      "question": "Should `Community 1` be split into smaller, more focused modules?",
+      "why": "Cohesion score 0.1106612685560054 - nodes in this community are weakly interconnected."
+    },
+    {
+      "type": "low_cohesion",
+      "question": "Should `Community 2` be split into smaller, more focused modules?",
+      "why": "Cohesion score 0.0944741532976827 - nodes in this community are weakly interconnected."
+    }
+  ]
+}
