@@ -326,19 +326,25 @@ public struct SkinGalleryView: View {
             Text("추천 마인크래프트 스킨 사이트")
                 .font(.headline)
 
-            HStack(spacing: 12) {
-                siteButton(name: "NameMC", subtitle: "인기 스킨 랭킹 & 프로필 검색", urlString: "https://namemc.com/minecraft-skins")
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+                siteButton(name: "Laby.net", subtitle: "글로벌 스킨 & 케이프 (laby.net/skins)", urlString: "https://laby.net/skins")
+                siteButton(name: "NameMC", subtitle: "스킨 랭킹 & 프로필 검색", urlString: "https://namemc.com/minecraft-skins")
                 siteButton(name: "The Skindex", subtitle: "최대 규모 스킨 커뮤니티", urlString: "https://www.minecraftskins.com/")
                 siteButton(name: "Planet Minecraft", subtitle: "고품질 크리에이티브 스킨", urlString: "https://www.planetminecraft.com/skins/")
             }
 
             Divider().padding(.vertical, 4)
 
-            Text("스킨 이미지 직링크(URL)로 다운로드")
-                .font(.headline)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("스킨 웹페이지 주소 또는 직링크(URL) 입력")
+                    .font(.headline)
+                Text("💡 Laby.net 스킨 주소(https://laby.net/skins/...)나 NameMC 링크를 그대로 붙여넣어도 원본 스킨을 자동으로 추출합니다.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
 
             HStack {
-                TextField("https://... (64x64 PNG 스킨 직링크 주소)", text: $customURLString)
+                TextField("예: https://laby.net/skins/... 또는 https://...skin.png", text: $customURLString)
                     .textFieldStyle(.roundedBorder)
 
                 Button {

@@ -74,10 +74,20 @@ public final class SkinDownloaderService {
         return try await downloadSkin(from: crafatarURL)
     }
 
-    /// Download Minecraft skin from any arbitrary direct image URL
+    /// Download Minecraft skin from any arbitrary direct image URL or web skin page (Laby.net, NameMC, Skindex, etc.)
     public func downloadSkin(from url: URL) async throws -> (skin: SkinTexture, image: NSImage, rawData: Data) {
+        // 1. Handle Laby.net profile URLs: e.g. https://laby.net/@Username
+        if let host = url.host?.lowercased(), host.contains("laby.net") {
+            if url.path.hasPrefix("/@") {
+                let username = String(url.path.dropFirst(2))
+                if !username.isEmpty {
+                    return try await downloadSkinByUsername(username)
+                }
+            }
+        }
+
         var req = URLRequest(url: url)
-        req.setValue("OhMyFriend-DesktopCompanion/1.0", forHTTPHeaderField: "User-Agent")
+        req.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36", forHTTPHeaderField: "User-Agent")
 
         let (data, response): (Data, URLResponse)
         do {
@@ -97,23 +107,47 @@ public final class SkinDownloaderService {
             throw SkinDownloadError.networkError("HTTP 상태 코드: \(httpRes.statusCode)")
         }
 
-        guard let image = NSImage(data: data) else {
-            throw SkinDownloadError.invalidSkinImage
+        // Check if data is already a valid Minecraft skin image
+        if let image = NSImage(data: data),
+           let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil) {
+            let w = cg.width
+            let h = cg.height
+            let isValidRatio = (w == 64 && (h == 64 || h == 32)) || (w == 128 && h == 128) || (w == h && w >= 64)
+            if isValidRatio, let skin = SkinTexture(image: image) {
+                return (skin, image, data)
+            }
         }
 
-        guard let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
-            throw SkinDownloadError.invalidSkinImage
+        // If not a direct image (or web page like laby.net/skins/<hash>, NameMC, etc.), parse HTML for Minecraft texture URL
+        if let html = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .ascii) {
+            // Pattern 1: Official Mojang texture server (Used by laby.net, NameMC, etc.)
+            let mojangPattern = #"https?://textures\.minecraft\.net/texture/([a-f0-9]{32,64})"#
+            if let regex = try? NSRegularExpression(pattern: mojangPattern, options: []),
+               let match = regex.firstMatch(in: html, options: [], range: NSRange(location: 0, length: html.utf16.count)),
+               let range = Range(match.range, in: html),
+               let textureURL = URL(string: String(html[range])) {
+                return try await downloadSkin(from: textureURL)
+            }
+
+            // Pattern 2: Direct texture PNG link inside web page
+            let pngPattern = #"https?://[^\s"'<>]+\.png"#
+            if let regex = try? NSRegularExpression(pattern: pngPattern, options: []) {
+                let matches = regex.matches(in: html, options: [], range: NSRange(location: 0, length: html.utf16.count))
+                for m in matches {
+                    if let r = Range(m.range, in: html),
+                       let candidateURL = URL(string: String(html[r])) {
+                        do {
+                            let res = try await downloadSkin(from: candidateURL)
+                            return res
+                        } catch {
+                            continue
+                        }
+                    }
+                }
+            }
         }
 
-        // Check Minecraft skin dimensions: standard 64x64, classic 64x32, or HD multiples (128x128, etc.)
-        let w = cg.width
-        let h = cg.height
-        let isValidRatio = (w == 64 && (h == 64 || h == 32)) || (w == 128 && h == 128) || (w == h && w >= 64)
-        guard isValidRatio, let skin = SkinTexture(image: image) else {
-            throw SkinDownloadError.invalidSkinImage
-        }
-
-        return (skin, image, data)
+        throw SkinDownloadError.invalidSkinImage
     }
 
     /// Returns a high-res 3D avatar body render URL for a given username
