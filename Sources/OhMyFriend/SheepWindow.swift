@@ -5,7 +5,7 @@ public protocol SheepWindowDelegate: AnyObject {
     func sheepWindowDidClick(_ window: SheepWindow)
 }
 
-public final class SheepWindow: NSPanel {
+public final class SheepWindow: EntityWindow {
     public private(set) var position: CGPoint
     public private(set) var hasWool: Bool = true
     public weak var sheepDelegate: SheepWindowDelegate?
@@ -21,18 +21,7 @@ public final class SheepWindow: NSPanel {
         self.position = startPos
         self.sheepDelegate = delegate
         let size = NSSize(width: 72, height: 52)
-        super.init(
-            contentRect: NSRect(x: startPos.x - 36, y: startPos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - 36, y: startPos.y, width: size.width, height: size.height), ignoresMouse: false)
         let view = SheepDrawView(frame: NSRect(origin: .zero, size: size))
         self.drawView = view
         contentView = view

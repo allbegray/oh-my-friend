@@ -8,17 +8,17 @@ import Foundation
 public final class DecorGManager {
     public static let shared = DecorGManager()
 
-    private var gStand: GArmorStandWindow?
+    private let gStand = ToggleSlot<GArmorStandWindow>()
     private var gPots: [GFlowerPotWindow] = []
-    private var gRug: GRugWindow?
+    private let gRug = ToggleSlot<GRugWindow>()
     private var gShelves: [GBookshelfWindow] = []
     private var gAnvil: GAnvilWindow?
     private var gAnvilNameMemo = ""
-    private var gLantern: GSoulLanternWindow?
-    private var gFroglight: GFroglightWindow?
-    private var gSensor: GSculkSensorWindow?
-    private var gBed: GBedWindow?
-    private var gMap: GMapWallWindow?
+    private let gLantern = ToggleSlot<GSoulLanternWindow>()
+    private let gFroglight = ToggleSlot<GFroglightWindow>()
+    private let gSensor = ToggleSlot<GSculkSensorWindow>()
+    private let gBed = ToggleSlot<GBedWindow>()
+    private let gMap = ToggleSlot<GMapWallWindow>()
 
     private init() {}
 
@@ -52,15 +52,11 @@ public final class DecorGManager {
     // MARK: - 🗿 갑옷 거치대
 
     public func toggleGStand() {
-        if let w = gStand, w.isVisible {
-            w.close(); gStand = nil; return
-        }
-        gStand = nil
-        let w = GArmorStandWindow(startPos: spawnPos(dx: -80)) { [weak self] pose, weapon in
-            self?.handleGStandTap(pose: pose, weapon: weapon)
-        }
-        gStand = w
-        w.start()
+        gStand.toggle(make: {
+            GArmorStandWindow(startPos: self.spawnPos(dx: -80)) { [weak self] pose, weapon in
+                self?.handleGStandTap(pose: pose, weapon: weapon)
+            }
+        }, start: { $0.start() })
     }
 
     private func handleGStandTap(pose: String, weapon: String) {
@@ -94,20 +90,16 @@ public final class DecorGManager {
     // MARK: - 🟥 양탄자
 
     public func toggleGRug() {
-        if let w = gRug, w.isVisible {
-            w.close(); gRug = nil; return
-        }
-        gRug = nil
-        let w = GRugWindow(startPos: spawnPos(dx: 80)) { hidden in
-            if hidden {
-                RewardCenter.say("🙈 앗, 양탄자 어디갔지~?")
-            } else {
-                RewardCenter.say("🟥 짠! 양탄자 등장!")
+        gRug.toggle(make: {
+            GRugWindow(startPos: self.spawnPos(dx: 80)) { hidden in
+                if hidden {
+                    RewardCenter.say("🙈 앗, 양탄자 어디갔지~?")
+                } else {
+                    RewardCenter.say("🟥 짠! 양탄자 등장!")
+                }
+                SoundAndEffectsManager.shared.play(.pop)
             }
-            SoundAndEffectsManager.shared.play(.pop)
-        }
-        gRug = w
-        w.start()
+        }, start: { $0.start() })
     }
 
     // MARK: - 📚 책장 (최대 15개, 완성 시 인챈트 해금 +4XP)
@@ -180,91 +172,71 @@ public final class DecorGManager {
     // MARK: - 🏮 영혼 랜턴 (파란 불꽃 + 퇴치 결계 + 밤 자동 점등)
 
     public func toggleGLantern() {
-        if let w = gLantern, w.isVisible {
-            w.close(); gLantern = nil; return
-        }
-        gLantern = nil
-        let w = GSoulLanternWindow(startPos: spawnPos(dx: 40)) { lit in
-            if lit {
-                RewardCenter.say("🏮 퇴치 결계 ON! 몹 접근 금지!")
-            } else {
-                RewardCenter.say("🏮 랜턴 소등...")
+        gLantern.toggle(make: {
+            GSoulLanternWindow(startPos: self.spawnPos(dx: 40)) { lit in
+                if lit {
+                    RewardCenter.say("🏮 퇴치 결계 ON! 몹 접근 금지!")
+                } else {
+                    RewardCenter.say("🏮 랜턴 소등...")
+                }
+                SoundAndEffectsManager.shared.play(.pop)
             }
-            SoundAndEffectsManager.shared.play(.pop)
-        }
-        gLantern = w
-        w.start()
+        }, start: { $0.start() })
     }
 
     // MARK: - 🐸 개구리불 (3색 순환 조명)
 
     public func toggleGFroglight() {
-        if let w = gFroglight, w.isVisible {
-            w.close(); gFroglight = nil; return
-        }
-        gFroglight = nil
-        let w = GFroglightWindow(startPos: spawnPos(dx: -120)) { colorName in
-            RewardCenter.say("🐸 개구리불: \(colorName)!")
-            SoundAndEffectsManager.shared.play(.pop)
-        }
-        gFroglight = w
-        w.start()
+        gFroglight.toggle(make: {
+            GFroglightWindow(startPos: self.spawnPos(dx: -120)) { colorName in
+                RewardCenter.say("🐸 개구리불: \(colorName)!")
+                SoundAndEffectsManager.shared.play(.pop)
+            }
+        }, start: { $0.start() })
     }
 
     // MARK: - 📡 스컬크 센서 (클릭 진동 감지 + 딩동 + 감도 3단계)
 
     public func toggleGSensor() {
-        if let w = gSensor, w.isVisible {
-            w.close(); gSensor = nil; return
-        }
-        gSensor = nil
-        let w = GSculkSensorWindow(startPos: spawnPos(dx: 120)) { level in
-            RewardCenter.say("딩동~ 🔔 (감도 \(level)/3)")
-            SoundAndEffectsManager.shared.play(.chime)
-        }
-        gSensor = w
-        w.start()
+        gSensor.toggle(make: {
+            GSculkSensorWindow(startPos: self.spawnPos(dx: 120)) { level in
+                RewardCenter.say("딩동~ 🔔 (감도 \(level)/3)")
+                SoundAndEffectsManager.shared.play(.chime)
+            }
+        }, start: { $0.start() })
     }
 
     // MARK: - 🛏️ 침대 (16색 순환 + 수면 연출 + 아침)
 
     public func toggleGBed() {
-        if let w = gBed, w.isVisible {
-            w.close(); gBed = nil; return
-        }
-        gBed = nil
-        let w = GBedWindow(startPos: spawnPos(dx: 0)) { colorName in
-            RewardCenter.say("🛏️ \(colorName) 침대! Zzz... ☀️ 좋은 아침!")
-            SoundAndEffectsManager.shared.play(.pop)
-        }
-        gBed = w
-        w.start()
+        gBed.toggle(make: {
+            GBedWindow(startPos: self.spawnPos(dx: 0)) { colorName in
+                RewardCenter.say("🛏️ \(colorName) 침대! Zzz... ☀️ 좋은 아침!")
+                SoundAndEffectsManager.shared.play(.pop)
+            }
+        }, start: { $0.start() })
     }
 
     // MARK: - 🖼️ 지도 벽 (9칸 채우기 + 완성 벽화 +5XP)
 
     public func toggleGMap() {
-        if let w = gMap, w.isVisible {
-            w.close(); gMap = nil; return
-        }
-        gMap = nil
-        let w = GMapWallWindow(startPos: spawnPos(dx: 0)) { filled in
-            if filled >= 9 {
-                RewardCenter.grant(xp: 5, "🖼️ 대륙 벽화 완성!")
-                SoundAndEffectsManager.shared.play(.chime)
-            } else {
-                RewardCenter.say("🖼️ 탐험 기록 \(filled)/9")
-                SoundAndEffectsManager.shared.play(.pop)
+        gMap.toggle(make: {
+            GMapWallWindow(startPos: self.spawnPos(dx: 0)) { filled in
+                if filled >= 9 {
+                    RewardCenter.grant(xp: 5, "🖼️ 대륙 벽화 완성!")
+                    SoundAndEffectsManager.shared.play(.chime)
+                } else {
+                    RewardCenter.say("🖼️ 탐험 기록 \(filled)/9")
+                    SoundAndEffectsManager.shared.play(.pop)
+                }
             }
-        }
-        gMap = w
-        w.start()
+        }, start: { $0.start() })
     }
 }
 
 // MARK: - 🗿 갑옷 거치대: 포즈 13종 순환 + 무기 4종 전시
 
-public final class GArmorStandWindow: NSPanel {
+public final class GArmorStandWindow: EntityWindow {
     public var position: CGPoint
     private let onTap: (String, String) -> Void
     private var tick: Timer?
@@ -281,18 +253,7 @@ public final class GArmorStandWindow: NSPanel {
     public init(startPos: CGPoint, onTap: @escaping (String, String) -> Void) {
         self.position = startPos
         self.onTap = onTap
-        super.init(
-            contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = GArmorStandDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
         self.drawView = view
         contentView = view
@@ -379,7 +340,7 @@ private final class GArmorStandDrawView: NSView {
 
 // MARK: - 🪴 화분: 꽃 16종 랜덤 전시 + 클릭 교체
 
-public final class GFlowerPotWindow: NSPanel {
+public final class GFlowerPotWindow: EntityWindow {
     public var position: CGPoint
     private let onTap: (String) -> Void
     private var drawView: GFlowerPotDrawView?
@@ -393,18 +354,7 @@ public final class GFlowerPotWindow: NSPanel {
         self.position = startPos
         self.onTap = onTap
         self.flower = GFlowerPotWindow.flowers.randomElement() ?? "🌹"
-        super.init(
-            contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = GFlowerPotDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
         self.drawView = view
         contentView = view
@@ -455,7 +405,7 @@ private final class GFlowerPotDrawView: NSView {
 
 // MARK: - 🟥 양탄자: 바닥 패널 + 클릭 숨기기/보이기
 
-public final class GRugWindow: NSPanel {
+public final class GRugWindow: EntityWindow {
     public var position: CGPoint
     private let onTap: (Bool) -> Void
     private var drawView: GRugDrawView?
@@ -466,18 +416,7 @@ public final class GRugWindow: NSPanel {
     public init(startPos: CGPoint, onTap: @escaping (Bool) -> Void) {
         self.position = startPos
         self.onTap = onTap
-        super.init(
-            contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = GRugDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
         self.drawView = view
         contentView = view
@@ -534,7 +473,7 @@ private final class GRugDrawView: NSView {
 
 // MARK: - 📚 책장: 클릭당 1개씩 최대 15개
 
-public final class GBookshelfWindow: NSPanel {
+public final class GBookshelfWindow: EntityWindow {
     public var position: CGPoint
     private let onTap: () -> Void
     private let seed: Int
@@ -546,18 +485,7 @@ public final class GBookshelfWindow: NSPanel {
         self.position = startPos
         self.seed = seed
         self.onTap = onTap
-        super.init(
-            contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = GBookshelfDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)), seed: seed)
         self.drawView = view
         contentView = view
@@ -612,7 +540,7 @@ private final class GBookshelfDrawView: NSView {
 
 // MARK: - ⚒️ 모루: 클릭 수리 연출
 
-public final class GAnvilWindow: NSPanel {
+public final class GAnvilWindow: EntityWindow {
     public var position: CGPoint
     private let onTap: () -> Void
     private var drawView: GAnvilDrawView?
@@ -622,18 +550,7 @@ public final class GAnvilWindow: NSPanel {
     public init(startPos: CGPoint, onTap: @escaping () -> Void) {
         self.position = startPos
         self.onTap = onTap
-        super.init(
-            contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = GAnvilDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
         self.drawView = view
         contentView = view
@@ -689,7 +606,7 @@ private final class GAnvilDrawView: NSView {
 
 // MARK: - 🏮 영혼 랜턴: 파란 불꽃 + 밤 자동 점등
 
-public final class GSoulLanternWindow: NSPanel {
+public final class GSoulLanternWindow: EntityWindow {
     public var position: CGPoint
     private let onTap: (Bool) -> Void
     private var tick: Timer?
@@ -702,18 +619,7 @@ public final class GSoulLanternWindow: NSPanel {
     public init(startPos: CGPoint, onTap: @escaping (Bool) -> Void) {
         self.position = startPos
         self.onTap = onTap
-        super.init(
-            contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = GSoulLanternDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
         self.drawView = view
         contentView = view
@@ -794,7 +700,7 @@ private final class GSoulLanternDrawView: NSView {
 
 // MARK: - 🐸 개구리불: 3색 순환 조명
 
-public final class GFroglightWindow: NSPanel {
+public final class GFroglightWindow: EntityWindow {
     public var position: CGPoint
     private let onTap: (String) -> Void
     private var tick: Timer?
@@ -813,18 +719,7 @@ public final class GFroglightWindow: NSPanel {
     public init(startPos: CGPoint, onTap: @escaping (String) -> Void) {
         self.position = startPos
         self.onTap = onTap
-        super.init(
-            contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = GFroglightDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
         self.drawView = view
         contentView = view
@@ -885,7 +780,7 @@ private final class GFroglightDrawView: NSView {
 
 // MARK: - 📡 스컬크 센서: 클릭 진동 감지 + 딩동 + 감도 3단계
 
-public final class GSculkSensorWindow: NSPanel {
+public final class GSculkSensorWindow: EntityWindow {
     public var position: CGPoint
     private let onTap: (Int) -> Void
     private var tick: Timer?
@@ -899,18 +794,7 @@ public final class GSculkSensorWindow: NSPanel {
     public init(startPos: CGPoint, onTap: @escaping (Int) -> Void) {
         self.position = startPos
         self.onTap = onTap
-        super.init(
-            contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = GSculkSensorDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
         self.drawView = view
         contentView = view
@@ -987,7 +871,7 @@ private final class GSculkSensorDrawView: NSView {
 
 // MARK: - 🛏️ 침대: 16색 순환 + 수면 연출
 
-public final class GBedWindow: NSPanel {
+public final class GBedWindow: EntityWindow {
     public var position: CGPoint
     private let onTap: (String) -> Void
     private var drawView: GBedDrawView?
@@ -1009,18 +893,7 @@ public final class GBedWindow: NSPanel {
     public init(startPos: CGPoint, onTap: @escaping (String) -> Void) {
         self.position = startPos
         self.onTap = onTap
-        super.init(
-            contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = GBedDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
         self.drawView = view
         contentView = view
@@ -1082,7 +955,7 @@ private final class GBedDrawView: NSView {
 
 // MARK: - 🖼️ 지도 벽: 9칸 중 클릭당 1칸씩 채우기
 
-public final class GMapWallWindow: NSPanel {
+public final class GMapWallWindow: EntityWindow {
     public var position: CGPoint
     private let onTap: (Int) -> Void
     private var drawView: GMapWallDrawView?
@@ -1093,18 +966,7 @@ public final class GMapWallWindow: NSPanel {
     public init(startPos: CGPoint, onTap: @escaping (Int) -> Void) {
         self.position = startPos
         self.onTap = onTap
-        super.init(
-            contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = GMapWallDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
         self.drawView = view
         contentView = view

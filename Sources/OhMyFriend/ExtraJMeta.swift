@@ -18,15 +18,15 @@ public final class MetaJManager {
     private var hardcoreTimer: Timer?
     private var hardcoreStart: Date?
 
-    private var cure: JZombieCureWindow?
-    private var job: JJobWindow?
-    private var nameTag: JNameTagWindow?
-    private var cart: JCartographyWindow?
-    private var arena: JArenaWindow?
-    private var race: JRaceWindow?
+    private let cure = ToggleSlot<JZombieCureWindow>()
+    private let job = ToggleSlot<JJobWindow>()
+    private let nameTag = ToggleSlot<JNameTagWindow>()
+    private let cart = ToggleSlot<JCartographyWindow>()
+    private let arena = ToggleSlot<JArenaWindow>()
+    private let race = ToggleSlot<JRaceWindow>()
     private var badge: JHardcoreBadgeWindow?
-    private var contest: JContestWindow?
-    private var stats: JStatsWindow?
+    private let contest = ToggleSlot<JContestWindow>()
+    private let stats = ToggleSlot<JStatsWindow>()
     private var fishing: JFishingKingWindow?
     private var fishDex = Set<String>()
 
@@ -82,15 +82,11 @@ public final class MetaJManager {
 
     private func toggleCure() {
         trackRun()
-        if let w = cure, w.isVisible {
-            w.close(); cure = nil; return
-        }
-        cure = nil
-        let w = JZombieCureWindow(startPos: spawnPos(dx: -60)) { [weak self] win in
-            self?.handleCureTap(win)
-        }
-        cure = w
-        w.start()
+        cure.toggle(make: {
+            JZombieCureWindow(startPos: self.spawnPos(dx: -60)) { [weak self] win in
+                self?.handleCureTap(win)
+            }
+        }, start: { $0.start() })
     }
 
     private func handleCureTap(_ w: JZombieCureWindow) {
@@ -124,10 +120,7 @@ public final class MetaJManager {
 
     private func toggleJob() {
         trackRun()
-        if let w = job, w.isVisible {
-            w.close(); job = nil; return
-        }
-        job = nil
+        if job.isActive { job.clear(); return }
         let alert = NSAlert()
         alert.messageText = "👨‍🌾 전직할 직업을 고르세요 (13종)"
         alert.addButton(withTitle: "전직")
@@ -139,9 +132,9 @@ public final class MetaJManager {
         let idx = popup.indexOfSelectedItem
         guard idx >= 0 && idx < jobs.count else { return }
         let picked = jobs[idx]
-        let w = JJobWindow(floorPos: spawnPos(dx: 60), emoji: picked.1, job: picked.0)
-        job = w
-        w.place()
+        job.toggle(make: {
+            JJobWindow(floorPos: self.spawnPos(dx: 60), emoji: picked.1, job: picked.0)
+        }, start: { $0.place() })
         grantJ(xp: 2, "👨‍🌾 \(picked.0)으로 전직! \(picked.2)")
         SoundAndEffectsManager.shared.play(.chime)
     }
@@ -150,10 +143,7 @@ public final class MetaJManager {
 
     private func toggleNameTag() {
         trackRun()
-        if let w = nameTag, w.isVisible {
-            w.close(); nameTag = nil; return
-        }
-        nameTag = nil
+        if nameTag.isActive { nameTag.clear(); return }
         let alert = NSAlert()
         alert.messageText = "🏷️ 명찰에 새길 이름"
         alert.addButton(withTitle: "붙이기")
@@ -163,13 +153,13 @@ public final class MetaJManager {
         alert.accessoryView = field
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         let name = field.stringValue.isEmpty ? "멍멍이" : field.stringValue
-        let w = JNameTagWindow(startPos: spawnPos(dx: 0), petName: name) { tapped in
-            RewardCenter.say("🏷️ \(tapped.petName)! ❤️")
-            SoundAndEffectsManager.shared.play(.heart)
-            tapped.bounce()
-        }
-        nameTag = w
-        w.start()
+        nameTag.toggle(make: {
+            JNameTagWindow(startPos: self.spawnPos(dx: 0), petName: name) { tapped in
+                RewardCenter.say("🏷️ \(tapped.petName)! ❤️")
+                SoundAndEffectsManager.shared.play(.heart)
+                tapped.bounce()
+            }
+        }, start: { $0.start() })
         SoundAndEffectsManager.shared.play(.pop)
     }
 
@@ -177,46 +167,35 @@ public final class MetaJManager {
 
     private func toggleCart() {
         trackRun()
-        if let w = cart, w.isVisible {
-            w.close(); cart = nil; return
-        }
-        cart = nil
-        let w = JCartographyWindow(floorPos: spawnPos(dx: -40)) { [weak self] done in
-            guard done else {
-                SoundAndEffectsManager.shared.play(.pop)
-                return
+        cart.toggle(make: {
+            JCartographyWindow(floorPos: self.spawnPos(dx: -40)) { [weak self] done in
+                guard done else {
+                    SoundAndEffectsManager.shared.play(.pop)
+                    return
+                }
+                self?.grantJ(xp: 5, "🗺️ 지도 완성! 위대한 탐험가!")
+                SoundAndEffectsManager.shared.play(.chime)
             }
-            self?.grantJ(xp: 5, "🗺️ 지도 완성! 위대한 탐험가!")
-            SoundAndEffectsManager.shared.play(.chime)
-        }
-        cart = w
-        w.place()
+        }, start: { $0.place() })
     }
 
     // MARK: - 5. 결투장 (검투사 2명 토너먼트)
 
     private func toggleArena() {
         trackRun()
-        if let w = arena, w.isVisible {
-            w.close(); arena = nil; return
-        }
-        arena = nil
-        let w = JArenaWindow(floorPos: spawnPos(dx: 40)) { [weak self] winner in
-            self?.grantJ(xp: 4, "⚔️ \(winner) 우승! 🏆 트로피!")
-            SoundAndEffectsManager.shared.play(.chime)
-        }
-        arena = w
-        w.start()
+        arena.toggle(make: {
+            JArenaWindow(floorPos: self.spawnPos(dx: 40)) { [weak self] winner in
+                self?.grantJ(xp: 4, "⚔️ \(winner) 우승! 🏆 트로피!")
+                SoundAndEffectsManager.shared.play(.chime)
+            }
+        }, start: { $0.start() })
     }
 
     // MARK: - 6. 경마 (3종 레이스 + 베팅)
 
     private func toggleRace() {
         trackRun()
-        if let w = race, w.isVisible {
-            w.close(); race = nil; return
-        }
-        race = nil
+        if race.isActive { race.clear(); return }
         let alert = NSAlert()
         alert.messageText = "🏇 우승마에 베팅하세요 (맞히면 3배 XP)"
         alert.addButton(withTitle: "1번 백마")
@@ -229,16 +208,16 @@ public final class MetaJManager {
         case .alertSecondButtonReturn: bet = 1
         default: bet = 2
         }
-        let w = JRaceWindow(floorPos: spawnPos(dx: 0), bet: bet) { [weak self] won, winnerName in
-            if won {
-                self?.grantJ(xp: 3, "🏇 적중! \(winnerName) 우승! 3배!")
-            } else {
-                self?.grantJ(xp: 1, "🏇 \(winnerName) 우승! 참가상!")
+        race.toggle(make: {
+            JRaceWindow(floorPos: self.spawnPos(dx: 0), bet: bet) { [weak self] won, winnerName in
+                if won {
+                    self?.grantJ(xp: 3, "🏇 적중! \(winnerName) 우승! 3배!")
+                } else {
+                    self?.grantJ(xp: 1, "🏇 \(winnerName) 우승! 참가상!")
+                }
+                SoundAndEffectsManager.shared.play(.chime)
             }
-            SoundAndEffectsManager.shared.play(.chime)
-        }
-        race = w
-        w.start()
+        }, start: { $0.start() })
     }
 
     // MARK: - 7. 하드코어 토글
@@ -281,10 +260,7 @@ public final class MetaJManager {
 
     private func toggleContest() {
         trackRun()
-        if let w = contest, w.isVisible {
-            w.close(); contest = nil; return
-        }
-        contest = nil
+        if contest.isActive { contest.clear(); return }
         let alert = NSAlert()
         alert.messageText = "🎨 콘테스트 주제에 투표하세요"
         alert.addButton(withTitle: "🏰 최고의 집")
@@ -297,9 +273,9 @@ public final class MetaJManager {
         case .alertSecondButtonReturn: winner = "🗡️"
         default: winner = "🎨"
         }
-        let w = JContestWindow(floorPos: spawnPos(dx: -80), winner: winner)
-        contest = w
-        w.place()
+        contest.toggle(make: {
+            JContestWindow(floorPos: self.spawnPos(dx: -80), winner: winner)
+        }, start: { $0.place() })
         grantJ(xp: 2, "🎨 콘테스트 참가! 우승작 \(winner)!")
         SoundAndEffectsManager.shared.play(.chime)
     }
@@ -308,10 +284,7 @@ public final class MetaJManager {
 
     private func toggleStats() {
         trackRun()
-        if let w = stats, w.isVisible {
-            w.close(); stats = nil; return
-        }
-        stats = nil
+        if stats.isActive { stats.clear(); return }
         let now = Date().timeIntervalSinceReferenceDate
         let total = UserDefaults.standard.double(forKey: timeKey) + (now - sessionStart)
         UserDefaults.standard.set(total, forKey: timeKey)
@@ -321,9 +294,9 @@ public final class MetaJManager {
         if count >= 50 { rank = "👑 전설" }
         else if count >= 10 { rank = "⭐ 프로" }
         else { rank = "🌱 노말" }
-        let w = JStatsWindow(floorPos: spawnPos(dx: 80), seconds: total, runs: count, rank: rank)
-        stats = w
-        w.place()
+        stats.toggle(make: {
+            JStatsWindow(floorPos: self.spawnPos(dx: 80), seconds: total, runs: count, rank: rank)
+        }, start: { $0.place() })
         SoundAndEffectsManager.shared.play(.pop)
     }
 
@@ -373,7 +346,7 @@ public final class MetaJManager {
 
 // MARK: - 1. 좀비 주민 치료 창
 
-public final class JZombieCureWindow: NSPanel {
+public final class JZombieCureWindow: EntityWindow {
     public var position: CGPoint
     private let onTap: (JZombieCureWindow) -> Void
     private var tick: Timer?
@@ -389,18 +362,7 @@ public final class JZombieCureWindow: NSPanel {
     public init(startPos: CGPoint, onTap: @escaping (JZombieCureWindow) -> Void) {
         self.position = startPos
         self.onTap = onTap
-        super.init(
-            contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = JZombieCureView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
         self.drawView = view
         contentView = view
@@ -486,7 +448,7 @@ private final class JZombieCureView: NSView {
 
 // MARK: - 2. 전직소 창
 
-public final class JJobWindow: NSPanel {
+public final class JJobWindow: EntityWindow {
     private var tick: Timer?
     private var phase: TimeInterval = 0
     private let emoji: String
@@ -497,18 +459,7 @@ public final class JJobWindow: NSPanel {
         self.emoji = emoji
         self.job = job
         let size = NSSize(width: 96, height: 72)
-        super.init(
-            contentRect: NSRect(x: floorPos.x - size.width / 2, y: floorPos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: floorPos.x - size.width / 2, y: floorPos.y, width: size.width, height: size.height), ignoresMouse: false)
         let view = JJobView(frame: NSRect(origin: .zero, size: size), emoji: emoji, job: job)
         self.drawView = view
         contentView = view
@@ -563,7 +514,7 @@ private final class JJobView: NSView {
 
 // MARK: - 3. 명찰 창 (몹 1마리 + 말풍선 명패)
 
-public final class JNameTagWindow: NSPanel {
+public final class JNameTagWindow: EntityWindow {
     public let petName: String
     public var position: CGPoint
     private let onTap: (JNameTagWindow) -> Void
@@ -578,18 +529,7 @@ public final class JNameTagWindow: NSPanel {
         self.position = startPos
         self.petName = petName
         self.onTap = onTap
-        super.init(
-            contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = JNameTagView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)), petName: petName)
         self.drawView = view
         contentView = view
@@ -660,7 +600,7 @@ private final class JNameTagView: NSView {
 
 // MARK: - 4. 제도대 (9칸 탐험 지도)
 
-public final class JCartographyWindow: NSPanel {
+public final class JCartographyWindow: EntityWindow {
     private let onExplore: (Bool) -> Void
     private var explored: [String?] = Array(repeating: nil, count: 9)
     private let terrains = ["🌲", "⛰️", "🏜️", "🌊", "🍄", "❄️", "🌾", "🪨", "🏝️"]
@@ -670,18 +610,7 @@ public final class JCartographyWindow: NSPanel {
     public init(floorPos: CGPoint, onExplore: @escaping (Bool) -> Void) {
         self.onExplore = onExplore
         let size = NSSize(width: 110, height: 110)
-        super.init(
-            contentRect: NSRect(x: floorPos.x - size.width / 2, y: floorPos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: floorPos.x - size.width / 2, y: floorPos.y, width: size.width, height: size.height), ignoresMouse: false)
         let view = JCartographyView(frame: NSRect(origin: .zero, size: size))
         self.drawView = view
         contentView = view
@@ -740,11 +669,11 @@ private final class JCartographyView: NSView {
 
 // MARK: - 5. 결투장 (검투사 토너먼트)
 
-public final class JArenaWindow: NSPanel {
+public final class JArenaWindow: EntityWindow {
     private let onWinner: (String) -> Void
     private var tick: Timer?
     private var phase: TimeInterval = 0
-    private var hp = [3, 3]
+    private var hp = [HitCounter(maxHits: 3), HitCounter(maxHits: 3)]
     private var finished = false
     private var clashLeft: TimeInterval = 0
     private var drawView: JArenaView?
@@ -753,18 +682,7 @@ public final class JArenaWindow: NSPanel {
     public init(floorPos: CGPoint, onWinner: @escaping (String) -> Void) {
         self.onWinner = onWinner
         let size = NSSize(width: 140, height: 80)
-        super.init(
-            contentRect: NSRect(x: floorPos.x - size.width / 2, y: floorPos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: floorPos.x - size.width / 2, y: floorPos.y, width: size.width, height: size.height), ignoresMouse: false)
         let view = JArenaView(frame: NSRect(origin: .zero, size: size))
         self.drawView = view
         contentView = view
@@ -788,20 +706,20 @@ public final class JArenaWindow: NSPanel {
     public override func mouseDown(with event: NSEvent) {
         guard !finished else { return }
         let loser = Bool.random() ? 0 : 1
-        hp[loser] -= 1
+        let downed = hp[loser].hit()
         clashLeft = 0.4
         SoundAndEffectsManager.shared.play(.pop)
         refresh()
-        if hp[0] <= 0 || hp[1] <= 0 {
+        if downed {
             finished = true
-            let winner = hp[0] > 0 ? names[0] : names[1]
+            let winner = loser == 0 ? names[1] : names[0]
             refresh()
             onWinner(winner)
         }
     }
 
     private func refresh() {
-        drawView?.hp = hp
+        drawView?.hp = hp.map { 3 - $0.hits }
         drawView?.finished = finished
         drawView?.clash = clashLeft > 0
         drawView?.bob = sin(phase * 5.0)
@@ -854,7 +772,7 @@ private final class JArenaView: NSView {
 
 // MARK: - 6. 경마 (3종 10초 레이스)
 
-public final class JRaceWindow: NSPanel {
+public final class JRaceWindow: EntityWindow {
     private let bet: Int
     private let onFinish: (Bool, String) -> Void
     private var tick: Timer?
@@ -870,18 +788,7 @@ public final class JRaceWindow: NSPanel {
         self.bet = bet
         self.onFinish = onFinish
         let size = NSSize(width: 220, height: 84)
-        super.init(
-            contentRect: NSRect(x: floorPos.x - size.width / 2, y: floorPos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = true
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: floorPos.x - size.width / 2, y: floorPos.y, width: size.width, height: size.height), ignoresMouse: true)
         let view = JRaceView(frame: NSRect(origin: .zero, size: size))
         self.drawView = view
         contentView = view
@@ -949,25 +856,14 @@ private final class JRaceView: NSView {
 
 // MARK: - 7. 하드코어 뱃지
 
-public final class JHardcoreBadgeWindow: NSPanel {
+public final class JHardcoreBadgeWindow: EntityWindow {
     private var tick: Timer?
     private var phase: TimeInterval = 0
     private var drawView: JHardcoreBadgeView?
 
     public init(floorPos: CGPoint) {
         let size = NSSize(width: 44, height: 44)
-        super.init(
-            contentRect: NSRect(x: floorPos.x - size.width / 2, y: floorPos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = true
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: floorPos.x - size.width / 2, y: floorPos.y, width: size.width, height: size.height), ignoresMouse: true)
         let view = JHardcoreBadgeView(frame: NSRect(origin: .zero, size: size))
         self.drawView = view
         contentView = view
@@ -1009,7 +905,7 @@ private final class JHardcoreBadgeView: NSView {
 
 // MARK: - 8. 콘테스트 우승작 창
 
-public final class JContestWindow: NSPanel {
+public final class JContestWindow: EntityWindow {
     private let winner: String
     private var tick: Timer?
     private var phase: TimeInterval = 0
@@ -1018,18 +914,7 @@ public final class JContestWindow: NSPanel {
     public init(floorPos: CGPoint, winner: String) {
         self.winner = winner
         let size = NSSize(width: 110, height: 80)
-        super.init(
-            contentRect: NSRect(x: floorPos.x - size.width / 2, y: floorPos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: floorPos.x - size.width / 2, y: floorPos.y, width: size.width, height: size.height), ignoresMouse: false)
         let view = JContestView(frame: NSRect(origin: .zero, size: size), winner: winner)
         self.drawView = view
         contentView = view
@@ -1083,21 +968,10 @@ private final class JContestView: NSView {
 
 // MARK: - 9. 통계실 창
 
-public final class JStatsWindow: NSPanel {
+public final class JStatsWindow: EntityWindow {
     public init(floorPos: CGPoint, seconds: Double, runs: Int, rank: String) {
         let size = NSSize(width: 170, height: 96)
-        super.init(
-            contentRect: NSRect(x: floorPos.x - size.width / 2, y: floorPos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: floorPos.x - size.width / 2, y: floorPos.y, width: size.width, height: size.height), ignoresMouse: false)
         contentView = JStatsView(frame: NSRect(origin: .zero, size: size), seconds: seconds, runs: runs, rank: rank)
     }
 
@@ -1140,7 +1014,7 @@ private final class JStatsView: NSView {
 
 // MARK: - 10. 낚시왕 창 (도감 5종 + 최대어)
 
-public final class JFishingKingWindow: NSPanel {
+public final class JFishingKingWindow: EntityWindow {
     public var best: String {
         didSet { drawView?.best = best; drawView?.needsDisplay = true }
     }
@@ -1159,18 +1033,7 @@ public final class JFishingKingWindow: NSPanel {
         self.month = month
         self.best = best
         self.onCatch = onCatch
-        super.init(
-            contentRect: NSRect(x: floorPos.x - panelW / 2, y: floorPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: floorPos.x - panelW / 2, y: floorPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = JFishingKingView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)), month: month, best: best)
         self.drawView = view
         contentView = view

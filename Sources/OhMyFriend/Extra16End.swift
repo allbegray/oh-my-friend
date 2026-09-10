@@ -21,19 +21,13 @@ private final class Extra16ChorusDrawView: NSView {
     }
 }
 
-private final class Extra16ChorusWindow: NSPanel {
+private final class Extra16ChorusWindow: EntityWindow {
     var onEat: (() -> Void)?
     init(floorPos: CGPoint, onEat: @escaping () -> Void) {
         self.onEat = onEat
         let size = NSSize(width: 72, height: 72)
         let frame = NSRect(x: floorPos.x - size.width / 2.0, y: floorPos.y, width: size.width, height: size.height)
-        super.init(contentRect: frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: frame, ignoresMouse: false)
         contentView = Extra16ChorusDrawView(frame: NSRect(origin: .zero, size: size))
     }
     func spawn() {
@@ -65,7 +59,7 @@ private final class Extra16ShulkerDrawView: NSView {
     }
 }
 
-private final class Extra16ShulkerWindow: NSPanel {
+private final class Extra16ShulkerWindow: EntityWindow {
     var onToggle: (() -> Void)?
     let drawView: Extra16ShulkerDrawView
     init(floorPos: CGPoint, storedXP: Int, onToggle: @escaping () -> Void) {
@@ -73,13 +67,7 @@ private final class Extra16ShulkerWindow: NSPanel {
         let size = NSSize(width: 84, height: 68)
         let frame = NSRect(x: floorPos.x - size.width / 2.0, y: floorPos.y, width: size.width, height: size.height)
         self.drawView = Extra16ShulkerDrawView(frame: NSRect(origin: .zero, size: size))
-        super.init(contentRect: frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: frame, ignoresMouse: false)
         drawView.storedXP = storedXP
         contentView = drawView
     }
@@ -111,19 +99,13 @@ private final class Extra16EggDrawView: NSView {
     }
 }
 
-private final class Extra16EggWindow: NSPanel {
+private final class Extra16EggWindow: EntityWindow {
     var onPoke: (() -> Void)?
     init(floorPos: CGPoint, onPoke: @escaping () -> Void) {
         self.onPoke = onPoke
         let size = NSSize(width: 72, height: 62)
         let frame = NSRect(x: floorPos.x - size.width / 2.0, y: floorPos.y, width: size.width, height: size.height)
-        super.init(contentRect: frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: frame, ignoresMouse: false)
         contentView = Extra16EggDrawView(frame: NSRect(origin: .zero, size: size))
     }
     func spawn() {
@@ -155,18 +137,12 @@ private final class Extra16MagmaDrawView: NSView {
     }
 }
 
-private final class Extra16MagmaWindow: NSPanel {
+private final class Extra16MagmaWindow: EntityWindow {
     private var closeTimer: Timer?
     init(floorPos: CGPoint) {
         let size = NSSize(width: 64, height: 64)
         let frame = NSRect(x: floorPos.x - size.width / 2.0, y: floorPos.y, width: size.width, height: size.height)
-        super.init(contentRect: frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = true
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: frame, ignoresMouse: true)
         contentView = Extra16MagmaDrawView(frame: NSRect(origin: .zero, size: size))
     }
     func spawn() {
@@ -204,20 +180,14 @@ private final class Extra16FogDrawView: NSView {
     }
 }
 
-private final class Extra16FogWindow: NSPanel {
+private final class Extra16FogWindow: EntityWindow {
     private var animTimer: Timer?
     private var phase: CGFloat = 0
     private let drawView: Extra16FogDrawView
     init() {
         let frame = NSScreen.main?.frame ?? NSRect(x: 0, y: 0, width: 1200, height: 800)
         self.drawView = Extra16FogDrawView(frame: NSRect(origin: .zero, size: frame.size))
-        super.init(contentRect: frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = true
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: frame, ignoresMouse: true)
         contentView = drawView
     }
     func spawn() {
@@ -250,10 +220,11 @@ public final class EndManager {
     private var shulkerWindow: Extra16ShulkerWindow?
     private var eggWindow: Extra16EggWindow?
     private var magmaWindow: Extra16MagmaWindow?
-    private var fogWindow: Extra16FogWindow?
+    private var fogSlot = ToggleSlot<Extra16FogWindow>()
 
-    private var chorusCooldownUntil = Date.distantPast
-    private var fireResistUntil = Date.distantPast
+    private var chorusCooldown = Cooldown()
+    private var chorusTickTimer: Timer?
+    private var fireResist = Cooldown()
     private var fireResistTimer: Timer?
 
     private func basePos() -> CGPoint {
@@ -271,11 +242,11 @@ public final class EndManager {
     }
 
     private func isFireResistActive() -> Bool {
-        return Date() < fireResistUntil
+        return !fireResist.ready
     }
 
     private func fireResistRemaining() -> Int {
-        return max(0, Int(fireResistUntil.timeIntervalSinceNow.rounded(.up)))
+        return max(0, Int(fireResist.remaining.rounded(.up)))
     }
 
     // MARK: 메뉴
@@ -291,7 +262,7 @@ public final class EndManager {
     }
 
     private func chorusTitle() -> String {
-        let remain = Int(chorusCooldownUntil.timeIntervalSinceNow.rounded(.up))
+        let remain = Int(chorusCooldown.remaining.rounded(.up))
         if remain > 0 { return "🍇 후렴과 먹기 (\(remain)s)" }
         return "🍇 후렴과 먹기"
     }
@@ -308,7 +279,7 @@ public final class EndManager {
     }
 
     private func fogTitle() -> String {
-        if fogWindow != nil { return "🌌 공허 안개 ON" }
+        if fogSlot.isActive { return "🌌 공허 안개 ON" }
         return "🌌 공허 안개"
     }
 
@@ -326,13 +297,21 @@ public final class EndManager {
     }
 
     private func eatChorus() {
-        let now = Date()
-        if now < chorusCooldownUntil {
-            let remain = Int(chorusCooldownUntil.timeIntervalSinceNow.rounded(.up))
+        if !chorusCooldown.ready {
+            let remain = Int(chorusCooldown.remaining.rounded(.up))
             RewardCenter.say("🍇 \(remain)초 뒤에...")
             return
         }
-        chorusCooldownUntil = now.addingTimeInterval(10)
+        chorusCooldown.trigger(10)
+        chorusTickTimer?.invalidate()
+        chorusTickTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] t in
+            self?.chorusCooldown.tick(1.0)
+            if self?.chorusCooldown.ready == true {
+                t.invalidate()
+                self?.chorusTickTimer = nil
+            }
+        }
+        if let t = chorusTickTimer { RunLoop.main.add(t, forMode: .common) }
         SoundAndEffectsManager.shared.play(.gulp)
         let me = RewardCenter.me()
         let dx = CGFloat.random(in: -300...300)
@@ -414,11 +393,14 @@ public final class EndManager {
         let w = Extra16MagmaWindow(floorPos: basePos())
         magmaWindow = w
         w.spawn()
-        fireResistUntil = Date().addingTimeInterval(90)
+        fireResist.trigger(90)
         fireResistTimer?.invalidate()
-        fireResistTimer = Timer.scheduledTimer(withTimeInterval: 90, repeats: false) { [weak self] t in
-            t.invalidate()
-            self?.fireResistTimer = nil
+        fireResistTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] t in
+            self?.fireResist.tick(1.0)
+            if self?.fireResist.ready == true {
+                t.invalidate()
+                self?.fireResistTimer = nil
+            }
         }
         if let t = fireResistTimer { RunLoop.main.add(t, forMode: .common) }
         RewardCenter.say("🔥 끄떡없다!")
@@ -428,17 +410,16 @@ public final class EndManager {
     // MARK: 5. 공허 안개
 
     private func runFog() {
-        if let f = fogWindow {
-            f.close()
-            fogWindow = nil
+        if fogSlot.isActive {
+            fogSlot.clear()
             return
         }
         if !isNight() {
             RewardCenter.say("🌌 심야에만...")
         }
-        let w = Extra16FogWindow()
-        fogWindow = w
-        w.spawn()
-        SoundAndEffectsManager.shared.play(.pop)
+        fogSlot.toggle(make: { Extra16FogWindow() }, start: { w in
+            w.spawn()
+            SoundAndEffectsManager.shared.play(.pop)
+        })
     }
 }

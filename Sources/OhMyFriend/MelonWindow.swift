@@ -1,7 +1,7 @@
 import AppKit
 import CoreGraphics
 
-public final class MelonWindow: NSPanel {
+public final class MelonWindow: EntityWindow {
     private let plantPos: CGPoint
     private let onSlice: (Bool) -> Void
     private var stage: Int = 0
@@ -23,21 +23,14 @@ public final class MelonWindow: NSPanel {
             width: size.width,
             height: size.height
         )
-        super.init(
-            contentRect: frame,
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: frame, ignoresMouse: false)
         let view = MelonDrawView(frame: NSRect(origin: .zero, size: size))
         self.drawView = view
         contentView = view
+    }
+
+    public required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
     }
 
     public func plant() {

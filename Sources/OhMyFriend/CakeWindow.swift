@@ -1,7 +1,7 @@
 import AppKit
 import CoreGraphics
 
-public final class CakeWindow: NSPanel {
+public final class CakeWindow: EntityWindow {
     private let onSlice: () -> Void
     private var slicesLeft = 7
     private var drawView: CakeDrawView?
@@ -9,23 +9,12 @@ public final class CakeWindow: NSPanel {
     public init(floorPos: CGPoint, onSlice: @escaping () -> Void) {
         self.onSlice = onSlice
         let size = NSSize(width: 84, height: 56)
-        super.init(
-            contentRect: NSRect(
+        super.init(contentRect: NSRect(
                 x: floorPos.x - size.width / 2.0,
                 y: floorPos.y,
                 width: size.width,
                 height: size.height
-            ),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+            ), ignoresMouse: false)
         let view = CakeDrawView(frame: NSRect(origin: .zero, size: size))
         self.drawView = view
         contentView = view

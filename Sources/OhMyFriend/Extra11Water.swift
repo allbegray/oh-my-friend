@@ -6,7 +6,7 @@ import Foundation
 // - 기존 파일 수정 없음. WeatherManager는 읽기(isRaining) + 공개 API(isEnabled)만 사용.
 // - RewardCenter 브리지(grant/say/me/movePlayer/heldItemName)만 사용, 네트워크/UserDefaults 없음.
 
-public final class GlowSquidWindow: NSPanel {
+public final class GlowSquidWindow: EntityWindow {
     public var onTap: (() -> Void)?
     private var tick: Timer?
     private var phase: TimeInterval = 0
@@ -16,18 +16,7 @@ public final class GlowSquidWindow: NSPanel {
     public init(startPos: CGPoint) {
         self.baseY = startPos.y
         let size = NSSize(width: 72, height: 64)
-        super.init(
-            contentRect: NSRect(x: startPos.x - 36, y: startPos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - 36, y: startPos.y, width: size.width, height: size.height), ignoresMouse: false)
         let view = GlowSquidDrawView(frame: NSRect(origin: .zero, size: size))
         self.drawView = view
         contentView = view
@@ -103,30 +92,19 @@ private final class GlowSquidDrawView: NSView {
     }
 }
 
-public final class PufferfishWindow: NSPanel {
+public final class PufferfishWindow: EntityWindow {
     public var onTap: (() -> Void)?
     public private(set) var isPuffed = false
     private var tick: Timer?
     private var phase: TimeInterval = 0
-    private var dir: CGFloat = 1
+    private var wander = WanderState(speed: 25)
     private var pos: CGPoint
     private var drawView: PufferfishDrawView?
 
     public init(startPos: CGPoint) {
         self.pos = startPos
         let size = NSSize(width: 64, height: 56)
-        super.init(
-            contentRect: NSRect(x: startPos.x - 32, y: startPos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - 32, y: startPos.y, width: size.width, height: size.height), ignoresMouse: false)
         let view = PufferfishDrawView(frame: NSRect(origin: .zero, size: size))
         self.drawView = view
         contentView = view
@@ -136,11 +114,9 @@ public final class PufferfishWindow: NSPanel {
         orderFrontRegardless()
         tick = Timer.scheduledTimer(withTimeInterval: 1.0 / 30.0, repeats: true) { [weak self] t in
             guard let self = self else { t.invalidate(); return }
-            self.phase += 1.0 / 30.0
-            if Int(self.phase * 30.0) % 60 == 0 {
-                self.dir = Bool.random() ? 1 : -1
-            }
-            self.pos.x += self.dir * 25.0 / 30.0
+            let dt = 1.0 / 30.0
+            self.phase += dt
+            self.pos.x += self.wander.tick(dt)
             self.pos.y += sin(self.phase * 2.5) * 8.0 / 30.0
             self.setFrameOrigin(NSPoint(x: self.pos.x - 32, y: self.pos.y))
             let me = RewardCenter.me()
@@ -204,7 +180,7 @@ private final class PufferfishDrawView: NSView {
     }
 }
 
-public final class BubbleColumnWindow: NSPanel {
+public final class BubbleColumnWindow: EntityWindow {
     public var onTap: (() -> Void)?
     private var tick: Timer?
     private var phase: CGFloat = 0
@@ -212,18 +188,7 @@ public final class BubbleColumnWindow: NSPanel {
 
     public init(basePos: CGPoint) {
         let size = NSSize(width: 64, height: 300)
-        super.init(
-            contentRect: NSRect(x: basePos.x - 32, y: basePos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: basePos.x - 32, y: basePos.y, width: size.width, height: size.height), ignoresMouse: false)
         let view = BubbleColumnDrawView(frame: NSRect(origin: .zero, size: size))
         self.drawView = view
         contentView = view
@@ -279,21 +244,10 @@ private final class BubbleColumnDrawView: NSView {
     }
 }
 
-public final class RainbowArchWindow: NSPanel {
+public final class RainbowArchWindow: EntityWindow {
     public init(centerPos: CGPoint) {
         let size = NSSize(width: 520, height: 260)
-        super.init(
-            contentRect: NSRect(x: centerPos.x - size.width / 2.0, y: centerPos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = true
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: centerPos.x - size.width / 2.0, y: centerPos.y, width: size.width, height: size.height), ignoresMouse: true)
         contentView = RainbowArchDrawView(frame: NSRect(origin: .zero, size: size))
     }
 
@@ -321,7 +275,7 @@ private final class RainbowArchDrawView: NSView {
     }
 }
 
-public final class RainbowPotWindow: NSPanel {
+public final class RainbowPotWindow: EntityWindow {
     public var onTap: (() -> Void)?
     private var sparkleTimer: Timer?
     private var phase: CGFloat = 0
@@ -329,18 +283,7 @@ public final class RainbowPotWindow: NSPanel {
 
     public init(pos: CGPoint) {
         let size = NSSize(width: 56, height: 44)
-        super.init(
-            contentRect: NSRect(x: pos.x - 28, y: pos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: pos.x - 28, y: pos.y, width: size.width, height: size.height), ignoresMouse: false)
         let view = RainbowPotDrawView(frame: NSRect(origin: .zero, size: size))
         self.drawView = view
         contentView = view
@@ -391,9 +334,9 @@ private final class RainbowPotDrawView: NSView {
 public final class WaterManager {
     public static let shared = WaterManager()
 
-    private var squid: GlowSquidWindow?
-    private var puffer: PufferfishWindow?
-    private var bubble: BubbleColumnWindow?
+    private let squidSlot = ToggleSlot<GlowSquidWindow>()
+    private let pufferSlot = ToggleSlot<PufferfishWindow>()
+    private let bubbleSlot = ToggleSlot<BubbleColumnWindow>()
     private var bubbleCooldownUntil: Date?
     private var isSpongeWet = false
     private var spongeDryTimer: Timer?
@@ -406,13 +349,13 @@ public final class WaterManager {
     public func entries() -> [ExtraMenuEntry] {
         return [
             ExtraMenuEntry({ [weak self] in
-                (self?.squid == nil) ? "🐙 발광오징어" : "🐙 발광오징어 (보내기)"
+                (self?.squidSlot.isActive == true) ? "🐙 발광오징어 (보내기)" : "🐙 발광오징어"
             }, { [weak self] in self?.toggleSquid() }),
             ExtraMenuEntry({ [weak self] in
-                (self?.puffer == nil) ? "🐡 복어" : "🐡 복어 (보내기)"
+                (self?.pufferSlot.isActive == true) ? "🐡 복어 (보내기)" : "🐡 복어"
             }, { [weak self] in self?.togglePuffer() }),
             ExtraMenuEntry({ [weak self] in
-                (self?.bubble == nil) ? "🫧 기포 기둥" : "🫧 기포 기둥 (끄기)"
+                (self?.bubbleSlot.isActive == true) ? "🫧 기포 기둥 (끄기)" : "🫧 기포 기둥"
             }, { [weak self] in self?.toggleBubble() }),
             ExtraMenuEntry({ [weak self] in
                 (self?.isSpongeWet == true) ? "🧽 스펀지 흡수 (젖음 💧)" : "🧽 스펀지 흡수"
@@ -432,69 +375,61 @@ public final class WaterManager {
     }
 
     private func toggleSquid() {
-        if let w = squid {
-            w.close()
-            squid = nil
-            return
-        }
-        let w = GlowSquidWindow(startPos: spawnBase())
-        w.onTap = { [weak self, weak w] in
-            RewardCenter.grant(xp: 2, "🦑✨ 어둠 속 길잡이! 발광 먹물 획득!")
-            if let w = w { w.close() }
-            self?.squid = nil
-        }
-        squid = w
-        w.start()
-        RewardCenter.say("🐙 발광오징어가 몽글몽글 떠올랐어!")
+        squidSlot.toggle(make: {
+            let w = GlowSquidWindow(startPos: self.spawnBase())
+            w.onTap = { [weak self] in
+                RewardCenter.grant(xp: 2, "🦑✨ 어둠 속 길잡이! 발광 먹물 획득!")
+                self?.squidSlot.clear()
+            }
+            return w
+        }, start: { w in
+            w.start()
+            RewardCenter.say("🐙 발광오징어가 몽글몽글 떠올랐어!")
+        })
     }
 
     private func togglePuffer() {
-        if let w = puffer {
-            w.close()
-            puffer = nil
-            return
-        }
-        let w = PufferfishWindow(startPos: spawnBase())
-        w.onTap = { [weak self, weak w] in
-            guard let self = self, let w = w else { return }
-            if w.isPuffed {
-                RewardCenter.say("❤️‍🩹 퉁퉁! 독가시 조심! (🎣 낚시로 잡아봐)")
-            } else {
-                RewardCenter.grant(xp: 2, "🐡 복어 포획! (가만히 있을 때가 기회!)")
-                w.close()
-                self.puffer = nil
+        pufferSlot.toggle(make: {
+            let w = PufferfishWindow(startPos: self.spawnBase())
+            w.onTap = { [weak self, weak w] in
+                guard let self = self, let w = w else { return }
+                if w.isPuffed {
+                    RewardCenter.say("❤️‍🩹 퉁퉁! 독가시 조심! (🎣 낚시로 잡아봐)")
+                } else {
+                    RewardCenter.grant(xp: 2, "🐡 복어 포획! (가만히 있을 때가 기회!)")
+                    self.pufferSlot.clear()
+                }
             }
-        }
-        puffer = w
-        w.start()
-        RewardCenter.say("🐡 복어가 쪼꼬미 헤엄쳐왔어! 가까이 가면 부풀어!")
+            return w
+        }, start: { w in
+            w.start()
+            RewardCenter.say("🐡 복어가 쪼꼬미 헤엄쳐왔어! 가까이 가면 부풀어!")
+        })
     }
 
     private func toggleBubble() {
-        if let w = bubble {
-            w.close()
-            bubble = nil
-            return
-        }
-        let w = BubbleColumnWindow(basePos: spawnBase())
-        w.onTap = { [weak self] in
-            guard let self = self else { return }
-            if let until = self.bubbleCooldownUntil, Date() < until {
-                RewardCenter.say("🫧 기포 충전 중... 잠시만!")
-                return
+        bubbleSlot.toggle(make: {
+            let w = BubbleColumnWindow(basePos: self.spawnBase())
+            w.onTap = { [weak self] in
+                guard let self = self else { return }
+                if let until = self.bubbleCooldownUntil, Date() < until {
+                    RewardCenter.say("🫧 기포 충전 중... 잠시만!")
+                    return
+                }
+                guard let mv = RewardCenter.movePlayer else {
+                    RewardCenter.say("🫧 기포가 몽글몽글! (이동 연결 없음)")
+                    return
+                }
+                let me = RewardCenter.me()
+                mv(CGPoint(x: me.x, y: me.y + 200))
+                self.bubbleCooldownUntil = Date().addingTimeInterval(5.0)
+                RewardCenter.say("🫧 소울샌드 부글부글! 위로 뿅!")
             }
-            guard let mv = RewardCenter.movePlayer else {
-                RewardCenter.say("🫧 기포가 몽글몽글! (이동 연결 없음)")
-                return
-            }
-            let me = RewardCenter.me()
-            mv(CGPoint(x: me.x, y: me.y + 200))
-            self.bubbleCooldownUntil = Date().addingTimeInterval(5.0)
-            RewardCenter.say("🫧 소울샌드 부글부글! 위로 뿅!")
-        }
-        bubble = w
-        w.start()
-        RewardCenter.say("🫧 기포 기둥! 클릭하면 위로 200pt 슝!")
+            return w
+        }, start: { w in
+            w.start()
+            RewardCenter.say("🫧 기포 기둥! 클릭하면 위로 200pt 슝!")
+        })
     }
 
     private func absorbRain() {

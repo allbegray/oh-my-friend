@@ -11,7 +11,7 @@ public extension TreeWindowDelegate {
     func treeWindowDidChop(logs: Int, apples: Int) {}
 }
 
-public final class TreeWindow: NSPanel {
+public final class TreeWindow: EntityWindow {
     private let plantPos: CGPoint
     private weak var treeDelegate: TreeWindowDelegate?
     private var stage: Int = 0
@@ -37,21 +37,14 @@ public final class TreeWindow: NSPanel {
             width: size.width,
             height: size.height
         )
-        super.init(
-            contentRect: frame,
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: frame, ignoresMouse: false)
         let view = TreeDrawView(frame: NSRect(origin: .zero, size: size))
         self.drawView = view
         contentView = view
+    }
+
+    public required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
     }
 
     public func start() {
@@ -139,7 +132,7 @@ public final class TreeWindow: NSPanel {
     }
 }
 
-public final class AppleWindow: NSPanel {
+public final class AppleWindow: EntityWindow {
     public var position: CGPoint
     private let onTap: (AppleWindow) -> Void
     private var drawView: AppleDrawView?
@@ -148,26 +141,14 @@ public final class AppleWindow: NSPanel {
         self.position = floorPos
         self.onTap = onTap
         let size = NSSize(width: 20, height: 24)
-        super.init(
-            contentRect: NSRect(
-                x: floorPos.x - size.width / 2.0,
-                y: floorPos.y,
-                width: size.width,
-                height: size.height
-            ),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: floorPos.x - size.width / 2.0, y: floorPos.y, width: size.width, height: size.height), ignoresMouse: false)
         let view = AppleDrawView(frame: NSRect(origin: .zero, size: size))
         self.drawView = view
         contentView = view
+    }
+
+    public required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
     }
 
     public func place() {

@@ -25,6 +25,21 @@ public enum HeldItem: String, CaseIterable {
     case sponge = "스펀지 🧽"
 }
 
+public enum BrewKind {
+    case swift
+    case invis
+    case strength
+}
+
+public struct ItemSpec {
+    public let damage: Int
+    public let hitEmoji: String
+    public let brew: BrewKind?
+    public let lootEmoji: String?
+    public let victoryQuotes: [String]?
+    public let makeModel: () -> SCNNode
+}
+
 public final class MinecraftCharacterNode: SCNNode {
     // Root container
     public let modelRoot = SCNNode()
@@ -417,94 +432,41 @@ public final class MinecraftCharacterNode: SCNNode {
     private func updateHeldItemModel() {
         rightHandItemAnchor.childNodes.forEach { $0.removeFromParentNode() }
 
-        switch currentHeldItem {
-        case .none:
-            break
-
-        case .diamondPickaxe:
-            let pickaxe = createPickaxeModel()
-            rightHandItemAnchor.addChildNode(pickaxe)
-
-        case .diamondSword:
-            let sword = createSwordModel()
-            rightHandItemAnchor.addChildNode(sword)
-
-        case .goldenApple:
-            let apple = createAppleModel()
-            rightHandItemAnchor.addChildNode(apple)
-
-        case .torch:
-            let torch = createTorchModel()
-            rightHandItemAnchor.addChildNode(torch)
-
-        case .fishingRod:
-            let rod = createFishingRodModel()
-            rightHandItemAnchor.addChildNode(rod)
-
-        case .bone:
-            let bone = createBoneModel()
-            rightHandItemAnchor.addChildNode(bone)
-
-        case .trident:
-            let trident = createTridentModel()
-            rightHandItemAnchor.addChildNode(trident)
-
-        case .wheat:
-            let wheat = createWheatModel()
-            rightHandItemAnchor.addChildNode(wheat)
-
-        case .milkBucket:
-            let milk = createBucketModel(fillColor: NSColor.white)
-            rightHandItemAnchor.addChildNode(milk)
-
-        case .emptyBucket:
-            let empty = createBucketModel(fillColor: NSColor(red: 0.55, green: 0.55, blue: 0.58, alpha: 1.0))
-            rightHandItemAnchor.addChildNode(empty)
-
-        case .flower:
-            let flower = createFlowerModel()
-            rightHandItemAnchor.addChildNode(flower)
-
-        case .balloon:
-            let balloon = createBalloonModel()
-            rightHandItemAnchor.addChildNode(balloon)
-
-        case .shears:
-            let shears = createShearsModel()
-            rightHandItemAnchor.addChildNode(shears)
-
-        case .bow:
-            let bow = createBowModel()
-            rightHandItemAnchor.addChildNode(bow)
-
-        case .lead:
-            let lead = createLeadModel()
-            rightHandItemAnchor.addChildNode(lead)
-
-        case .bamboo:
-            let bamboo = createBambooModel()
-            rightHandItemAnchor.addChildNode(bamboo)
-
-        case .axe:
-            let axe = createAxeModel()
-            rightHandItemAnchor.addChildNode(axe)
-
-        case .carrot:
-            let carrot = createCarrotModel()
-            rightHandItemAnchor.addChildNode(carrot)
-
-        case .salmon:
-            let salmon = createSalmonModel()
-            rightHandItemAnchor.addChildNode(salmon)
-
-        case .sponge:
-            let sponge = createSpongeModel()
-            rightHandItemAnchor.addChildNode(sponge)
+        if currentHeldItem != .none {
+            rightHandItemAnchor.addChildNode(Self.spec(for: currentHeldItem).makeModel())
         }
         EnchantmentGlintShader.apply(to: rightHandItemAnchor, enabled: isEnchantedGlintEnabled)
     }
 
-    private func createPickaxeModel() -> SCNNode {
+    // MARK: - Held Item Registry (손 아이템 단일 진실 공급원)
+    // 새 아이템 추가 = 아래 specs 테이블에 1행. enum·모델·데미지·양조·전리품이 여기만 보면 된다.
+    public static func spec(for item: HeldItem) -> ItemSpec { specs[item]! }
+
+    private static let specs: [HeldItem: ItemSpec] = [
+        .none: ItemSpec(damage: 1, hitEmoji: "👊 펀치!", brew: nil, lootEmoji: nil, victoryQuotes: nil, makeModel: { SCNNode() }),
+        .diamondPickaxe: ItemSpec(damage: 2, hitEmoji: "⛏️ 강타!", brew: nil, lootEmoji: "🟢 경험치 +5", victoryQuotes: ["단단한 놈은 곡괭이로 캐는 법! ⛏️", "광물인 줄 알고 캤더니 크리퍼였네? 💎", "곡괭이 맛이 어떠냐! ⛏️"], makeModel: { createPickaxeModel() }),
+        .diamondSword: ItemSpec(damage: 3, hitEmoji: "⚔️ 슬래시!", brew: nil, lootEmoji: "💥 화약 획득!", victoryQuotes: ["칼날 끝에 자비란 없다! ⚔️", "크리퍼 따위, 내 검엔 한 방이지! 🗡️", "터지기 전에 베었다! 완벽한 칼각! ✨", "화약 득템! 폭탄 만들러 가볼까? 💥"], makeModel: { createSwordModel() }),
+        .goldenApple: ItemSpec(damage: 1, hitEmoji: "🍎 사과 쿵!", brew: .swift, lootEmoji: nil, victoryQuotes: nil, makeModel: { createAppleModel() }),
+        .torch: ItemSpec(damage: 1, hitEmoji: "🕯️ 횃불 지지기!", brew: nil, lootEmoji: "✨ 처치 완료!", victoryQuotes: ["불장난은 위험하다고 했잖아? 🔥", "횃불 하나로 제압 완료! 🕯️", "어둠 속에 숨을 생각 마라! ⚡"], makeModel: { createTorchModel() }),
+        .fishingRod: ItemSpec(damage: 1, hitEmoji: "🎣 낚싯줄 찌르기!", brew: nil, lootEmoji: nil, victoryQuotes: nil, makeModel: { createFishingRodModel() }),
+        .bone: ItemSpec(damage: 1, hitEmoji: "🦴 뼈다귀 어택!", brew: .strength, lootEmoji: nil, victoryQuotes: nil, makeModel: { createBoneModel() }),
+        .trident: ItemSpec(damage: 3, hitEmoji: "🔱 삼지창 찌르기!", brew: nil, lootEmoji: nil, victoryQuotes: nil, makeModel: { createTridentModel() }),
+        .wheat: ItemSpec(damage: 1, hitEmoji: "🌾 밀 후리기!", brew: nil, lootEmoji: nil, victoryQuotes: nil, makeModel: { createWheatModel() }),
+        .milkBucket: ItemSpec(damage: 1, hitEmoji: "🪣 양동이 쿵!", brew: nil, lootEmoji: nil, victoryQuotes: nil, makeModel: { createBucketModel(fillColor: NSColor.white) }),
+        .emptyBucket: ItemSpec(damage: 1, hitEmoji: "🪣 양동이 쿵!", brew: nil, lootEmoji: nil, victoryQuotes: nil, makeModel: { createBucketModel(fillColor: NSColor(red: 0.55, green: 0.55, blue: 0.58, alpha: 1.0)) }),
+        .flower: ItemSpec(damage: 1, hitEmoji: "🌺 꽃 후리기!", brew: .invis, lootEmoji: nil, victoryQuotes: nil, makeModel: { createFlowerModel() }),
+        .balloon: ItemSpec(damage: 1, hitEmoji: "🎈 풍선 쿵!", brew: nil, lootEmoji: nil, victoryQuotes: nil, makeModel: { createBalloonModel() }),
+        .shears: ItemSpec(damage: 1, hitEmoji: "✂️ 가위 쿡!", brew: nil, lootEmoji: nil, victoryQuotes: nil, makeModel: { createShearsModel() }),
+        .bow: ItemSpec(damage: 2, hitEmoji: "🏹 활 강타!", brew: nil, lootEmoji: nil, victoryQuotes: nil, makeModel: { createBowModel() }),
+        .lead: ItemSpec(damage: 1, hitEmoji: "🧶 리드줄 후리기!", brew: nil, lootEmoji: nil, victoryQuotes: nil, makeModel: { createLeadModel() }),
+        .bamboo: ItemSpec(damage: 1, hitEmoji: "🎍 대나무 쿡!", brew: nil, lootEmoji: nil, victoryQuotes: nil, makeModel: { createBambooModel() }),
+        .axe: ItemSpec(damage: 2, hitEmoji: "🪓 도끼 찍기!", brew: nil, lootEmoji: nil, victoryQuotes: nil, makeModel: { createAxeModel() }),
+        .carrot: ItemSpec(damage: 1, hitEmoji: "🥕 당근 쿡!", brew: nil, lootEmoji: nil, victoryQuotes: nil, makeModel: { createCarrotModel() }),
+        .salmon: ItemSpec(damage: 1, hitEmoji: "🍣 연어 찰싹!", brew: nil, lootEmoji: nil, victoryQuotes: nil, makeModel: { createSalmonModel() }),
+        .sponge: ItemSpec(damage: 1, hitEmoji: "🧽 스펀지 퍽!", brew: nil, lootEmoji: nil, victoryQuotes: nil, makeModel: { createSpongeModel() }),
+    ]
+
+    private static func createPickaxeModel() -> SCNNode {
         let root = SCNNode()
         root.eulerAngles = SCNVector3(CGFloat.pi / 2.0, 0, 0)
 
@@ -529,7 +491,7 @@ public final class MinecraftCharacterNode: SCNNode {
         return root
     }
 
-    private func createSwordModel() -> SCNNode {
+    private static func createSwordModel() -> SCNNode {
         let root = SCNNode()
         root.eulerAngles = SCNVector3(CGFloat.pi / 2.0, 0, 0)
 
@@ -563,7 +525,7 @@ public final class MinecraftCharacterNode: SCNNode {
         return root
     }
 
-    private func createAppleModel() -> SCNNode {
+    private static func createAppleModel() -> SCNNode {
         let root = SCNNode()
         let aBox = SCNBox(width: 0.3, height: 0.3, length: 0.3, chamferRadius: 0.04)
         let goldMat = SCNMaterial()
@@ -574,7 +536,7 @@ public final class MinecraftCharacterNode: SCNNode {
         return root
     }
 
-    private func createTorchModel() -> SCNNode {
+    private static func createTorchModel() -> SCNNode {
         let root = SCNNode()
         let stickBox = SCNBox(width: 0.08, height: 0.5, length: 0.08, chamferRadius: 0)
         let woodMat = SCNMaterial()
@@ -593,7 +555,7 @@ public final class MinecraftCharacterNode: SCNNode {
         return root
     }
 
-    private func createFishingRodModel() -> SCNNode {
+    private static func createFishingRodModel() -> SCNNode {
         let root = SCNNode()
         let woodMat = SCNMaterial()
         woodMat.diffuse.contents = NSColor(red: 0.52, green: 0.35, blue: 0.18, alpha: 1.0)
@@ -635,7 +597,7 @@ public final class MinecraftCharacterNode: SCNNode {
         return root
     }
 
-    private func createBoneModel() -> SCNNode {
+    private static func createBoneModel() -> SCNNode {
         let root = SCNNode()
         let whiteMat = SCNMaterial()
         whiteMat.diffuse.contents = NSColor(red: 0.95, green: 0.95, blue: 0.92, alpha: 1.0)
@@ -664,7 +626,7 @@ public final class MinecraftCharacterNode: SCNNode {
     }
 
     /// 🔱 삼지창: 나무 손잡이 + 3갈래 다이아 촉 (H2 Trident)
-    private func createTridentModel() -> SCNNode {
+    private static func createTridentModel() -> SCNNode {
         let root = SCNNode()
         root.eulerAngles = SCNVector3(CGFloat.pi / 2.0, 0, 0)
         let woodMat = SCNMaterial()
@@ -695,7 +657,7 @@ public final class MinecraftCharacterNode: SCNNode {
     }
 
     /// 🌾 밀: 노란 줄기 + 이삭 (M4 Wheat)
-    private func createWheatModel() -> SCNNode {
+    private static func createWheatModel() -> SCNNode {
         let root = SCNNode()
         let stemMat = SCNMaterial()
         stemMat.diffuse.contents = NSColor(red: 0.55, green: 0.42, blue: 0.18, alpha: 1.0)
@@ -716,7 +678,7 @@ public final class MinecraftCharacterNode: SCNNode {
         return root
     }
 
-    private func createShearsModel() -> SCNNode {
+    private static func createShearsModel() -> SCNNode {
         let root = SCNNode()
         let ironMat = SCNMaterial()
         ironMat.diffuse.contents = NSColor(red: 0.65, green: 0.66, blue: 0.68, alpha: 1.0)
@@ -735,7 +697,7 @@ public final class MinecraftCharacterNode: SCNNode {
         return root
     }
 
-    private func createBowModel() -> SCNNode {
+    private static func createBowModel() -> SCNNode {
         let root = SCNNode()
         let woodMat = SCNMaterial()
         woodMat.diffuse.contents = NSColor(red: 0.55, green: 0.36, blue: 0.18, alpha: 1.0)
@@ -757,7 +719,7 @@ public final class MinecraftCharacterNode: SCNNode {
         return root
     }
 
-    private func createLeadModel() -> SCNNode {
+    private static func createLeadModel() -> SCNNode {
         let root = SCNNode()
         let ropeMat = SCNMaterial()
         ropeMat.diffuse.contents = NSColor(red: 0.55, green: 0.38, blue: 0.20, alpha: 1.0)
@@ -774,7 +736,7 @@ public final class MinecraftCharacterNode: SCNNode {
         return root
     }
 
-    private func createBambooModel() -> SCNNode {
+    private static func createBambooModel() -> SCNNode {
         let root = SCNNode()
         let greenMat = SCNMaterial()
         greenMat.diffuse.contents = NSColor(red: 0.35, green: 0.72, blue: 0.25, alpha: 1.0)
@@ -795,7 +757,7 @@ public final class MinecraftCharacterNode: SCNNode {
         return root
     }
 
-    private func createAxeModel() -> SCNNode {
+    private static func createAxeModel() -> SCNNode {
         let root = SCNNode()
         root.eulerAngles = SCNVector3(CGFloat.pi / 2.0, 0, 0)
         let woodMat = SCNMaterial()
@@ -815,7 +777,7 @@ public final class MinecraftCharacterNode: SCNNode {
         return root
     }
 
-    private func createCarrotModel() -> SCNNode {
+    private static func createCarrotModel() -> SCNNode {
         let root = SCNNode()
         let orangeMat = SCNMaterial()
         orangeMat.diffuse.contents = NSColor(red: 0.95, green: 0.55, blue: 0.15, alpha: 1.0)
@@ -834,7 +796,7 @@ public final class MinecraftCharacterNode: SCNNode {
         return root
     }
 
-    private func createSalmonModel() -> SCNNode {
+    private static func createSalmonModel() -> SCNNode {
         let root = SCNNode()
         root.eulerAngles = SCNVector3(0, 0, CGFloat.pi / 2.0)
         let pinkMat = SCNMaterial()
@@ -852,7 +814,7 @@ public final class MinecraftCharacterNode: SCNNode {
         return root
     }
 
-    private func createSpongeModel() -> SCNNode {
+    private static func createSpongeModel() -> SCNNode {
         let root = SCNNode()
         let yellowMat = SCNMaterial()
         yellowMat.diffuse.contents = NSColor(red: 0.95, green: 0.85, blue: 0.35, alpha: 1.0)
@@ -873,7 +835,7 @@ public final class MinecraftCharacterNode: SCNNode {
         return root
     }
 
-    private func createBalloonModel() -> SCNNode {        let root = SCNNode()
+    private static func createBalloonModel() -> SCNNode {        let root = SCNNode()
         let stringMat = SCNMaterial()
         stringMat.diffuse.contents = NSColor(white: 0.9, alpha: 0.9)
         let balloonMat = SCNMaterial()
@@ -891,7 +853,7 @@ public final class MinecraftCharacterNode: SCNNode {
         return root
     }
 
-    private func createFlowerModel() -> SCNNode {        let root = SCNNode()
+    private static func createFlowerModel() -> SCNNode {        let root = SCNNode()
         let stemMat = SCNMaterial()
         stemMat.diffuse.contents = NSColor(red: 0.2, green: 0.6, blue: 0.2, alpha: 1.0)
         let petalMat = SCNMaterial()
@@ -910,7 +872,7 @@ public final class MinecraftCharacterNode: SCNNode {
     }
 
     /// 🥛 양동이: 철 양동이 + 내용물 색상 (L2 Milk, 빈 양동이 겸용)
-    private func createBucketModel(fillColor: NSColor) -> SCNNode {
+    private static func createBucketModel(fillColor: NSColor) -> SCNNode {
         let root = SCNNode()
         let ironMat = SCNMaterial()
         ironMat.diffuse.contents = NSColor(red: 0.62, green: 0.63, blue: 0.66, alpha: 1.0)

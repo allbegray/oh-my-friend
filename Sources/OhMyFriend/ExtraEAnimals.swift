@@ -26,7 +26,7 @@ public final class AnimalsEManager {
     private var horseStand: EHorseArmorWindow?
     // 당나귀 길들이기 + XP 뱅크(15칸)
     private var donkey: EDonkeyWindow?
-    private var donkeyTaps: Int = 0
+    private var donkeyTaps = HitCounter(maxHits: 3)
     private var donkeyTamed: Bool = false
     private var donkeyBank: Int = 0
     // 노새 최고 점프 기록 (메모리)
@@ -38,10 +38,10 @@ public final class AnimalsEManager {
     private var zombieHorse: EZombieHorseWindow?
     private var zombieRiding: Bool = false
     // 앵무새 모방 순환 인덱스
-    private var mimic: EParrotMimicWindow?
+    private let mimicSlot = ToggleSlot<EParrotMimicWindow>()
     private var mimicIndex: Int = 0
     // 아르마딜로
-    private var armadillo: EArmadilloWindow?
+    private let armadilloSlot = ToggleSlot<EArmadilloWindow>()
 
     private init() {}
 
@@ -69,7 +69,7 @@ public final class AnimalsEManager {
             ExtraMenuEntry({ [weak self] in
                 guard let self = self else { return "🫏 당나귀" }
                 if self.donkeyTamed { return "🫏 당나귀 길들임 (📦 \(self.donkeyBank)/15)" }
-                return "🫏 당나귀 (\(self.donkeyTaps)/3)"
+                return "🫏 당나귀 (\(self.donkeyTaps.hits)/3)"
             }, { [weak self] in self?.toggleDonkey() }),
             ExtraMenuEntry({ [weak self] in
                 guard let self = self else { return "🐎 노새" }
@@ -125,15 +125,12 @@ public final class AnimalsEManager {
     // MARK: - 🦔 아르마딜로: 사막 배회 + 클릭 시 인갑 +1(6 상한) + 몸말기
 
     private func toggleArmadillo() {
-        if let w = armadillo, w.isVisible {
-            w.close(); armadillo = nil; return
-        }
-        armadillo = nil
-        let w = EArmadilloWindow(startPos: spawnPos(dx: -80)) { [weak self] tapped in
-            self?.handleArmadilloTap(tapped)
-        }
-        armadillo = w
-        w.start()
+        let pos = spawnPos(dx: -80)
+        armadilloSlot.toggle(make: {
+            EArmadilloWindow(startPos: pos) { [weak self] tapped in
+                self?.handleArmadilloTap(tapped)
+            }
+        }, start: { $0.start() })
     }
 
     private func handleArmadilloTap(_ w: EArmadilloWindow) {
@@ -290,7 +287,7 @@ public final class AnimalsEManager {
             w.close(); donkey = nil; return
         }
         donkey = nil
-        donkeyTaps = donkeyTamed ? donkeyTaps : 0
+        if !donkeyTamed { donkeyTaps.reset() }
         let w = EDonkeyWindow(startPos: spawnPos(dx: -60), tamed: donkeyTamed) { [weak self] tapped in
             self?.handleDonkeyTap(tapped)
         }
@@ -300,9 +297,8 @@ public final class AnimalsEManager {
 
     private func handleDonkeyTap(_ w: EDonkeyWindow) {
         if !donkeyTamed {
-            donkeyTaps += 1
             w.nudge()
-            if donkeyTaps >= 3 {
+            if donkeyTaps.hit() {
                 donkeyTamed = true
                 donkeyBank = 0
                 w.setTamed(true)
@@ -439,15 +435,12 @@ public final class AnimalsEManager {
     ]
 
     private func toggleMimic() {
-        if let w = mimic, w.isVisible {
-            w.close(); mimic = nil; return
-        }
-        mimic = nil
-        let w = EParrotMimicWindow(startPos: spawnPos(dx: 100)) { [weak self] tapped in
-            self?.handleMimicTap(tapped)
-        }
-        mimic = w
-        w.start()
+        let pos = spawnPos(dx: 100)
+        mimicSlot.toggle(make: {
+            EParrotMimicWindow(startPos: pos) { [weak self] tapped in
+                self?.handleMimicTap(tapped)
+            }
+        }, start: { $0.start() })
     }
 
     private func handleMimicTap(_ w: EParrotMimicWindow) {
@@ -461,24 +454,13 @@ public final class AnimalsEManager {
 
 // MARK: - 🛡️ 늑대 갑옷 전시대
 
-public final class EWolfArmorStandWindow: NSPanel {
+public final class EWolfArmorStandWindow: EntityWindow {
     private var tick: Timer?
     private var phase: TimeInterval = 0
     private var drawView: EWolfArmorStandDrawView?
 
     public init(startPos: CGPoint) {
-        super.init(
-            contentRect: NSRect(x: startPos.x - 36, y: startPos.y, width: 72, height: 60),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = true
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - 36, y: startPos.y, width: 72, height: 60), ignoresMouse: true)
         let view = EWolfArmorStandDrawView(frame: NSRect(origin: .zero, size: NSSize(width: 72, height: 60)))
         self.drawView = view
         contentView = view
@@ -529,13 +511,13 @@ private final class EWolfArmorStandDrawView: NSView {
 
 // MARK: - 🦔 아르마딜로: 사막 배회 + 몸말기
 
-public final class EArmadilloWindow: NSPanel {
+public final class EArmadilloWindow: EntityWindow {
     public var position: CGPoint
     private let onTap: (EArmadilloWindow) -> Void
     private var tick: Timer?
     private var phase: TimeInterval = 0
-    private var dir: CGFloat = 1
-    private var curlLeft: TimeInterval = 0
+    private var wander = WanderState(speed: 26.0)
+    private var curlCooldown = Cooldown()
     private var drawView: EArmadilloDrawView?
     private let panelW: CGFloat = 64
     private let panelH: CGFloat = 44
@@ -543,18 +525,7 @@ public final class EArmadilloWindow: NSPanel {
     public init(startPos: CGPoint, onTap: @escaping (EArmadilloWindow) -> Void) {
         self.position = startPos
         self.onTap = onTap
-        super.init(
-            contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = EArmadilloDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
         self.drawView = view
         contentView = view
@@ -566,16 +537,14 @@ public final class EArmadilloWindow: NSPanel {
         tick = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] t in
             guard let self = self else { t.invalidate(); return }
             self.phase += 1.0 / 60.0
-            if self.curlLeft > 0 { self.curlLeft -= 1.0 / 60.0 }
-            if self.curlLeft <= 0 {
-                if Int(self.phase) % 4 == 0 && Int(self.phase * 60.0) % 60 == 0 {
-                    self.dir = Bool.random() ? 1 : -1
-                }
-                self.position.x += self.dir * 26.0 / 60.0
+            let dt = 1.0 / 60.0
+            self.curlCooldown.tick(dt)
+            if self.curlCooldown.ready {
+                self.position.x += self.wander.tick(dt)
             }
             self.setFrameOrigin(NSPoint(x: self.position.x - self.panelW / 2, y: self.position.y))
-            self.drawView?.facingRight = self.dir > 0
-            self.drawView?.curled = self.curlLeft > 0
+            self.drawView?.facingRight = self.wander.direction > 0
+            self.drawView?.curled = !self.curlCooldown.ready
             self.drawView?.step = sin(self.phase * 5.0)
             self.drawView?.needsDisplay = true
         }
@@ -583,7 +552,7 @@ public final class EArmadilloWindow: NSPanel {
     }
 
     public func curlUp() {
-        curlLeft = 1.2
+        curlCooldown.trigger(1.2)
     }
 
     public override func mouseDown(with event: NSEvent) {
@@ -650,7 +619,7 @@ private final class EArmadilloDrawView: NSView {
 
 // MARK: - 🎁 고양이 선물 상자
 
-public final class EGiftCatWindow: NSPanel {
+public final class EGiftCatWindow: EntityWindow {
     private let onTap: () -> Void
     private var tick: Timer?
     private var phase: TimeInterval = 0
@@ -658,18 +627,7 @@ public final class EGiftCatWindow: NSPanel {
 
     public init(startPos: CGPoint, onTap: @escaping () -> Void) {
         self.onTap = onTap
-        super.init(
-            contentRect: NSRect(x: startPos.x - 30, y: startPos.y, width: 60, height: 56),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - 30, y: startPos.y, width: 60, height: 56), ignoresMouse: false)
         let view = EGiftCatDrawView(frame: NSRect(origin: .zero, size: NSSize(width: 60, height: 56)))
         self.drawView = view
         contentView = view
@@ -725,7 +683,7 @@ private final class EGiftCatDrawView: NSView {
 
 // MARK: - 🐠 열대어 어항
 
-public final class ETropicalFishWindow: NSPanel {
+public final class ETropicalFishWindow: EntityWindow {
     private let onTap: (ETropicalFishWindow) -> Void
     private var tick: Timer?
     private var phase: TimeInterval = 0
@@ -735,18 +693,7 @@ public final class ETropicalFishWindow: NSPanel {
 
     public init(startPos: CGPoint, onTap: @escaping (ETropicalFishWindow) -> Void) {
         self.onTap = onTap
-        super.init(
-            contentRect: NSRect(x: startPos.x - 40, y: startPos.y, width: 80, height: 56),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - 40, y: startPos.y, width: 80, height: 56), ignoresMouse: false)
         let view = ETropicalFishDrawView(frame: NSRect(origin: .zero, size: NSSize(width: 80, height: 56)))
         self.drawView = view
         contentView = view
@@ -829,24 +776,13 @@ private final class ETropicalFishDrawView: NSView {
 
 // MARK: - 🐴 말 갑옷 전시대 (철·금·다이아)
 
-public final class EHorseArmorWindow: NSPanel {
+public final class EHorseArmorWindow: EntityWindow {
     private var tick: Timer?
     private var phase: TimeInterval = 0
     private var drawView: EHorseArmorDrawView?
 
     public init(startPos: CGPoint, tier: String) {
-        super.init(
-            contentRect: NSRect(x: startPos.x - 44, y: startPos.y, width: 88, height: 64),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = true
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - 44, y: startPos.y, width: 88, height: 64), ignoresMouse: true)
         let view = EHorseArmorDrawView(frame: NSRect(origin: .zero, size: NSSize(width: 88, height: 64)), tier: tier)
         self.drawView = view
         contentView = view
@@ -911,11 +847,11 @@ private final class EHorseArmorDrawView: NSView {
 
 // MARK: - 🫏 당나귀: 길들이기 + XP 뱅크
 
-public final class EDonkeyWindow: NSPanel {
+public final class EDonkeyWindow: EntityWindow {
     private let onTap: (EDonkeyWindow) -> Void
     private var tick: Timer?
     private var phase: TimeInterval = 0
-    private var dir: CGFloat = 1
+    private var wander = WanderState(speed: 16.0)
     private var hopLeft: TimeInterval = 0
     private var tamed: Bool
     private var drawView: EDonkeyDrawView?
@@ -927,18 +863,7 @@ public final class EDonkeyWindow: NSPanel {
         self.position = startPos
         self.tamed = tamed
         self.onTap = onTap
-        super.init(
-            contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = EDonkeyDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
         self.drawView = view
         contentView = view
@@ -951,13 +876,10 @@ public final class EDonkeyWindow: NSPanel {
             guard let self = self else { t.invalidate(); return }
             self.phase += 1.0 / 60.0
             if self.hopLeft > 0 { self.hopLeft -= 1.0 / 60.0 }
-            if Int(self.phase) % 5 == 0 && Int(self.phase * 60.0) % 60 == 0 {
-                self.dir = Bool.random() ? 1 : -1
-            }
-            self.position.x += self.dir * 16.0 / 60.0
+            self.position.x += self.wander.tick(1.0 / 60.0)
             let hop: CGFloat = self.hopLeft > 0 ? 10.0 : 0
             self.setFrameOrigin(NSPoint(x: self.position.x - self.panelW / 2, y: self.position.y + hop))
-            self.drawView?.facingRight = self.dir > 0
+            self.drawView?.facingRight = self.wander.direction > 0
             self.drawView?.tamed = self.tamed
             self.drawView?.step = sin(self.phase * 3.5)
             self.drawView?.needsDisplay = true
@@ -1027,7 +949,7 @@ private final class EDonkeyDrawView: NSView {
 
 // MARK: - 🐎 노새: 깡충 3단 점프 + 최고 기록
 
-public final class EMuleWindow: NSPanel {
+public final class EMuleWindow: EntityWindow {
     private let onTap: (EMuleWindow, CGFloat) -> Void
     private var tick: Timer?
     private var phase: TimeInterval = 0
@@ -1041,18 +963,7 @@ public final class EMuleWindow: NSPanel {
     public init(startPos: CGPoint, onTap: @escaping (EMuleWindow, CGFloat) -> Void) {
         self.position = startPos
         self.onTap = onTap
-        super.init(
-            contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = EMuleDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
         self.drawView = view
         contentView = view
@@ -1126,7 +1037,7 @@ private final class EMuleDrawView: NSView {
 
 // MARK: - 💀 스켈레톤마: 뇌우 소환 + 번개 + 탑승
 
-public final class ESkeletonHorseWindow: NSPanel {
+public final class ESkeletonHorseWindow: EntityWindow {
     private let onTap: (ESkeletonHorseWindow) -> Void
     private var tick: Timer?
     private var phase: TimeInterval = 0
@@ -1141,18 +1052,7 @@ public final class ESkeletonHorseWindow: NSPanel {
     public init(startPos: CGPoint, onTap: @escaping (ESkeletonHorseWindow) -> Void) {
         self.position = startPos
         self.onTap = onTap
-        super.init(
-            contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = ESkeletonHorseDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
         self.drawView = view
         contentView = view
@@ -1253,7 +1153,7 @@ private final class ESkeletonHorseDrawView: NSView {
 
 // MARK: - 🧟 좀비마: 무적 + 탑승 토글
 
-public final class EZombieHorseWindow: NSPanel {
+public final class EZombieHorseWindow: EntityWindow {
     private let onTap: (EZombieHorseWindow) -> Void
     private var tick: Timer?
     private var phase: TimeInterval = 0
@@ -1267,18 +1167,7 @@ public final class EZombieHorseWindow: NSPanel {
     public init(startPos: CGPoint, onTap: @escaping (EZombieHorseWindow) -> Void) {
         self.position = startPos
         self.onTap = onTap
-        super.init(
-            contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = EZombieHorseDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
         self.drawView = view
         contentView = view
@@ -1366,7 +1255,7 @@ private final class EZombieHorseDrawView: NSView {
 
 // MARK: - 🦜 앵무새 모방: 몹 울음소리 순환 + 파티클
 
-public final class EParrotMimicWindow: NSPanel {
+public final class EParrotMimicWindow: EntityWindow {
     private let onTap: (EParrotMimicWindow) -> Void
     private var tick: Timer?
     private var phase: TimeInterval = 0
@@ -1375,18 +1264,7 @@ public final class EParrotMimicWindow: NSPanel {
 
     public init(startPos: CGPoint, onTap: @escaping (EParrotMimicWindow) -> Void) {
         self.onTap = onTap
-        super.init(
-            contentRect: NSRect(x: startPos.x - 28, y: startPos.y, width: 56, height: 52),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - 28, y: startPos.y, width: 56, height: 52), ignoresMouse: false)
         let view = EParrotMimicDrawView(frame: NSRect(origin: .zero, size: NSSize(width: 56, height: 52)))
         self.drawView = view
         contentView = view

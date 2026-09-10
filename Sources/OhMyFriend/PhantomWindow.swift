@@ -7,7 +7,7 @@ public protocol PhantomWindowDelegate: AnyObject {
     func phantomWindowDidDefeat(_ window: PhantomWindow)
 }
 
-public final class PhantomWindow: NSPanel {
+public final class PhantomWindow: EntityWindow {
     public private(set) var position: CGPoint
     public var anchor: CGPoint = .zero
     public weak var phantomDelegate: PhantomWindowDelegate?
@@ -27,18 +27,7 @@ public final class PhantomWindow: NSPanel {
         self.anchor = startPos
         self.phantomDelegate = delegate
         let size = NSSize(width: 84, height: 48)
-        super.init(
-            contentRect: NSRect(x: startPos.x - 42, y: startPos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - 42, y: startPos.y, width: size.width, height: size.height), ignoresMouse: false)
         let view = PhantomDrawView(frame: NSRect(origin: .zero, size: size))
         self.drawView = view
         contentView = view

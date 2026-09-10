@@ -14,12 +14,12 @@ public final class EndCManager {
     private var city: CEndCityWindow?
     private var ship: CEndShipWindow?
     private var rebirth: CEndRebirthWindow?
-    private var breath: CEndBreathWindow?
+    private let breathSlot = ToggleSlot<CEndBreathWindow>()
     private var gateA: CEndGatewayWindow?
     private var gateB: CEndGatewayWindow?
     private var brick: CEndBrickWallWindow?
     private var chest: CEnderChestWindow?
-    private var head: CDragonHeadWindow?
+    private let headSlot = ToggleSlot<CDragonHeadWindow>()
     private var crystal: CCrystalWindow?
     private var rescueTimer: Timer?
     private var rescueActive = false
@@ -115,15 +115,12 @@ public final class EndCManager {
     // MARK: - 4. 용의 숨결
 
     public func toggleBreath() {
-        if let w = breath, w.isVisible {
-            w.close(); breath = nil; return
-        }
-        breath = nil
-        let w = CEndBreathWindow(startPos: spawnPos(dx: 0)) { [weak self] tapped in
-            self?.handleBreathTap(tapped)
-        }
-        breath = w
-        w.start()
+        let pos = spawnPos(dx: 0)
+        breathSlot.toggle(make: {
+            CEndBreathWindow(startPos: pos) { [weak self] tapped in
+                self?.handleBreathTap(tapped)
+            }
+        }, start: { $0.start() })
     }
 
     private func handleBreathTap(_ w: CEndBreathWindow) {
@@ -226,20 +223,17 @@ public final class EndCManager {
     // MARK: - 8. 드래곤 머리
 
     public func toggleHead() {
-        if let w = head, w.isVisible {
-            w.close(); head = nil; return
-        }
-        head = nil
-        let w = CDragonHeadWindow(startPos: spawnPos(dx: 60)) { worn in
-            if worn {
-                RewardCenter.say("🐲 드래곤 머리 착용!")
-            } else {
-                RewardCenter.say("🐲 벗기 완료")
+        let pos = spawnPos(dx: 60)
+        headSlot.toggle(make: {
+            CDragonHeadWindow(startPos: pos) { worn in
+                if worn {
+                    RewardCenter.say("🐲 드래곤 머리 착용!")
+                } else {
+                    RewardCenter.say("🐲 벗기 완료")
+                }
+                SoundAndEffectsManager.shared.play(.pop)
             }
-            SoundAndEffectsManager.shared.play(.pop)
-        }
-        head = w
-        w.start()
+        }, start: { $0.start() })
     }
 
     // MARK: - 9. 엔드 크리스탈 (대폭발)
@@ -261,7 +255,7 @@ public final class EndCManager {
 
     private func clearBlastArea() {
         // 폭발 주변 정리: 임시 연출 창들을 함께 닫는다.
-        if let w = breath, w.isVisible { w.close(); breath = nil }
+        breathSlot.clear()
         if let w = brick, w.isVisible { w.close(); brick = nil }
     }
 
@@ -295,7 +289,7 @@ public final class EndCManager {
 
 // MARK: - 1. 시티: 하늘 상자 3개 순차 파밍
 
-public final class CEndCityWindow: NSPanel {
+public final class CEndCityWindow: EntityWindow {
     private let onDone: () -> Void
     private var opened = 0
     private var drawView: CEndCityDrawView?
@@ -304,18 +298,7 @@ public final class CEndCityWindow: NSPanel {
 
     public init(startPos: CGPoint, onDone: @escaping () -> Void) {
         self.onDone = onDone
-        super.init(
-            contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y + 60, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y + 60, width: panelW, height: panelH), ignoresMouse: false)
         let view = CEndCityDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
         self.drawView = view
         contentView = view
@@ -375,7 +358,7 @@ private final class CEndCityDrawView: NSView {
 
 // MARK: - 2. 엔드 배
 
-public final class CEndShipWindow: NSPanel {
+public final class CEndShipWindow: EntityWindow {
     private let onLoot: () -> Void
     private var done = false
     private var drawView: CEndShipDrawView?
@@ -384,18 +367,7 @@ public final class CEndShipWindow: NSPanel {
 
     public init(startPos: CGPoint, onLoot: @escaping () -> Void) {
         self.onLoot = onLoot
-        super.init(
-            contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y + 90, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y + 90, width: panelW, height: panelH), ignoresMouse: false)
         let view = CEndShipDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
         self.drawView = view
         contentView = view
@@ -438,28 +410,18 @@ private final class CEndShipDrawView: NSView {
 
 // MARK: - 3. 드래곤 부활전: 크리스탈 4개 설치 → 5타 레이드
 
-public final class CEndRebirthWindow: NSPanel {
+public final class CEndRebirthWindow: EntityWindow {
     private let onSlain: () -> Void
     private var crystals = 0
-    private var hits = 0
+    private var raid = HitCounter(maxHits: 5)
+    private var hits: Int { raid.hits }
     private var drawView: CEndRebirthDrawView?
     private let panelW: CGFloat = 150
     private let panelH: CGFloat = 110
 
     public init(startPos: CGPoint, onSlain: @escaping () -> Void) {
         self.onSlain = onSlain
-        super.init(
-            contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = CEndRebirthDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
         self.drawView = view
         contentView = view
@@ -475,11 +437,11 @@ public final class CEndRebirthWindow: NSPanel {
             crystals += 1
             RewardCenter.say("💎 크리스탈 설치 \(crystals)/4")
             SoundAndEffectsManager.shared.play(.pop)
-        } else if hits < 5 {
-            hits += 1
-            RewardCenter.say("🐉 격타 \(hits)/5!")
+        } else if raid.hits < 5 {
+            _ = raid.hit()
+            RewardCenter.say("🐉 격타 \(raid.hits)/5!")
             SoundAndEffectsManager.shared.play(.pop)
-            if hits >= 5 {
+            if raid.hits >= 5 {
                 let cb = onSlain
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { cb() }
             }
@@ -533,7 +495,7 @@ private final class CEndRebirthDrawView: NSView {
 
 // MARK: - 4. 용의 숨결 브레스 존
 
-public final class CEndBreathWindow: NSPanel {
+public final class CEndBreathWindow: EntityWindow {
     private let onTap: (CEndBreathWindow) -> Void
     private var tick: Timer?
     private var phase: TimeInterval = 0
@@ -543,18 +505,7 @@ public final class CEndBreathWindow: NSPanel {
     public init(startPos: CGPoint, onTap: @escaping (CEndBreathWindow) -> Void) {
         self.onTap = onTap
         let size = NSSize(width: 150, height: 70)
-        super.init(
-            contentRect: NSRect(x: startPos.x - size.width / 2, y: startPos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - size.width / 2, y: startPos.y, width: size.width, height: size.height), ignoresMouse: false)
         let view = CEndBreathDrawView(frame: NSRect(origin: .zero, size: size))
         self.drawView = view
         contentView = view
@@ -618,7 +569,7 @@ private final class CEndBreathDrawView: NSView {
 
 // MARK: - 5. 게이트웨이 포털
 
-public final class CEndGatewayWindow: NSPanel {
+public final class CEndGatewayWindow: EntityWindow {
     public var position: CGPoint
     private let onHop: () -> Void
     private var tick: Timer?
@@ -630,18 +581,7 @@ public final class CEndGatewayWindow: NSPanel {
     public init(startPos: CGPoint, tag: Int, onHop: @escaping () -> Void) {
         self.position = startPos
         self.onHop = onHop
-        super.init(
-            contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = CEndGatewayDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
         self.drawView = view
         contentView = view
@@ -691,7 +631,7 @@ private final class CEndGatewayDrawView: NSView {
 
 // MARK: - 6. 엔드 석벽돌 결계 (10분 유지)
 
-public final class CEndBrickWallWindow: NSPanel {
+public final class CEndBrickWallWindow: EntityWindow {
     private let onTap: () -> Void
     private var lifeTimer: Timer?
     private var drawView: CEndBrickWallDrawView?
@@ -699,18 +639,7 @@ public final class CEndBrickWallWindow: NSPanel {
     public init(startPos: CGPoint, onTap: @escaping () -> Void) {
         self.onTap = onTap
         let size = NSSize(width: 170, height: 90)
-        super.init(
-            contentRect: NSRect(x: startPos.x - size.width / 2, y: startPos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - size.width / 2, y: startPos.y, width: size.width, height: size.height), ignoresMouse: false)
         let view = CEndBrickWallDrawView(frame: NSRect(origin: .zero, size: size))
         self.drawView = view
         contentView = view
@@ -778,7 +707,7 @@ private final class CEndBrickWallDrawView: NSView {
 
 // MARK: - 7. 엔더 상자 (열기/닫기 + XP 10 입출금)
 
-public final class CEnderChestWindow: NSPanel {
+public final class CEnderChestWindow: EntityWindow {
     private let vault: () -> Int
     private let onToggle: (Bool) -> Void
     private var isOpened = false
@@ -788,18 +717,7 @@ public final class CEnderChestWindow: NSPanel {
         self.vault = vault
         self.onToggle = onToggle
         let size = NSSize(width: 92, height: 76)
-        super.init(
-            contentRect: NSRect(x: startPos.x - size.width / 2, y: startPos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - size.width / 2, y: startPos.y, width: size.width, height: size.height), ignoresMouse: false)
         let view = CEnderChestDrawView(frame: NSRect(origin: .zero, size: size))
         self.drawView = view
         contentView = view
@@ -850,7 +768,7 @@ private final class CEnderChestDrawView: NSView {
 
 // MARK: - 8. 드래곤 머리 (쓰기 토글 + 불꽃 파티클)
 
-public final class CDragonHeadWindow: NSPanel {
+public final class CDragonHeadWindow: EntityWindow {
     private let onWear: (Bool) -> Void
     private var worn = false
     private var tick: Timer?
@@ -860,18 +778,7 @@ public final class CDragonHeadWindow: NSPanel {
     public init(startPos: CGPoint, onWear: @escaping (Bool) -> Void) {
         self.onWear = onWear
         let size = NSSize(width: 72, height: 72)
-        super.init(
-            contentRect: NSRect(x: startPos.x - size.width / 2, y: startPos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - size.width / 2, y: startPos.y, width: size.width, height: size.height), ignoresMouse: false)
         let view = CDragonHeadDrawView(frame: NSRect(origin: .zero, size: size))
         self.drawView = view
         contentView = view
@@ -935,28 +842,17 @@ private final class CDragonHeadDrawView: NSView {
 
 // MARK: - 9. 엔드 크리스탈 (대폭발 플래시)
 
-public final class CCrystalWindow: NSPanel {
+public final class CCrystalWindow: EntityWindow {
     private let onBoom: () -> Void
     private var exploded = false
-    private var flashLeft: TimeInterval = 0
+    private var flashCooldown = Cooldown()
     private var tick: Timer?
     private var drawView: CCrystalDrawView?
 
     public init(startPos: CGPoint, onBoom: @escaping () -> Void) {
         self.onBoom = onBoom
         let size = NSSize(width: 80, height: 100)
-        super.init(
-            contentRect: NSRect(x: startPos.x - size.width / 2, y: startPos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - size.width / 2, y: startPos.y, width: size.width, height: size.height), ignoresMouse: false)
         let view = CCrystalDrawView(frame: NSRect(origin: .zero, size: size))
         self.drawView = view
         contentView = view
@@ -967,9 +863,9 @@ public final class CCrystalWindow: NSPanel {
         SoundAndEffectsManager.shared.play(.pop)
         tick = Timer.scheduledTimer(withTimeInterval: 1.0 / 30.0, repeats: true) { [weak self] t in
             guard let self = self else { t.invalidate(); return }
-            if self.flashLeft > 0 {
-                self.flashLeft -= 1.0 / 30.0
-                self.drawView?.flash = self.flashLeft > 0
+            if !self.flashCooldown.ready {
+                self.flashCooldown.tick(1.0 / 30.0)
+                self.drawView?.flash = !self.flashCooldown.ready
                 self.drawView?.needsDisplay = true
             }
         }
@@ -979,7 +875,7 @@ public final class CCrystalWindow: NSPanel {
     public override func mouseDown(with event: NSEvent) {
         guard !exploded else { return }
         exploded = true
-        flashLeft = 0.5
+        flashCooldown.trigger(0.5)
         drawView?.flash = true
         drawView?.needsDisplay = true
         let cb = onBoom

@@ -102,7 +102,7 @@ public final class AdvancementManager {
     }
 }
 
-private final class AdvancementToastWindow: NSPanel {
+private final class AdvancementToastWindow: EntityWindow {
     private let onDone: () -> Void
     private var timer: Timer?
 
@@ -116,24 +116,18 @@ private final class AdvancementToastWindow: NSPanel {
             width: size.width,
             height: size.height
         )
-        super.init(
-            contentRect: frame,
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
+        super.init(contentRect: frame, ignoresMouse: true)
         self.hasShadow = true
-        self.ignoresMouseEvents = true
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         let view = AdvancementToastDrawView(
             frame: NSRect(origin: .zero, size: size),
             title: "🏆 발전 과제 달성!",
             subtitle: advancement.title
         )
         contentView = view
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
     }
 
     func show() {

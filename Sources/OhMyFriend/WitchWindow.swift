@@ -1,7 +1,7 @@
 import AppKit
 import CoreGraphics
 
-public final class WitchWindow: NSPanel {
+public final class WitchWindow: EntityWindow {
     public var anchor: CGPoint = .zero
     private var hp = 2
     private var flyTimer: Timer?
@@ -17,18 +17,7 @@ public final class WitchWindow: NSPanel {
         self.onThrow = onThrow
         self.onDefeat = onDefeat
         let size = NSSize(width: 56, height: 84)
-        super.init(
-            contentRect: NSRect(x: startPos.x - 28, y: startPos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - 28, y: startPos.y, width: size.width, height: size.height), ignoresMouse: false)
         let view = WitchDrawView(frame: NSRect(origin: .zero, size: size))
         self.drawView = view
         contentView = view

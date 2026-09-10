@@ -1,7 +1,7 @@
 import AppKit
 import CoreGraphics
 
-public final class TridentEntityWindow: NSPanel {
+public final class TridentEntityWindow: EntityWindow {
     private let startPos: CGPoint
     private let targetPos: CGPoint
     private let onReturned: () -> Void
@@ -19,19 +19,7 @@ public final class TridentEntityWindow: NSPanel {
 
         let size: CGFloat = 56.0
         let frame = NSRect(x: startPos.x - size / 2.0, y: startPos.y - size / 2.0, width: size, height: size)
-        super.init(
-            contentRect: frame,
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = true
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: frame, ignoresMouse: true)
 
         let view = TridentDrawView(frame: NSRect(origin: .zero, size: frame.size))
         view.facingRight = targetPos.x >= startPos.x

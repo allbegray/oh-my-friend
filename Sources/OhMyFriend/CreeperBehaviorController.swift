@@ -212,15 +212,6 @@ public final class CreeperBehaviorController {
     }
 
     private func chooseLootEmoji(weapon: HeldItem) -> String {
-        switch weapon {
-        case .diamondSword:
-            return "💥 화약 획득!"
-        case .diamondPickaxe:
-            return "🟢 경험치 +5"
-        case .torch:
-            return "✨ 처치 완료!"
-        default:
-            return "💥 화약 획득!"
-        }
+        MinecraftCharacterNode.spec(for: weapon).lootEmoji ?? "💥 화약 획득!"
     }
 }

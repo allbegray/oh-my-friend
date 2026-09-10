@@ -1,29 +1,18 @@
 import AppKit
 import CoreGraphics
 
-public final class TargetWindow: NSPanel {
+public final class TargetWindow: EntityWindow {
     public var centerPos: CGPoint = .zero
 
     public init(centerPos: CGPoint) {
         self.centerPos = centerPos
         let size = NSSize(width: 90, height: 90)
-        super.init(
-            contentRect: NSRect(
+        super.init(contentRect: NSRect(
                 x: centerPos.x - size.width / 2.0,
                 y: centerPos.y - size.height / 2.0,
                 width: size.width,
                 height: size.height
-            ),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = true
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+            ), ignoresMouse: true)
         contentView = TargetDrawView(frame: NSRect(origin: .zero, size: size))
     }
 
@@ -52,7 +41,7 @@ private final class TargetDrawView: NSView {
     }
 }
 
-public final class BatWindow: NSPanel {
+public final class BatWindow: EntityWindow {
     public var anchor: CGPoint = .zero
     private var flyTimer: Timer?
     private var phase: TimeInterval = 0
@@ -64,18 +53,7 @@ public final class BatWindow: NSPanel {
         self.anchorProvider = anchorProvider
         self.anchor = anchorProvider()
         let size = NSSize(width: 40, height: 30)
-        super.init(
-            contentRect: NSRect(x: anchor.x, y: anchor.y + 120, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = true
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: anchor.x, y: anchor.y + 120, width: size.width, height: size.height), ignoresMouse: true)
         let view = BatDrawView(frame: NSRect(origin: .zero, size: size))
         self.drawView = view
         contentView = view

@@ -1,7 +1,7 @@
 import AppKit
 import CoreGraphics
 
-public final class JukeboxEntityWindow: NSPanel {
+public final class JukeboxEntityWindow: EntityWindow {
     private let floorPos: CGPoint
     private let onFinished: () -> Void
     private var timer: Timer?
@@ -18,18 +18,7 @@ public final class JukeboxEntityWindow: NSPanel {
             width: size.width,
             height: size.height
         )
-        super.init(
-            contentRect: frame,
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = true
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: frame, ignoresMouse: true)
         contentView = JukeboxDrawView(frame: NSRect(origin: .zero, size: size))
     }
 

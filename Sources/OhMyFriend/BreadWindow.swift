@@ -1,7 +1,7 @@
 import AppKit
 import CoreGraphics
 
-public final class BreadWindow: NSPanel {
+public final class BreadWindow: EntityWindow {
     private let isPumpkinPie: Bool
     private let onEaten: (Bool) -> Void
     private var isBaked = false
@@ -14,27 +14,15 @@ public final class BreadWindow: NSPanel {
         self.isPumpkinPie = isPumpkinPie
         self.onEaten = onEaten
         let size = NSSize(width: 64, height: 48)
-        super.init(
-            contentRect: NSRect(
-                x: floorPos.x - size.width / 2.0,
-                y: floorPos.y,
-                width: size.width,
-                height: size.height
-            ),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: floorPos.x - size.width / 2.0, y: floorPos.y, width: size.width, height: size.height), ignoresMouse: false)
         let view = BreadDrawView(frame: NSRect(origin: .zero, size: size))
         view.isPumpkinPie = isPumpkinPie
         self.drawView = view
         contentView = view
+    }
+
+    public required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
     }
 
     public func bake() {

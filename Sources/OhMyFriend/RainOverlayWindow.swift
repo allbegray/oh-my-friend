@@ -1,7 +1,7 @@
 import AppKit
 import CoreGraphics
 
-public final class RainOverlayWindow: NSPanel {
+public final class RainOverlayWindow: EntityWindow {
     private var rainTimer: Timer?
     private var drops: [CGPoint] = []
     private var drawView: RainDrawView?
@@ -9,18 +9,7 @@ public final class RainOverlayWindow: NSPanel {
     private var boltX: CGFloat = 0
 
     public init(screen: NSScreen) {
-        super.init(
-            contentRect: screen.frame,
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.floatingWindow)) - 2)
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = true
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: screen.frame, ignoresMouse: true, level: NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.floatingWindow)) - 2))
         let view = RainDrawView(frame: NSRect(origin: .zero, size: screen.frame.size))
         self.drawView = view
         contentView = view
@@ -30,6 +19,10 @@ public final class RainOverlayWindow: NSPanel {
                 y: CGFloat.random(in: 0...screen.frame.height)
             ))
         }
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
     }
 
     public func show() {

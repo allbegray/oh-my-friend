@@ -55,29 +55,18 @@ private final class CaravanCamelDrawView: NSView {
     }
 }
 
-private final class CaravanCamelWindow: NSPanel {
+private final class CaravanCamelWindow: EntityWindow {
     private var position: CGPoint
     private var riding = false
     private var timer: Timer?
     private var phase: TimeInterval = 0
-    private var dir: CGFloat = 1
+    private var wander = WanderState(speed: 30.0)
     private var drawView: CaravanCamelDrawView?
 
     init(startPos: CGPoint) {
         self.position = startPos
         let size = NSSize(width: 84, height: 84)
-        super.init(
-            contentRect: NSRect(x: startPos.x - 42, y: startPos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - 42, y: startPos.y, width: size.width, height: size.height), ignoresMouse: false)
         let view = CaravanCamelDrawView(frame: NSRect(origin: .zero, size: size))
         self.drawView = view
         contentView = view
@@ -89,13 +78,10 @@ private final class CaravanCamelWindow: NSPanel {
         timer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] t in
             guard let self = self else { t.invalidate(); return }
             self.phase += 1.0 / 60.0
-            if Int(self.phase * 60.0) % 240 == 0 {
-                self.dir = Bool.random() ? 1 : -1
-            }
-            let speed: CGFloat = self.riding ? 60.0 : 30.0
-            self.position.x += self.dir * speed / 60.0
+            self.wander.speed = self.riding ? 60.0 : 30.0
+            self.position.x += self.wander.tick(1.0 / 60.0)
             self.setFrameOrigin(NSPoint(x: self.position.x - 42, y: self.position.y))
-            self.drawView?.facingRight = self.dir > 0
+            self.drawView?.facingRight = self.wander.direction > 0
             self.drawView?.bob = sin(self.phase * (self.riding ? 8.0 : 4.0))
             self.drawView?.riding = self.riding
             self.drawView?.dust = CGFloat(self.phase * 30.0)
@@ -176,30 +162,19 @@ private final class CaravanLlamaDrawView: NSView {
     }
 }
 
-private final class CaravanLlamaWindow: NSPanel {
+private final class CaravanLlamaWindow: EntityWindow {
     private var position: CGPoint
     private var timer: Timer?
     private var phase: TimeInterval = 0
-    private var dir: CGFloat = 1
-    private var nextSpit: TimeInterval = 6.0
+    private var wander = WanderState(speed: 26.0)
+    private var spitCooldown = Cooldown()
     private var spitUntil: TimeInterval = 0
     private var drawView: CaravanLlamaDrawView?
 
     init(startPos: CGPoint) {
         self.position = startPos
         let size = NSSize(width: 88, height: 72)
-        super.init(
-            contentRect: NSRect(x: startPos.x - 44, y: startPos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - 44, y: startPos.y, width: size.width, height: size.height), ignoresMouse: false)
         let view = CaravanLlamaDrawView(frame: NSRect(origin: .zero, size: size))
         view.carpet = Int.random(in: 0..<3)
         self.drawView = view
@@ -209,23 +184,22 @@ private final class CaravanLlamaWindow: NSPanel {
     func start() {
         orderFrontRegardless()
         SoundAndEffectsManager.shared.play(.pop)
+        spitCooldown.trigger(6.0)
         timer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] t in
             guard let self = self else { t.invalidate(); return }
             self.phase += 1.0 / 60.0
-            if Int(self.phase * 60.0) % 240 == 0 {
-                self.dir = Bool.random() ? 1 : -1
-            }
-            self.position.x += self.dir * 26.0 / 60.0
+            self.position.x += self.wander.tick(1.0 / 60.0)
             self.setFrameOrigin(NSPoint(x: self.position.x - 44, y: self.position.y))
-            if self.phase >= self.nextSpit {
+            self.spitCooldown.tick(1.0 / 60.0)
+            if self.spitCooldown.ready {
+                self.spitCooldown.trigger(TimeInterval.random(in: 8.0...15.0))
                 self.spitUntil = self.phase + 1.0
-                self.nextSpit = self.phase + TimeInterval.random(in: 8.0...15.0)
                 SoundAndEffectsManager.shared.play(.pop)
                 RewardCenter.say("💦 퉤!")
             }
             let spitting = self.phase < self.spitUntil
             self.drawView?.spitting = spitting
-            self.drawView?.facingRight = self.dir > 0
+            self.drawView?.facingRight = self.wander.direction > 0
             self.drawView?.bob = sin(self.phase * 4.0)
             self.drawView?.needsDisplay = true
         }
@@ -273,7 +247,7 @@ private final class CaravanTraderDrawView: NSView {
     }
 }
 
-private final class CaravanTraderWindow: NSPanel {
+private final class CaravanTraderWindow: EntityWindow {
     private var position: CGPoint
     private var timer: Timer?
     private var phase: TimeInterval = 0
@@ -283,18 +257,7 @@ private final class CaravanTraderWindow: NSPanel {
     init(startPos: CGPoint) {
         self.position = startPos
         let size = NSSize(width: 76, height: 68)
-        super.init(
-            contentRect: NSRect(x: startPos.x - 38, y: startPos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - 38, y: startPos.y, width: size.width, height: size.height), ignoresMouse: false)
         let view = CaravanTraderDrawView(frame: NSRect(origin: .zero, size: size))
         self.drawView = view
         contentView = view
@@ -379,21 +342,10 @@ private final class CaravanCactusDrawView: NSView {
     }
 }
 
-private final class CaravanCactusWindow: NSPanel {
+private final class CaravanCactusWindow: EntityWindow {
     init(startPos: CGPoint) {
         let size = NSSize(width: 60, height: 58)
-        super.init(
-            contentRect: NSRect(x: startPos.x - 30, y: startPos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - 30, y: startPos.y, width: size.width, height: size.height), ignoresMouse: false)
         contentView = CaravanCactusDrawView(frame: NSRect(origin: .zero, size: size))
     }
 
@@ -447,7 +399,7 @@ private final class CaravanTempleDrawView: NSView {
     }
 }
 
-private final class CaravanTempleWindow: NSPanel {
+private final class CaravanTempleWindow: EntityWindow {
     private var fuseTimer: Timer?
     private var fuseElapsed: TimeInterval = 0
     private var used = false
@@ -455,18 +407,7 @@ private final class CaravanTempleWindow: NSPanel {
 
     init(startPos: CGPoint) {
         let size = NSSize(width: 100, height: 64)
-        super.init(
-            contentRect: NSRect(x: startPos.x - 50, y: startPos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - 50, y: startPos.y, width: size.width, height: size.height), ignoresMouse: false)
         let view = CaravanTempleDrawView(frame: NSRect(origin: .zero, size: size))
         self.drawView = view
         contentView = view

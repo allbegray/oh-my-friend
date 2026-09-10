@@ -11,7 +11,7 @@ public extension ChickenWindowDelegate {
     func chickenWindowDidHatchChick(_ parent: ChickenWindow, chick: ChickenWindow) {}
 }
 
-public final class ChickenWindow: NSPanel {
+public final class ChickenWindow: EntityWindow {
     public var position: CGPoint
     public let scale: CGFloat
     public weak var chickenDelegate: ChickenWindowDelegate?
@@ -36,21 +36,14 @@ public final class ChickenWindow: NSPanel {
         let h: CGFloat = 48 * scale
         self.panelW = w
         self.panelH = h
-        super.init(
-            contentRect: NSRect(x: startPos.x - w / 2.0, y: startPos.y, width: w, height: h),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - w / 2.0, y: startPos.y, width: w, height: h), ignoresMouse: false)
         let view = ChickenDrawView(frame: NSRect(origin: .zero, size: NSSize(width: w, height: h)))
         self.drawView = view
         contentView = view
+    }
+
+    public required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
     }
 
     public func start() {
@@ -119,7 +112,7 @@ public final class ChickenWindow: NSPanel {
     }
 }
 
-public final class EggWindow: NSPanel {
+public final class EggWindow: EntityWindow {
     public var position: CGPoint
     private let onTap: (EggWindow) -> Void
     private var drawView: EggDrawView?
@@ -128,26 +121,14 @@ public final class EggWindow: NSPanel {
         self.position = floorPos
         self.onTap = onTap
         let size = NSSize(width: 24, height: 28)
-        super.init(
-            contentRect: NSRect(
-                x: floorPos.x - size.width / 2.0,
-                y: floorPos.y,
-                width: size.width,
-                height: size.height
-            ),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: floorPos.x - size.width / 2.0, y: floorPos.y, width: size.width, height: size.height), ignoresMouse: false)
         let view = EggDrawView(frame: NSRect(origin: .zero, size: size))
         self.drawView = view
         contentView = view
+    }
+
+    public required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
     }
 
     public func place() {

@@ -3,7 +3,7 @@ import AppKit
 // MARK: - TNT 폭파 연출 오버레이
 // 대상 앱 창 위에 투명 패널을 띄워 ① 도화선 점멸(마인크래프트 primed TNT처럼 하얗게 펄스)
 // ② 폭발 섬광·연기·불똥과 함께 창 전체가 블록 파편으로 비산하는 모습을 그린다.
-public final class BlockBreakOverlayWindow: NSPanel {
+public final class BlockBreakOverlayWindow: EntityWindow {
     /// 모든 창이 함께 쓸 수 있는 파편 예산 (2x 화면 기준, 프레임당).
     /// 그리기 비용이 파편 수에 거의 선형이라(실측 @2x 1880x1860 패널: 1980개 14.2ms / 900개 6.9ms / 450개 4.0ms)
     /// 캐릭터·물리·창 합성이 함께 도는 16.7ms 프레임 안에 들어오는 값으로 잡는다.
@@ -42,20 +42,9 @@ public final class BlockBreakOverlayWindow: NSPanel {
             debrisBudget: debrisBudget
         )
 
-        super.init(
-            contentRect: frameRect,
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
+        super.init(contentRect: frameRect, ignoresMouse: true)
 
-        level = .floating
-        isOpaque = false
-        backgroundColor = .clear
-        hasShadow = false
-        ignoresMouseEvents = true
         isReleasedWhenClosed = false
-        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
 
         contentView = effectView
     }

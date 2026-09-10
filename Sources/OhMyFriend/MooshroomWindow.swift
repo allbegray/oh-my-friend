@@ -5,7 +5,7 @@ public protocol MooshroomWindowDelegate: AnyObject {
     func mooshroomWindowDidClick(_ window: MooshroomWindow)
 }
 
-public final class MooshroomWindow: NSPanel {
+public final class MooshroomWindow: EntityWindow {
     public private(set) var position: CGPoint
     public weak var mooshroomDelegate: MooshroomWindowDelegate?
 
@@ -19,21 +19,14 @@ public final class MooshroomWindow: NSPanel {
         self.position = startPos
         self.mooshroomDelegate = delegate
         let size = NSSize(width: 84, height: 60)
-        super.init(
-            contentRect: NSRect(x: startPos.x - 42, y: startPos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - 42, y: startPos.y, width: size.width, height: size.height), ignoresMouse: false)
         let view = MooshroomDrawView(frame: NSRect(origin: .zero, size: size))
         self.drawView = view
         contentView = view
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
     }
 
     public func start() {

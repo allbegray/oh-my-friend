@@ -8,15 +8,15 @@ import Foundation
 public final class StructuresIManager {
     public static let shared = StructuresIManager()
 
-    private var mansion: IMansionWindow?
-    private var evoker: IEvokerWindow?
-    private var vindicator: IVindicatorWindow?
-    private var outpost: IOutpostWindow?
-    private var city: IAncientCityWindow?
-    private var chamber: ITrialChamberWindow?
-    private var temple: IOceanTempleWindow?
-    private var ship: IEndShipWindow?
-    private var hero: IHeroWindow?
+    private let mansion = ToggleSlot<IMansionWindow>()
+    private let evoker = ToggleSlot<IEvokerWindow>()
+    private let vindicator = ToggleSlot<IVindicatorWindow>()
+    private let outpost = ToggleSlot<IOutpostWindow>()
+    private let city = ToggleSlot<IAncientCityWindow>()
+    private let chamber = ToggleSlot<ITrialChamberWindow>()
+    private let temple = ToggleSlot<IOceanTempleWindow>()
+    private let ship = ToggleSlot<IEndShipWindow>()
+    private let hero = ToggleSlot<IHeroWindow>()
     private var bottleCount = 0
     private var bottleBuffUntil: Date?
 
@@ -52,15 +52,11 @@ public final class StructuresIManager {
     // MARK: - 저택: 입구 + 방 4개 순차 탐험 + 보스방 해금
 
     public func toggleMansion() {
-        if let w = mansion, w.isVisible {
-            w.close(); mansion = nil; return
-        }
-        mansion = nil
-        let w = IMansionWindow(startPos: spawnPos(dx: -80)) { [weak self] tapped in
-            self?.handleMansionTap(tapped)
-        }
-        mansion = w
-        w.start()
+        mansion.toggle(make: {
+            IMansionWindow(startPos: self.spawnPos(dx: -80)) { [weak self] tapped in
+                self?.handleMansionTap(tapped)
+            }
+        }, start: { $0.start() })
     }
 
     private func handleMansionTap(_ w: IMansionWindow) {
@@ -80,15 +76,11 @@ public final class StructuresIManager {
     // MARK: - 소환사: 벡스 3마리(클릭 1타) + 본체 3타 + 토템 확정 +8XP
 
     public func toggleEvoker() {
-        if let w = evoker, w.isVisible {
-            w.close(); evoker = nil; return
-        }
-        evoker = nil
-        let w = IEvokerWindow(startPos: spawnPos(dx: 80)) { [weak self] tapped in
-            self?.handleEvokerTap(tapped)
-        }
-        evoker = w
-        w.start()
+        evoker.toggle(make: {
+            IEvokerWindow(startPos: self.spawnPos(dx: 80)) { [weak self] tapped in
+                self?.handleEvokerTap(tapped)
+            }
+        }, start: { $0.start() })
     }
 
     private func handleEvokerTap(_ w: IEvokerWindow) {
@@ -102,9 +94,9 @@ public final class StructuresIManager {
             if w.isDefeated {
                 RewardCenter.grant(xp: 8, "🧙 불사의 토템 확정!")
                 SoundAndEffectsManager.shared.play(.chime)
-                w.close(); evoker = nil
+                evoker.clear()
             } else {
-                RewardCenter.say("🧙 \(3 - w.bodyHits)대 남음!")
+                RewardCenter.say("🧙 \(3 - w.bodyHits.hits)대 남음!")
             }
         }
     }
@@ -112,15 +104,11 @@ public final class StructuresIManager {
     // MARK: - 변명자: 도끼 돌진 + 클릭 2타 + "각하!" +4XP
 
     public func toggleVindicator() {
-        if let w = vindicator, w.isVisible {
-            w.close(); vindicator = nil; return
-        }
-        vindicator = nil
-        let w = IVindicatorWindow(startPos: spawnPos(dx: 120)) { [weak self] tapped in
-            self?.handleVindicatorTap(tapped)
-        }
-        vindicator = w
-        w.start()
+        vindicator.toggle(make: {
+            IVindicatorWindow(startPos: self.spawnPos(dx: 120)) { [weak self] tapped in
+                self?.handleVindicatorTap(tapped)
+            }
+        }, start: { $0.start() })
     }
 
     private func handleVindicatorTap(_ w: IVindicatorWindow) {
@@ -130,7 +118,7 @@ public final class StructuresIManager {
         } else {
             RewardCenter.grant(xp: 4, "🪓 각하! 변명자 격퇴!")
             SoundAndEffectsManager.shared.play(.chime)
-            w.close(); vindicator = nil
+            vindicator.clear()
         }
     }
 
@@ -160,15 +148,11 @@ public final class StructuresIManager {
     // MARK: - 전초기지: 정찰탑 + 상자 2개 + 염소뿔 +3XP
 
     public func toggleOutpost() {
-        if let w = outpost, w.isVisible {
-            w.close(); outpost = nil; return
-        }
-        outpost = nil
-        let w = IOutpostWindow(startPos: spawnPos(dx: -120)) { [weak self] tapped in
-            self?.handleOutpostTap(tapped)
-        }
-        outpost = w
-        w.start()
+        outpost.toggle(make: {
+            IOutpostWindow(startPos: self.spawnPos(dx: -120)) { [weak self] tapped in
+                self?.handleOutpostTap(tapped)
+            }
+        }, start: { $0.start() })
     }
 
     private func handleOutpostTap(_ w: IOutpostWindow) {
@@ -188,15 +172,11 @@ public final class StructuresIManager {
     // MARK: - 고대 도시: 스컬크 진동 + 긴장 게이지 + 반향 조각 +5XP
 
     public func toggleCity() {
-        if let w = city, w.isVisible {
-            w.close(); city = nil; return
-        }
-        city = nil
-        let w = IAncientCityWindow(startPos: spawnPos(dx: 40)) { [weak self] tapped in
-            self?.handleCityTap(tapped)
-        }
-        city = w
-        w.start()
+        city.toggle(make: {
+            IAncientCityWindow(startPos: self.spawnPos(dx: 40)) { [weak self] tapped in
+                self?.handleCityTap(tapped)
+            }
+        }, start: { $0.start() })
     }
 
     private func handleCityTap(_ w: IAncientCityWindow) {
@@ -205,7 +185,7 @@ public final class StructuresIManager {
         if w.tension >= 100 {
             RewardCenter.grant(xp: 5, "🏛️ 반향 조각!")
             SoundAndEffectsManager.shared.play(.chime)
-            w.close(); city = nil
+            city.clear()
         } else {
             RewardCenter.say("🏛️ 긴장 \(Int(w.tension))%...")
         }
@@ -214,15 +194,11 @@ public final class StructuresIManager {
     // MARK: - 트라이얼 챔버: 웨이브 3(1→2→3) + 열쇠 + 메이스 +8XP
 
     public func toggleChamber() {
-        if let w = chamber, w.isVisible {
-            w.close(); chamber = nil; return
-        }
-        chamber = nil
-        let w = ITrialChamberWindow(startPos: spawnPos(dx: -40)) { [weak self] tapped in
-            self?.handleChamberTap(tapped)
-        }
-        chamber = w
-        w.start()
+        chamber.toggle(make: {
+            ITrialChamberWindow(startPos: self.spawnPos(dx: -40)) { [weak self] tapped in
+                self?.handleChamberTap(tapped)
+            }
+        }, start: { $0.start() })
     }
 
     private func handleChamberTap(_ w: ITrialChamberWindow) {
@@ -232,22 +208,18 @@ public final class StructuresIManager {
         } else {
             RewardCenter.grant(xp: 8, "🧪 🔑 메이스 획득!")
             SoundAndEffectsManager.shared.play(.chime)
-            w.close(); chamber = nil
+            chamber.clear()
         }
     }
 
     // MARK: - 해저 사원: 물 오버레이 + 물빼기 5초 + 황금 블록 4개 +6XP
 
     public func toggleTemple() {
-        if let w = temple, w.isVisible {
-            w.close(); temple = nil; return
-        }
-        temple = nil
-        let w = IOceanTempleWindow(startPos: spawnPos(dx: 0)) { [weak self] tapped in
-            self?.handleTempleTap(tapped)
-        }
-        temple = w
-        w.start()
+        temple.toggle(make: {
+            IOceanTempleWindow(startPos: self.spawnPos(dx: 0)) { [weak self] tapped in
+                self?.handleTempleTap(tapped)
+            }
+        }, start: { $0.start() })
     }
 
     private func handleTempleTap(_ w: IOceanTempleWindow) {
@@ -263,7 +235,7 @@ public final class StructuresIManager {
             if w.minedGold >= 4 {
                 RewardCenter.grant(xp: 6, "🌊 해저 사원 정복!")
                 SoundAndEffectsManager.shared.play(.chime)
-                w.close(); temple = nil
+                temple.clear()
             }
         }
     }
@@ -271,15 +243,11 @@ public final class StructuresIManager {
     // MARK: - 엔드 배(I원정): 항해 30초 + 엘리트라 파편 3개 + 완성 +6XP
 
     public func toggleShip() {
-        if let w = ship, w.isVisible {
-            w.close(); ship = nil; return
-        }
-        ship = nil
-        let w = IEndShipWindow(startPos: spawnPos(dx: -160)) { [weak self] tapped in
-            self?.handleShipTap(tapped)
-        }
-        ship = w
-        w.start()
+        ship.toggle(make: {
+            IEndShipWindow(startPos: self.spawnPos(dx: -160)) { [weak self] tapped in
+                self?.handleShipTap(tapped)
+            }
+        }, start: { $0.start() })
     }
 
     private func handleShipTap(_ w: IEndShipWindow) {
@@ -290,7 +258,7 @@ public final class StructuresIManager {
         if w.isComplete {
             RewardCenter.grant(xp: 6, "🐲 엘리트라 완성!")
             SoundAndEffectsManager.shared.play(.chime)
-            w.close(); ship = nil
+            ship.clear()
         } else if !w.voyageDone {
             RewardCenter.say("🐲 항해 중 \(Int(w.progress * 100))%...")
         }
@@ -299,15 +267,11 @@ public final class StructuresIManager {
     // MARK: - 습격 영웅: 주민 퍼레이드 + 할인 기분 + 폭죽 +4XP
 
     public func toggleHero() {
-        if let w = hero, w.isVisible {
-            w.close(); hero = nil; return
-        }
-        hero = nil
-        let w = IHeroWindow(startPos: spawnPos(dx: 160)) { [weak self] tapped in
-            self?.handleHeroTap(tapped)
-        }
-        hero = w
-        w.start()
+        hero.toggle(make: {
+            IHeroWindow(startPos: self.spawnPos(dx: 160)) { [weak self] tapped in
+                self?.handleHeroTap(tapped)
+            }
+        }, start: { $0.start() })
     }
 
     private func handleHeroTap(_ w: IHeroWindow) {
@@ -315,7 +279,7 @@ public final class StructuresIManager {
         SoundAndEffectsManager.shared.play(.chime)
         if w.cheers >= 2 {
             RewardCenter.grant(xp: 4, "🎖️ 🎟️ 할인 기분 + 폭죽!")
-            w.close(); hero = nil
+            hero.clear()
         } else {
             RewardCenter.say("🎖️ 주민 퍼레이드!")
         }
@@ -324,7 +288,7 @@ public final class StructuresIManager {
 
 // MARK: - I저택: 입구 + 방 4개 + 보스방 (클릭당 1단계)
 
-public final class IMansionWindow: NSPanel {
+public final class IMansionWindow: EntityWindow {
     public static let bossStage = 5
     public private(set) var stage = 0
     private let onTap: (IMansionWindow) -> Void
@@ -336,18 +300,7 @@ public final class IMansionWindow: NSPanel {
 
     public init(startPos: CGPoint, onTap: @escaping (IMansionWindow) -> Void) {
         self.onTap = onTap
-        super.init(
-            contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = IMansionDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
         self.drawView = view
         contentView = view
@@ -426,31 +379,19 @@ private final class IMansionDrawView: NSView {
 
 // MARK: - I소환사 + I벡스 3마리
 
-public final class IIllagerVexWindow: NSPanel {
+public final class IIllagerVexWindow: EntityWindow {
     private let onTap: (IIllagerVexWindow) -> Void
-    private var hp = 1
+    private var hits = HitCounter(maxHits: 1)
 
     public init(startPos: CGPoint, onTap: @escaping (IIllagerVexWindow) -> Void) {
         self.onTap = onTap
         let size = NSSize(width: 30, height: 30)
-        super.init(
-            contentRect: NSRect(x: startPos.x - 15, y: startPos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - 15, y: startPos.y, width: size.width, height: size.height), ignoresMouse: false)
         contentView = IIllagerVexDrawView(frame: NSRect(origin: .zero, size: size))
     }
 
     public override func mouseDown(with event: NSEvent) {
-        hp -= 1
-        if hp <= 0 {
+        if hits.hit() {
             SoundAndEffectsManager.shared.play(.pop)
             RewardCenter.say("👻 벡스 처치!")
             close()
@@ -473,11 +414,11 @@ private final class IIllagerVexDrawView: NSView {
     }
 }
 
-public final class IEvokerWindow: NSPanel {
-    public private(set) var bodyHits = 0
+public final class IEvokerWindow: EntityWindow {
+    public private(set) var bodyHits = HitCounter(maxHits: 3)
     public private(set) var vexAlive = 3
     public var isVexPhase: Bool { vexAlive > 0 }
-    public var isDefeated: Bool { bodyHits >= 3 }
+    public var isDefeated: Bool { bodyHits.hits >= bodyHits.maxHits }
     private let onTap: (IEvokerWindow) -> Void
     private var tick: Timer?
     private var phase: TimeInterval = 0
@@ -490,18 +431,7 @@ public final class IEvokerWindow: NSPanel {
     public init(startPos: CGPoint, onTap: @escaping (IEvokerWindow) -> Void) {
         self.basePos = startPos
         self.onTap = onTap
-        super.init(
-            contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = IEvokerDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
         self.drawView = view
         contentView = view
@@ -538,8 +468,8 @@ public final class IEvokerWindow: NSPanel {
     @discardableResult
     public func hitBody() -> Bool {
         guard !isVexPhase, !isDefeated else { return false }
-        bodyHits += 1
-        drawView?.hits = bodyHits
+        _ = bodyHits.hit()
+        drawView?.hits = bodyHits.hits
         drawView?.needsDisplay = true
         return true
     }
@@ -587,13 +517,13 @@ private final class IEvokerDrawView: NSView {
 
 // MARK: - I변명자: 도끼 돌진 + 2타
 
-public final class IVindicatorWindow: NSPanel {
+public final class IVindicatorWindow: EntityWindow {
     public var position: CGPoint
     private let onTap: (IVindicatorWindow) -> Void
-    private var hp = 2
+    private var hits = HitCounter(maxHits: 2)
     private var tick: Timer?
     private var phase: TimeInterval = 0
-    private var dir: CGFloat = 1
+    private var wander = WanderState(speed: 150)
     private var drawView: IVindicatorDrawView?
     private let panelW: CGFloat = 52
     private let panelH: CGFloat = 70
@@ -601,18 +531,7 @@ public final class IVindicatorWindow: NSPanel {
     public init(startPos: CGPoint, onTap: @escaping (IVindicatorWindow) -> Void) {
         self.position = startPos
         self.onTap = onTap
-        super.init(
-            contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = IVindicatorDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
         self.drawView = view
         contentView = view
@@ -627,11 +546,11 @@ public final class IVindicatorWindow: NSPanel {
             let me = RewardCenter.me()
             if me != .zero {
                 let d = me.x - self.position.x
-                if abs(d) > 10 { self.dir = d > 0 ? 1 : -1 }
+                if abs(d) > 10 { self.wander.direction = d > 0 ? 1 : -1 }
             }
-            self.position.x += self.dir * 150.0 / 60.0
+            self.position.x += self.wander.tick(1.0 / 60.0)
             self.setFrameOrigin(NSPoint(x: self.position.x - self.panelW / 2, y: self.position.y))
-            self.drawView?.facingRight = self.dir > 0
+            self.drawView?.facingRight = self.wander.direction > 0
             self.drawView?.step = sin(self.phase * 12.0)
             self.drawView?.needsDisplay = true
         }
@@ -640,8 +559,7 @@ public final class IVindicatorWindow: NSPanel {
 
     @discardableResult
     public func hit() -> Bool {
-        hp -= 1
-        return hp > 0
+        return !hits.hit()
     }
 
     public override func mouseDown(with event: NSEvent) {
@@ -685,7 +603,7 @@ private final class IVindicatorDrawView: NSView {
 
 // MARK: - I전초기지: 정찰탑 + 상자 2개
 
-public final class IOutpostWindow: NSPanel {
+public final class IOutpostWindow: EntityWindow {
     public private(set) var lootedChests = 0
     private let onTap: (IOutpostWindow) -> Void
     private var tick: Timer?
@@ -696,18 +614,7 @@ public final class IOutpostWindow: NSPanel {
 
     public init(startPos: CGPoint, onTap: @escaping (IOutpostWindow) -> Void) {
         self.onTap = onTap
-        super.init(
-            contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = IOutpostDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
         self.drawView = view
         contentView = view
@@ -779,7 +686,7 @@ private final class IOutpostDrawView: NSView {
 
 // MARK: - I고대도시: 스컬크 진동 + 긴장 게이지
 
-public final class IAncientCityWindow: NSPanel {
+public final class IAncientCityWindow: EntityWindow {
     public private(set) var tension: CGFloat = 0
     private let onTap: (IAncientCityWindow) -> Void
     private var tick: Timer?
@@ -791,18 +698,7 @@ public final class IAncientCityWindow: NSPanel {
 
     public init(startPos: CGPoint, onTap: @escaping (IAncientCityWindow) -> Void) {
         self.onTap = onTap
-        super.init(
-            contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = IAncientCityDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
         self.drawView = view
         contentView = view
@@ -869,7 +765,7 @@ private final class IAncientCityDrawView: NSView {
 
 // MARK: - I트라이얼챔버: 웨이브 3 (1→2→3)
 
-public final class ITrialChamberWindow: NSPanel {
+public final class ITrialChamberWindow: EntityWindow {
     public private(set) var wave = 1
     public private(set) var leftInWave = 1
     private let onTap: (ITrialChamberWindow) -> Void
@@ -881,18 +777,7 @@ public final class ITrialChamberWindow: NSPanel {
 
     public init(startPos: CGPoint, onTap: @escaping (ITrialChamberWindow) -> Void) {
         self.onTap = onTap
-        super.init(
-            contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = ITrialChamberDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
         self.drawView = view
         contentView = view
@@ -968,7 +853,7 @@ private final class ITrialChamberDrawView: NSView {
 
 // MARK: - I해저사원: 물빼기 5초 + 황금 4개
 
-public final class IOceanTempleWindow: NSPanel {
+public final class IOceanTempleWindow: EntityWindow {
     public private(set) var isDrained = false
     public private(set) var minedGold = 0
     private let onTap: (IOceanTempleWindow) -> Void
@@ -982,18 +867,7 @@ public final class IOceanTempleWindow: NSPanel {
 
     public init(startPos: CGPoint, onTap: @escaping (IOceanTempleWindow) -> Void) {
         self.onTap = onTap
-        super.init(
-            contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = IOceanTempleDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
         self.drawView = view
         contentView = view
@@ -1082,7 +956,7 @@ private final class IOceanTempleDrawView: NSView {
 
 // MARK: - I엔드배(I원정): 항해 30초 + 파편 3개
 
-public final class IEndShipWindow: NSPanel {
+public final class IEndShipWindow: EntityWindow {
     public private(set) var fragments = 0
     public private(set) var progress: CGFloat = 0
     public var voyageDone: Bool { progress >= 1.0 }
@@ -1097,18 +971,7 @@ public final class IEndShipWindow: NSPanel {
 
     public init(startPos: CGPoint, onTap: @escaping (IEndShipWindow) -> Void) {
         self.onTap = onTap
-        super.init(
-            contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = IEndShipDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
         self.drawView = view
         contentView = view
@@ -1183,7 +1046,7 @@ private final class IEndShipDrawView: NSView {
 
 // MARK: - I습격영웅: 주민 퍼레이드 + 폭죽
 
-public final class IHeroWindow: NSPanel {
+public final class IHeroWindow: EntityWindow {
     public private(set) var cheers = 0
     private let onTap: (IHeroWindow) -> Void
     private var tick: Timer?
@@ -1195,18 +1058,7 @@ public final class IHeroWindow: NSPanel {
 
     public init(startPos: CGPoint, onTap: @escaping (IHeroWindow) -> Void) {
         self.onTap = onTap
-        super.init(
-            contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = IHeroDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
         self.drawView = view
         contentView = view

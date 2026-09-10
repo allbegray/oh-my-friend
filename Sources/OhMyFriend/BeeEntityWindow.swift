@@ -1,25 +1,18 @@
 import AppKit
 import CoreGraphics
 
-public final class BeeEntityWindow: NSPanel {
+public final class BeeEntityWindow: EntityWindow {
     public var followOffset: CGPoint = .zero
     private var wobble: CGFloat = 0
 
     public init(startPos: CGPoint) {
         let size = NSSize(width: 30, height: 26)
-        super.init(
-            contentRect: NSRect(x: startPos.x - 15, y: startPos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = true
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - 15, y: startPos.y, width: size.width, height: size.height), ignoresMouse: true)
         contentView = BeeDrawView(frame: NSRect(origin: .zero, size: size))
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
     }
 
     public func follow(target: CGPoint, excited: Bool) {
@@ -48,7 +41,7 @@ private final class BeeDrawView: NSView {
     }
 }
 
-public final class BeehiveEntityWindow: NSPanel {
+public final class BeehiveEntityWindow: EntityWindow {
     private let floorPos: CGPoint
     private let onCollect: () -> Void
     private var honeyTimer: Timer?
@@ -59,26 +52,19 @@ public final class BeehiveEntityWindow: NSPanel {
         self.floorPos = floorPos
         self.onCollect = onCollect
         let size = NSSize(width: 76, height: 84)
-        super.init(
-            contentRect: NSRect(
-                x: floorPos.x - size.width / 2.0,
-                y: floorPos.y,
-                width: size.width,
-                height: size.height
-            ),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(
+            x: floorPos.x - size.width / 2.0,
+            y: floorPos.y,
+            width: size.width,
+            height: size.height
+        ), ignoresMouse: false)
         let view = BeehiveDrawView(frame: NSRect(origin: .zero, size: size))
         self.drawView = view
         contentView = view
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
     }
 
     public func place() {

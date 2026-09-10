@@ -36,7 +36,7 @@ extension AppController {
     private func addExtraBatch(_ root: NSMenu, title: String, entries: [ExtraMenuEntry]) {
         let sub = NSMenu()
         for e in entries {
-            sub.addItem(ClosureMenuItem(title: e.title(), run: e.run))
+            sub.addItem(ClosureMenuItem(e))
         }
         let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
         item.submenu = sub

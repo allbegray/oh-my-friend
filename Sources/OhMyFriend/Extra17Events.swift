@@ -54,7 +54,7 @@ public final class MobHeadWard {
 
 // MARK: - 약탈자 패널 (웨이브 몹, 클릭 1타 격퇴)
 
-private final class Extra17PillagerWindow: NSPanel {
+private final class Extra17PillagerWindow: EntityWindow {
     var onTap: (() -> Void)?
     private var animTimer: Timer?
     private var phase: TimeInterval = 0
@@ -62,18 +62,7 @@ private final class Extra17PillagerWindow: NSPanel {
 
     init(startPos: CGPoint) {
         let size = NSSize(width: 48, height: 68)
-        super.init(
-            contentRect: NSRect(x: startPos.x - 24, y: startPos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - 24, y: startPos.y, width: size.width, height: size.height), ignoresMouse: false)
         let view = Extra17PillagerDrawView(frame: NSRect(origin: .zero, size: size))
         self.drawView = view
         contentView = view
@@ -136,7 +125,7 @@ private final class Extra17PillagerDrawView: NSView {
 
 // MARK: - 피리 연주 오버레이 (8초 음표 파티클)
 
-private final class Extra17FluteWindow: NSPanel {
+private final class Extra17FluteWindow: EntityWindow {
     var onFinish: (() -> Void)?
     private var animTimer: Timer?
     private var finishTimer: Timer?
@@ -146,18 +135,7 @@ private final class Extra17FluteWindow: NSPanel {
 
     init(startPos: CGPoint) {
         let size = NSSize(width: 96, height: 72)
-        super.init(
-            contentRect: NSRect(x: startPos.x - 48, y: startPos.y + 60, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = true
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - 48, y: startPos.y + 60, width: size.width, height: size.height), ignoresMouse: true)
         let view = Extra17FluteDrawView(frame: NSRect(origin: .zero, size: size))
         self.drawView = view
         contentView = view
@@ -246,7 +224,7 @@ private final class Extra17FluteDrawView: NSView {
 
 // MARK: - 활공 링 (하늘 링 3개, 순서대로 클릭)
 
-private final class Extra17GlideRingWindow: NSPanel {
+private final class Extra17GlideRingWindow: EntityWindow {
     let ringIndex: Int
     var onTap: ((Int) -> Void)?
     private var drawView: Extra17GlideRingDrawView?
@@ -254,18 +232,7 @@ private final class Extra17GlideRingWindow: NSPanel {
     init(startPos: CGPoint, index: Int) {
         self.ringIndex = index
         let size = NSSize(width: 76, height: 76)
-        super.init(
-            contentRect: NSRect(x: startPos.x - 38, y: startPos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - 38, y: startPos.y, width: size.width, height: size.height), ignoresMouse: false)
         let view = Extra17GlideRingDrawView(frame: NSRect(origin: .zero, size: size))
         view.index = index
         self.drawView = view

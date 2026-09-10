@@ -188,23 +188,12 @@ public final class WinterManager {
 
 // MARK: - 토스트
 
-private final class WinterToastPanel: NSPanel {
+private final class WinterToastPanel: EntityWindow {
     private var onClose: (() -> Void)?
 
     init(message: String, at pos: CGPoint) {
         let size = NSSize(width: 240, height: 56)
-        super.init(
-            contentRect: NSRect(x: pos.x - size.width / 2.0, y: pos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = true
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: pos.x - size.width / 2.0, y: pos.y, width: size.width, height: size.height), ignoresMouse: true)
         contentView = WinterToastDrawView(frame: NSRect(origin: .zero, size: size), message: message)
     }
 
@@ -257,25 +246,14 @@ private final class WinterToastDrawView: NSView {
 
 // MARK: - 눈보라 오버레이 (클릭 무시, 60초 자동 정리)
 
-private final class SnowstormOverlayPanel: NSPanel {
+private final class SnowstormOverlayPanel: EntityWindow {
     private var timer: Timer?
     private var flakes: [CGPoint] = []
     private var drawView: SnowstormDrawView?
     private var onClose: (() -> Void)?
 
     init(screenFrame: NSRect) {
-        super.init(
-            contentRect: screenFrame,
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.floatingWindow)) - 2)
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = true
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: screenFrame, ignoresMouse: true, level: NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.floatingWindow)) - 2))
         let view = SnowstormDrawView(frame: NSRect(origin: .zero, size: screenFrame.size))
         self.drawView = view
         contentView = view
@@ -338,24 +316,13 @@ private final class SnowstormDrawView: NSView {
 
 // MARK: - 눈덩이 (클릭 시 투척)
 
-private final class SnowballPanel: NSPanel {
+private final class SnowballPanel: EntityWindow {
     private let onThrow: () -> Void
 
     init(at pos: CGPoint, onThrow: @escaping () -> Void) {
         self.onThrow = onThrow
         let size = NSSize(width: 56, height: 56)
-        super.init(
-            contentRect: NSRect(x: pos.x - size.width / 2.0, y: pos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: pos.x - size.width / 2.0, y: pos.y, width: size.width, height: size.height), ignoresMouse: false)
         contentView = SnowballDrawView(frame: NSRect(origin: .zero, size: size))
     }
 
@@ -379,7 +346,7 @@ private final class SnowballDrawView: NSView {
     }
 }
 
-private final class SnowballFlightPanel: NSPanel {
+private final class SnowballFlightPanel: EntityWindow {
     private var timer: Timer?
     private var elapsed: TimeInterval = 0
     private let duration: TimeInterval = 0.6
@@ -393,18 +360,7 @@ private final class SnowballFlightPanel: NSPanel {
         self.to = to
         let size = NSSize(width: 260, height: 160)
         let origin = CGPoint(x: min(from.x, to.x) - 40, y: min(from.y, to.y) - 40)
-        super.init(
-            contentRect: NSRect(x: origin.x, y: origin.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = true
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: origin.x, y: origin.y, width: size.width, height: size.height), ignoresMouse: true)
         let v = SnowballFlightView(frame: NSRect(origin: .zero, size: size), from: CGPoint(x: from.x - origin.x, y: from.y - origin.y), to: CGPoint(x: to.x - origin.x, y: to.y - origin.y))
         self.flightView = v
         contentView = v
@@ -465,24 +421,13 @@ private final class SnowballFlightView: NSView {
 
 // MARK: - 얼음 미끄럼틀
 
-private final class IceSlidePanel: NSPanel {
+private final class IceSlidePanel: EntityWindow {
     private let onSlide: () -> Void
 
     init(at pos: CGPoint, onSlide: @escaping () -> Void) {
         self.onSlide = onSlide
         let size = NSSize(width: 220, height: 80)
-        super.init(
-            contentRect: NSRect(x: pos.x - size.width / 2.0, y: pos.y - 10, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: pos.x - size.width / 2.0, y: pos.y - 10, width: size.width, height: size.height), ignoresMouse: false)
         contentView = IceSlideDrawView(frame: NSRect(origin: .zero, size: size))
     }
 
@@ -511,7 +456,7 @@ private final class IceSlideDrawView: NSView {
 
 // MARK: - 별똥별
 
-private final class ShootingStarPanel: NSPanel {
+private final class ShootingStarPanel: EntityWindow {
     private var timer: Timer?
     private var elapsed: TimeInterval = 0
     private var starView: ShootingStarDrawView?
@@ -520,18 +465,7 @@ private final class ShootingStarPanel: NSPanel {
     init(at pos: CGPoint, onWish: @escaping () -> Void) {
         self.onWish = onWish
         let size = NSSize(width: 220, height: 220)
-        super.init(
-            contentRect: NSRect(x: pos.x - size.width / 2.0, y: pos.y - 60, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: pos.x - size.width / 2.0, y: pos.y - 60, width: size.width, height: size.height), ignoresMouse: false)
         let v = ShootingStarDrawView(frame: NSRect(origin: .zero, size: size))
         self.starView = v
         contentView = v
@@ -587,7 +521,7 @@ private final class ShootingStarDrawView: NSView {
 
 // MARK: - 대나무 발판 (3단 성장)
 
-private final class BambooPanel: NSPanel {
+private final class BambooPanel: EntityWindow {
     private var timer: Timer?
     private var stage: Int = 0
     private var ticks: Int = 0
@@ -597,18 +531,7 @@ private final class BambooPanel: NSPanel {
     init(at pos: CGPoint, onClimb: @escaping () -> Void) {
         self.onClimb = onClimb
         let size = NSSize(width: 100, height: 190)
-        super.init(
-            contentRect: NSRect(x: pos.x - size.width / 2.0, y: pos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: pos.x - size.width / 2.0, y: pos.y, width: size.width, height: size.height), ignoresMouse: false)
         let v = BambooDrawView(frame: NSRect(origin: .zero, size: size))
         self.bambooView = v
         contentView = v
@@ -668,7 +591,7 @@ private final class BambooDrawView: NSView {
 
 // MARK: - 캠프 요리 (5초 조리)
 
-private final class CampCookPanel: NSPanel {
+private final class CampCookPanel: EntityWindow {
     private var timer: Timer?
     private var elapsed: TimeInterval = 0
     private let cookDuration: TimeInterval = 5.0
@@ -681,18 +604,7 @@ private final class CampCookPanel: NSPanel {
         self.onHint = onHint
         self.onDone = onDone
         let size = NSSize(width: 150, height: 130)
-        super.init(
-            contentRect: NSRect(x: pos.x - size.width / 2.0, y: pos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: pos.x - size.width / 2.0, y: pos.y, width: size.width, height: size.height), ignoresMouse: false)
         let v = CampCookDrawView(frame: NSRect(origin: .zero, size: size))
         self.cookView = v
         contentView = v

@@ -11,8 +11,8 @@ public final class SeaDManager {
     private var elder: DElderGuardianWindow?
     private var guardian: DGuardianWindow?
     private var dolphin: DDolphinWindow?
-    private var wreck: DShipwreckWindow?
-    private var coral: DCoralWindow?
+    private let wreckSlot = ToggleSlot<DShipwreckWindow>()
+    private let coralSlot = ToggleSlot<DCoralWindow>()
     private var kelp: DKelpWindow?
     private var lantern: DSeaLanternWindow?
     private var clam: DClamWindow?
@@ -170,13 +170,12 @@ public final class SeaDManager {
     // MARK: - 난파선: 상자 3개 + 지도 조각 3개 = 보물 힌트 +5XP
 
     public func toggleWreck() {
-        if let w = wreck, w.isVisible { w.close(); wreck = nil; return }
-        wreck = nil
-        let w = DShipwreckWindow(startPos: spawnPos(dx: -120)) { [weak self] tapped in
-            self?.handleWreckTap(tapped)
-        }
-        wreck = w
-        w.start()
+        let pos = spawnPos(dx: -120)
+        wreckSlot.toggle(make: {
+            DShipwreckWindow(startPos: pos) { [weak self] tapped in
+                self?.handleWreckTap(tapped)
+            }
+        }, start: { $0.start() })
         RewardCenter.say("🚢 난파선을 발견했다! 상자를 열어보자!")
     }
 
@@ -194,13 +193,12 @@ public final class SeaDManager {
     // MARK: - 산호초: 5색 순환 파밍 + 완성 시 염료 세트 +4XP
 
     public func toggleCoral() {
-        if let w = coral, w.isVisible { w.close(); coral = nil; return }
-        coral = nil
-        let w = DCoralWindow(startPos: spawnPos(dx: 120)) { [weak self] tapped in
-            self?.handleCoralTap(tapped)
-        }
-        coral = w
-        w.start()
+        let pos = spawnPos(dx: 120)
+        coralSlot.toggle(make: {
+            DCoralWindow(startPos: pos) { [weak self] tapped in
+                self?.handleCoralTap(tapped)
+            }
+        }, start: { $0.start() })
         RewardCenter.say("🪸 산호를 클릭해 5색을 모아보자!")
     }
 
@@ -415,8 +413,9 @@ public final class SeaDManager {
 
 // MARK: - 👁️ 엘더가디언: 대형 눈 보스 + 20초 저주
 
-public final class DElderGuardianWindow: NSPanel {
+public final class DElderGuardianWindow: EntityWindow {
     public var position: CGPoint
+    private var counter = HitCounter(maxHits: 4)
     public private(set) var hits: Int = 0
     public private(set) var curseLeft: TimeInterval = 20
     public var isDefeated: Bool { hits >= 4 }
@@ -430,18 +429,7 @@ public final class DElderGuardianWindow: NSPanel {
     public init(startPos: CGPoint, onTap: @escaping (DElderGuardianWindow) -> Void) {
         self.position = startPos
         self.onTap = onTap
-        super.init(
-            contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = DElderDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
         self.drawView = view
         contentView = view
@@ -466,7 +454,8 @@ public final class DElderGuardianWindow: NSPanel {
 
     @discardableResult
     public func registerHit() -> Int {
-        if !isDefeated { hits += 1 }
+        if !isDefeated { _ = counter.hit() }
+        hits = counter.hits
         drawView?.needsDisplay = true
         return hits
     }
@@ -519,8 +508,9 @@ private final class DElderDrawView: NSView {
 
 // MARK: - 🐡 가디언: 3초 레이저 사이클
 
-public final class DGuardianWindow: NSPanel {
+public final class DGuardianWindow: EntityWindow {
     public var position: CGPoint
+    private var counter = HitCounter(maxHits: 2)
     public private(set) var hits: Int = 0
     private let onTap: (DGuardianWindow) -> Void
     private var tick: Timer?
@@ -532,18 +522,7 @@ public final class DGuardianWindow: NSPanel {
     public init(startPos: CGPoint, onTap: @escaping (DGuardianWindow) -> Void) {
         self.position = startPos
         self.onTap = onTap
-        super.init(
-            contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = DGuardianDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
         self.drawView = view
         contentView = view
@@ -576,8 +555,9 @@ public final class DGuardianWindow: NSPanel {
 
     @discardableResult
     public func registerHit() -> Bool {
-        hits += 1
-        return hits >= 2
+        let defeated = counter.hit()
+        hits = counter.hits
+        return defeated
     }
 
     public override func mouseDown(with event: NSEvent) { onTap(self) }
@@ -628,7 +608,7 @@ private final class DGuardianDrawView: NSView {
 
 // MARK: - 🐬 돌고래: 플레이어 추종 + 60pt 호위
 
-public final class DDolphinWindow: NSPanel {
+public final class DDolphinWindow: EntityWindow {
     public var position: CGPoint
     public private(set) var isEscorting: Bool = false
     private let onTap: (DDolphinWindow) -> Void
@@ -641,18 +621,7 @@ public final class DDolphinWindow: NSPanel {
     public init(startPos: CGPoint, onTap: @escaping (DDolphinWindow) -> Void) {
         self.position = startPos
         self.onTap = onTap
-        super.init(
-            contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = DDolphinDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
         self.drawView = view
         contentView = view
@@ -736,7 +705,7 @@ private final class DDolphinDrawView: NSView {
 
 // MARK: - 🚢 난파선: 상자 3개 + 지도 조각
 
-public final class DShipwreckWindow: NSPanel {
+public final class DShipwreckWindow: EntityWindow {
     public var position: CGPoint
     public private(set) var opened: Int = 0
     private let onTap: (DShipwreckWindow) -> Void
@@ -746,18 +715,7 @@ public final class DShipwreckWindow: NSPanel {
         self.position = startPos
         self.onTap = onTap
         let size = NSSize(width: 120, height: 72)
-        super.init(
-            contentRect: NSRect(x: startPos.x - size.width / 2, y: startPos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - size.width / 2, y: startPos.y, width: size.width, height: size.height), ignoresMouse: false)
         let view = DShipwreckDrawView(frame: NSRect(origin: .zero, size: size))
         self.drawView = view
         contentView = view
@@ -807,7 +765,7 @@ private final class DShipwreckDrawView: NSView {
 
 // MARK: - 🪸 산호초: 5색 순환 파밍
 
-public final class DCoralWindow: NSPanel {
+public final class DCoralWindow: EntityWindow {
     public var position: CGPoint
     public private(set) var collected: [String] = []
     private let onTap: (DCoralWindow) -> Void
@@ -818,18 +776,7 @@ public final class DCoralWindow: NSPanel {
         self.position = startPos
         self.onTap = onTap
         let size = NSSize(width: 96, height: 64)
-        super.init(
-            contentRect: NSRect(x: startPos.x - size.width / 2, y: startPos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - size.width / 2, y: startPos.y, width: size.width, height: size.height), ignoresMouse: false)
         let view = DCoralDrawView(frame: NSRect(origin: .zero, size: size))
         self.drawView = view
         contentView = view
@@ -880,12 +827,12 @@ private final class DCoralDrawView: NSView {
 
 // MARK: - 🌿 켈프: 5초/단계 5단계 고속 성장
 
-public final class DKelpWindow: NSPanel {
+public final class DKelpWindow: EntityWindow {
     public var position: CGPoint
     public private(set) var stage: Int = 0
     private let onTap: (DKelpWindow) -> Void
     private var tick: Timer?
-    private var acc: TimeInterval = 0
+    private var growthCooldown = Cooldown()
     private var drawView: DKelpDrawView?
     private let maxStage = 5
 
@@ -893,18 +840,7 @@ public final class DKelpWindow: NSPanel {
         self.position = startPos
         self.onTap = onTap
         let size = NSSize(width: 64, height: 96)
-        super.init(
-            contentRect: NSRect(x: startPos.x - size.width / 2, y: startPos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - size.width / 2, y: startPos.y, width: size.width, height: size.height), ignoresMouse: false)
         let view = DKelpDrawView(frame: NSRect(origin: .zero, size: size))
         self.drawView = view
         contentView = view
@@ -913,12 +849,13 @@ public final class DKelpWindow: NSPanel {
     public func start() {
         orderFrontRegardless()
         SoundAndEffectsManager.shared.play(.pop)
+        growthCooldown.trigger(5.0)
         tick = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] t in
             guard let self = self else { t.invalidate(); return }
             if self.stage < self.maxStage {
-                self.acc += 1.0
-                if self.acc >= 5.0 {
-                    self.acc = 0
+                self.growthCooldown.tick(1.0)
+                if self.growthCooldown.ready {
+                    self.growthCooldown.trigger(5.0)
                     self.stage += 1
                     self.drawView?.stage = self.stage
                     self.drawView?.needsDisplay = true
@@ -932,7 +869,7 @@ public final class DKelpWindow: NSPanel {
     public func tryHarvest() -> Bool {
         guard stage >= maxStage else { return false }
         stage = 0
-        acc = 0
+        growthCooldown.trigger(5.0)
         drawView?.stage = stage
         drawView?.needsDisplay = true
         return true
@@ -971,7 +908,7 @@ private final class DKelpDrawView: NSView {
 
 // MARK: - 🏮 바다 랜턴: 밤 자동 점등 장식
 
-public final class DSeaLanternWindow: NSPanel {
+public final class DSeaLanternWindow: EntityWindow {
     public var position: CGPoint
     public private(set) var isLit: Bool = false
     private let onTap: (DSeaLanternWindow) -> Void
@@ -982,18 +919,7 @@ public final class DSeaLanternWindow: NSPanel {
         self.position = startPos
         self.onTap = onTap
         let size = NSSize(width: 56, height: 64)
-        super.init(
-            contentRect: NSRect(x: startPos.x - size.width / 2, y: startPos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - size.width / 2, y: startPos.y, width: size.width, height: size.height), ignoresMouse: false)
         let view = DSeaLanternDrawView(frame: NSRect(origin: .zero, size: size))
         self.drawView = view
         contentView = view
@@ -1055,7 +981,7 @@ private final class DSeaLanternDrawView: NSView {
 
 // MARK: - 🐚 조개: 30% 진주
 
-public final class DClamWindow: NSPanel {
+public final class DClamWindow: EntityWindow {
     public var position: CGPoint
     private let onTap: (DClamWindow) -> Void
     private var drawView: DClamDrawView?
@@ -1064,18 +990,7 @@ public final class DClamWindow: NSPanel {
         self.position = startPos
         self.onTap = onTap
         let size = NSSize(width: 64, height: 48)
-        super.init(
-            contentRect: NSRect(x: startPos.x - size.width / 2, y: startPos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - size.width / 2, y: startPos.y, width: size.width, height: size.height), ignoresMouse: false)
         let view = DClamDrawView(frame: NSRect(origin: .zero, size: size))
         self.drawView = view
         contentView = view
@@ -1124,7 +1039,7 @@ private final class DClamDrawView: NSView {
 
 // MARK: - 🤿 심해 상자 (호흡 버프 60초 동안 수확)
 
-public final class DDiveChestWindow: NSPanel {
+public final class DDiveChestWindow: EntityWindow {
     public var position: CGPoint
     private let onTap: () -> Void
     private var done = false
@@ -1134,18 +1049,7 @@ public final class DDiveChestWindow: NSPanel {
         self.position = startPos
         self.onTap = onTap
         let size = NSSize(width: 72, height: 56)
-        super.init(
-            contentRect: NSRect(x: startPos.x - size.width / 2, y: startPos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - size.width / 2, y: startPos.y, width: size.width, height: size.height), ignoresMouse: false)
         let view = DDiveChestDrawView(frame: NSRect(origin: .zero, size: size))
         self.drawView = view
         contentView = view
@@ -1191,7 +1095,7 @@ private final class DDiveChestDrawView: NSView {
 
 // MARK: - 🎣 낚시 대회장 (5분 타이머 + 클릭 낚시)
 
-public final class DFishingContestWindow: NSPanel {
+public final class DFishingContestWindow: EntityWindow {
     public var position: CGPoint
     public var timeLeft: TimeInterval = 300
     public var lastCatch: CGFloat = 0
@@ -1204,18 +1108,7 @@ public final class DFishingContestWindow: NSPanel {
         self.position = startPos
         self.onTap = onTap
         let size = NSSize(width: 96, height: 72)
-        super.init(
-            contentRect: NSRect(x: startPos.x - size.width / 2, y: startPos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - size.width / 2, y: startPos.y, width: size.width, height: size.height), ignoresMouse: false)
         let view = DFishingContestDrawView(frame: NSRect(origin: .zero, size: size))
         self.drawView = view
         contentView = view

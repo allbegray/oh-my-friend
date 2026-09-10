@@ -1,7 +1,7 @@
 import AppKit
 import CoreGraphics
 
-public final class DragonShadowWindow: NSPanel {
+public final class DragonShadowWindow: EntityWindow {
     private var flyTimer: Timer?
     private var progress: CGFloat = 0
     private let duration: TimeInterval = 6.0
@@ -9,18 +9,7 @@ public final class DragonShadowWindow: NSPanel {
 
     public init(screen: NSScreen) {
         let h: CGFloat = 130
-        super.init(
-            contentRect: NSRect(x: screen.frame.minX, y: screen.frame.maxY - h - 30, width: screen.frame.width, height: h),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = true
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: screen.frame.minX, y: screen.frame.maxY - h - 30, width: screen.frame.width, height: h), ignoresMouse: true)
         let view = DragonShadowDrawView(frame: NSRect(origin: .zero, size: NSSize(width: screen.frame.width, height: h)))
         self.drawView = view
         contentView = view

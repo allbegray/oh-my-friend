@@ -1,30 +1,23 @@
 import AppKit
 import CoreGraphics
 
-public final class BrewStandWindow: NSPanel {
+public final class BrewStandWindow: EntityWindow {
     private let onBrew: () -> Void
 
     public init(floorPos: CGPoint, onBrew: @escaping () -> Void) {
         self.onBrew = onBrew
         let size = NSSize(width: 72, height: 80)
-        super.init(
-            contentRect: NSRect(
-                x: floorPos.x - size.width / 2.0,
-                y: floorPos.y,
-                width: size.width,
-                height: size.height
-            ),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(
+            x: floorPos.x - size.width / 2.0,
+            y: floorPos.y,
+            width: size.width,
+            height: size.height
+        ), ignoresMouse: false)
         contentView = BrewStandDrawView(frame: NSRect(origin: .zero, size: size))
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
     }
 
     public func place() {

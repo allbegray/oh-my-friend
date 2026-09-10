@@ -187,25 +187,14 @@ public final class SocialManager {
 
 // MARK: - 토스트 팝업
 
-private final class SocialToastPanel: NSPanel {
+private final class SocialToastPanel: EntityWindow {
     private let message: String
     private var onClose: (() -> Void)?
 
     init(message: String, at pos: CGPoint) {
         self.message = message
         let size = NSSize(width: 230, height: 56)
-        super.init(
-            contentRect: NSRect(x: pos.x - size.width / 2.0, y: pos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = true
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: pos.x - size.width / 2.0, y: pos.y, width: size.width, height: size.height), ignoresMouse: true)
         contentView = SocialToastDrawView(frame: NSRect(origin: .zero, size: size), message: message)
     }
 
@@ -256,7 +245,7 @@ private final class SocialToastDrawView: NSView {
 
 // MARK: - 포옹 하트 폭발
 
-private final class HugBurstPanel: NSPanel {
+private final class HugBurstPanel: EntityWindow {
     private var timer: Timer?
     private var elapsed: TimeInterval = 0
     private let duration: TimeInterval = 2.0
@@ -265,18 +254,7 @@ private final class HugBurstPanel: NSPanel {
 
     init(at pos: CGPoint) {
         let size = NSSize(width: 160, height: 160)
-        super.init(
-            contentRect: NSRect(x: pos.x - size.width / 2.0, y: pos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = true
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: pos.x - size.width / 2.0, y: pos.y, width: size.width, height: size.height), ignoresMouse: true)
         let v = HugBurstView(frame: NSRect(origin: .zero, size: size))
         self.burstView = v
         contentView = v
@@ -331,23 +309,12 @@ private final class HugBurstView: NSView {
 
 // MARK: - 보물 지도 / X 마크 / 발굴
 
-private final class TreasureMapPanel: NSPanel {
+private final class TreasureMapPanel: EntityWindow {
     private var onClose: (() -> Void)?
 
     init(at pos: CGPoint) {
         let size = NSSize(width: 200, height: 150)
-        super.init(
-            contentRect: NSRect(x: pos.x - size.width / 2.0, y: pos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = true
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: pos.x - size.width / 2.0, y: pos.y, width: size.width, height: size.height), ignoresMouse: true)
         contentView = TreasureMapDrawView(frame: NSRect(origin: .zero, size: size))
     }
 
@@ -389,24 +356,13 @@ private final class TreasureMapDrawView: NSView {
     }
 }
 
-private final class TreasureXPanel: NSPanel {
+private final class TreasureXPanel: EntityWindow {
     private let onDig: () -> Void
 
     init(at pos: CGPoint, onDig: @escaping () -> Void) {
         self.onDig = onDig
         let size = NSSize(width: 72, height: 72)
-        super.init(
-            contentRect: NSRect(x: pos.x - size.width / 2.0, y: pos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: pos.x - size.width / 2.0, y: pos.y, width: size.width, height: size.height), ignoresMouse: false)
         contentView = TreasureXDrawView(frame: NSRect(origin: .zero, size: size))
     }
 
@@ -435,7 +391,7 @@ private final class TreasureXDrawView: NSView {
     }
 }
 
-private final class DigBurstPanel: NSPanel {
+private final class DigBurstPanel: EntityWindow {
     private var timer: Timer?
     private var elapsed: TimeInterval = 0
     private var digView: DigBurstView?
@@ -443,18 +399,7 @@ private final class DigBurstPanel: NSPanel {
 
     init(at pos: CGPoint) {
         let size = NSSize(width: 140, height: 120)
-        super.init(
-            contentRect: NSRect(x: pos.x - size.width / 2.0, y: pos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = true
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: pos.x - size.width / 2.0, y: pos.y, width: size.width, height: size.height), ignoresMouse: true)
         let v = DigBurstView(frame: NSRect(origin: .zero, size: size))
         self.digView = v
         contentView = v
@@ -507,23 +452,12 @@ private final class DigBurstView: NSView {
 
 // MARK: - 기념사진 플래시
 
-private final class PhotoFlashPanel: NSPanel {
+private final class PhotoFlashPanel: EntityWindow {
     private var onClose: (() -> Void)?
 
     init(at pos: CGPoint) {
         let size = NSSize(width: 320, height: 240)
-        super.init(
-            contentRect: NSRect(x: pos.x - size.width / 2.0, y: pos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = true
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: pos.x - size.width / 2.0, y: pos.y, width: size.width, height: size.height), ignoresMouse: true)
         contentView = PhotoFlashDrawView(frame: NSRect(origin: .zero, size: size))
     }
 

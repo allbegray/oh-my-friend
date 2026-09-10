@@ -1,7 +1,7 @@
 import AppKit
 import CoreGraphics
 
-public final class LeadLineWindow: NSPanel {
+public final class LeadLineWindow: EntityWindow {
     private var petPos: CGPoint
     private var anchorPos: CGPoint
     private var lineView: LeadLineView?
@@ -9,22 +9,15 @@ public final class LeadLineWindow: NSPanel {
     public init(petPos: CGPoint, anchorPos: CGPoint) {
         self.petPos = petPos
         self.anchorPos = anchorPos
-        super.init(
-            contentRect: LeadLineWindow.frameFor(petPos: petPos, anchorPos: anchorPos),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = true
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: LeadLineWindow.frameFor(petPos: petPos, anchorPos: anchorPos), ignoresMouse: true)
         let view = LeadLineView(frame: NSRect(origin: .zero, size: frame.size))
         view.update(petLocal: petPos.minus(origin: frame.origin), anchorLocal: anchorPos.minus(origin: frame.origin))
         self.lineView = view
         contentView = view
+    }
+
+    public required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
     }
 
     public func update(petPos: CGPoint, anchorPos: CGPoint) {

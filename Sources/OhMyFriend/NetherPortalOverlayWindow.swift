@@ -1,7 +1,7 @@
 import AppKit
 import CoreGraphics
 
-public final class NetherPortalOverlayWindow: NSPanel {
+public final class NetherPortalOverlayWindow: EntityWindow {
     public let floorPos: CGPoint
     public private(set) var hasEntered = false
     private var swirlTimer: Timer?
@@ -17,18 +17,7 @@ public final class NetherPortalOverlayWindow: NSPanel {
             width: size.width,
             height: size.height
         )
-        super.init(
-            contentRect: frame,
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = true
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: frame, ignoresMouse: true)
         let view = PortalDrawView(frame: NSRect(origin: .zero, size: size))
         self.drawView = view
         contentView = view

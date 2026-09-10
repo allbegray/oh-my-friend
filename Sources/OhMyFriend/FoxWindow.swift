@@ -6,7 +6,7 @@ public protocol FoxWindowDelegate: AnyObject {
     func foxWindowDidEscape(_ window: FoxWindow)
 }
 
-public final class FoxWindow: NSPanel {
+public final class FoxWindow: EntityWindow {
     public private(set) var position: CGPoint
     public var carriedEmoji: String?
     public weak var foxDelegate: FoxWindowDelegate?
@@ -22,18 +22,7 @@ public final class FoxWindow: NSPanel {
         self.position = startPos
         self.foxDelegate = delegate
         let size = NSSize(width: 64, height: 44)
-        super.init(
-            contentRect: NSRect(x: startPos.x - 32, y: startPos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - 32, y: startPos.y, width: size.width, height: size.height), ignoresMouse: false)
         let view = FoxDrawView(frame: NSRect(origin: .zero, size: size))
         self.drawView = view
         contentView = view

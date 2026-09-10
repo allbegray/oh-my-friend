@@ -1,28 +1,21 @@
 import AppKit
 import CoreGraphics
 
-public final class AxolotlWindow: NSPanel {
+public final class AxolotlWindow: EntityWindow {
     private var followTimer: Timer?
     private var phase: TimeInterval = 0
     private var drawView: AxolotlDrawView?
 
     public init() {
         let size = NSSize(width: 36, height: 28)
-        super.init(
-            contentRect: NSRect(x: 300, y: 300, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = true
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: 300, y: 300, width: size.width, height: size.height), ignoresMouse: true)
         let view = AxolotlDrawView(frame: NSRect(origin: .zero, size: size))
         self.drawView = view
         contentView = view
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
     }
 
     public func perch() {

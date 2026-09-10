@@ -2,7 +2,7 @@ import AppKit
 import CoreGraphics
 
 /// 스켈레톤이 발사하여 플레이어를 향해 포물선으로 날아가는 3D 마인크래프트 화살 엔티티
-public final class ArrowEntityWindow: NSPanel {
+public final class ArrowEntityWindow: EntityWindow {
     private let startPos: CGPoint
     private let targetPos: CGPoint
     private let onHit: (Bool) -> Void // parameter: isDeflected by shield
@@ -26,19 +26,7 @@ public final class ArrowEntityWindow: NSPanel {
 
         let size: CGFloat = 40.0
         let frame = NSRect(x: startPos.x - size / 2.0, y: startPos.y - size / 2.0, width: size, height: size)
-        super.init(
-            contentRect: frame,
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = true
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: frame, ignoresMouse: true)
 
         let arrowView = ArrowDrawView(frame: NSRect(origin: .zero, size: frame.size))
         arrowView.facingRight = targetPos.x >= startPos.x

@@ -8,10 +8,10 @@ import Foundation
 public final class WildlifeManager {
     public static let shared = WildlifeManager()
 
-    private var rabbit: RabbitWindow?
-    private var bear: PolarBearWindow?
-    private var frog: FrogWindow?
-    private var turtle: TurtleWindow?
+    private let rabbitSlot = ToggleSlot<RabbitWindow>()
+    private let bearSlot = ToggleSlot<PolarBearWindow>()
+    private let frogSlot = ToggleSlot<FrogWindow>()
+    private let turtleSlot = ToggleSlot<TurtleWindow>()
     private var trail: FootprintTrail?
 
     private init() {}
@@ -27,51 +27,35 @@ public final class WildlifeManager {
     }
 
     public func toggleRabbit() {
-        if let w = rabbit, w.isVisible {
-            w.close(); rabbit = nil; return
-        }
-        rabbit = nil
-        let w = RabbitWindow(startPos: spawnPos(dx: -60)) { [weak self] tapped in
-            self?.handleRabbitTap(tapped)
-        }
-        rabbit = w
-        w.start()
+        rabbitSlot.toggle(make: {
+            RabbitWindow(startPos: self.spawnPos(dx: -60)) { [weak self] tapped in
+                self?.handleRabbitTap(tapped)
+            }
+        }, start: { $0.start() })
     }
 
     public func toggleBear() {
-        if let w = bear, w.isVisible {
-            w.close(); bear = nil; return
-        }
-        bear = nil
-        let w = PolarBearWindow(startPos: spawnPos(dx: 60)) { [weak self] tapped in
-            self?.handleBearTap(tapped)
-        }
-        bear = w
-        w.start()
+        bearSlot.toggle(make: {
+            PolarBearWindow(startPos: self.spawnPos(dx: 60)) { [weak self] tapped in
+                self?.handleBearTap(tapped)
+            }
+        }, start: { $0.start() })
     }
 
     public func toggleFrog() {
-        if let w = frog, w.isVisible {
-            w.close(); frog = nil; return
-        }
-        frog = nil
-        let w = FrogWindow(startPos: spawnPos(dx: -100)) { [weak self] tapped in
-            self?.handleFrogTap(tapped)
-        }
-        frog = w
-        w.start()
+        frogSlot.toggle(make: {
+            FrogWindow(startPos: self.spawnPos(dx: -100)) { [weak self] tapped in
+                self?.handleFrogTap(tapped)
+            }
+        }, start: { $0.start() })
     }
 
     public func toggleTurtle() {
-        if let w = turtle, w.isVisible {
-            w.close(); turtle = nil; return
-        }
-        turtle = nil
-        let w = TurtleWindow(startPos: spawnPos(dx: 100)) { [weak self] tapped in
-            self?.handleTurtleTap(tapped)
-        }
-        turtle = w
-        w.start()
+        turtleSlot.toggle(make: {
+            TurtleWindow(startPos: self.spawnPos(dx: 100)) { [weak self] tapped in
+                self?.handleTurtleTap(tapped)
+            }
+        }, start: { $0.start() })
     }
 
     public func toggleTrail() {
@@ -151,33 +135,21 @@ public final class WildlifeManager {
 
 // MARK: - 토끼: 깡충 점프 이동 + 빨간 눈, 당근 유혹 1.4배속 추적
 
-public final class RabbitWindow: NSPanel {
+public final class RabbitWindow: EntityWindow {
     public var position: CGPoint
     private let onTap: (RabbitWindow) -> Void
     private var tick: Timer?
     private var phase: TimeInterval = 0
-    private var dir: CGFloat = 1
+    private var wander = WanderState(speed: 42)
     private var boost: TimeInterval = 0
     private var drawView: RabbitDrawView?
     private let panelW: CGFloat = 64
     private let panelH: CGFloat = 48
-    private let baseSpeed: CGFloat = 42
 
     public init(startPos: CGPoint, onTap: @escaping (RabbitWindow) -> Void) {
         self.position = startPos
         self.onTap = onTap
-        super.init(
-            contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = RabbitDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
         self.drawView = view
         contentView = view
@@ -188,24 +160,21 @@ public final class RabbitWindow: NSPanel {
         SoundAndEffectsManager.shared.play(.pop)
         tick = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] t in
             guard let self = self else { t.invalidate(); return }
-            self.phase += 1.0 / 60.0
-            if self.boost > 0 { self.boost -= 1.0 / 60.0 }
+            let dt = 1.0 / 60.0
+            self.phase += dt
+            if self.boost > 0 { self.boost -= dt }
             let lured = RewardCenter.heldItemName?() == "당근 🥕"
-            var speed = self.baseSpeed
             if lured {
-                speed *= 1.4
                 let me = RewardCenter.me()
                 if me != .zero {
                     let d = me.x - self.position.x
-                    if abs(d) > 8 { self.dir = d > 0 ? 1 : -1 }
+                    if abs(d) > 8 { self.wander.direction = d > 0 ? 1 : -1 }
                 }
-            } else if Int(self.phase) % 3 == 0 && Int(self.phase * 60.0) % 60 == 0 {
-                self.dir = Bool.random() ? 1 : -1
             }
-            self.position.x += self.dir * speed / 60.0
+            self.position.x += self.wander.tick(dt) * (lured ? 1.4 : 1.0)
             let hop = abs(sin(self.phase * 7.0)) * 16.0 + (self.boost > 0 ? 8.0 : 0)
             self.setFrameOrigin(NSPoint(x: self.position.x - self.panelW / 2, y: self.position.y + hop))
-            self.drawView?.facingRight = self.dir > 0
+            self.drawView?.facingRight = self.wander.direction > 0
             self.drawView?.hop = hop
             self.drawView?.needsDisplay = true
         }
@@ -265,33 +234,21 @@ private final class RabbitDrawView: NSView {
 
 // MARK: - 북극곰: 느릿 중립 배회, 클릭 시 5초 분노 추격 / 연어 진정
 
-public final class PolarBearWindow: NSPanel {
+public final class PolarBearWindow: EntityWindow {
     public var position: CGPoint
     private let onTap: (PolarBearWindow) -> Void
     private var tick: Timer?
     private var phase: TimeInterval = 0
-    private var dir: CGFloat = 1
+    private var wander = WanderState(speed: 18)
     private var rageLeft: TimeInterval = 0
     private var drawView: PolarBearDrawView?
     private let panelW: CGFloat = 84
     private let panelH: CGFloat = 56
-    private let baseSpeed: CGFloat = 18
 
     public init(startPos: CGPoint, onTap: @escaping (PolarBearWindow) -> Void) {
         self.position = startPos
         self.onTap = onTap
-        super.init(
-            contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = PolarBearDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
         self.drawView = view
         contentView = view
@@ -302,23 +259,20 @@ public final class PolarBearWindow: NSPanel {
         SoundAndEffectsManager.shared.play(.pop)
         tick = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] t in
             guard let self = self else { t.invalidate(); return }
-            self.phase += 1.0 / 60.0
-            if self.rageLeft > 0 {
-                self.rageLeft -= 1.0 / 60.0
+            let dt = 1.0 / 60.0
+            self.phase += dt
+            let raged = self.rageLeft > 0
+            if raged {
+                self.rageLeft -= dt
                 let me = RewardCenter.me()
                 if me != .zero {
                     let d = me.x - self.position.x
-                    if abs(d) > 6 { self.dir = d > 0 ? 1 : -1 }
+                    if abs(d) > 6 { self.wander.direction = d > 0 ? 1 : -1 }
                 }
-                self.position.x += self.dir * self.baseSpeed * 2.0 / 60.0
-            } else {
-                if Int(self.phase) % 5 == 0 && Int(self.phase * 60.0) % 60 == 0 {
-                    self.dir = Bool.random() ? 1 : -1
-                }
-                self.position.x += self.dir * self.baseSpeed / 60.0
             }
+            self.position.x += self.wander.tick(dt) * (raged ? 2.0 : 1.0)
             self.setFrameOrigin(NSPoint(x: self.position.x - self.panelW / 2, y: self.position.y))
-            self.drawView?.facingRight = self.dir > 0
+            self.drawView?.facingRight = self.wander.direction > 0
             self.drawView?.enraged = self.rageLeft > 0
             self.drawView?.bob = sin(self.phase * 3.0)
             self.drawView?.needsDisplay = true
@@ -401,12 +355,12 @@ private final class PolarBearDrawView: NSView {
 
 // MARK: - 개구리: 점프 이동 + 0.6초 혀 발사 + 파리 사냥 +1XP
 
-public final class FrogWindow: NSPanel {
+public final class FrogWindow: EntityWindow {
     public var position: CGPoint
     private let onTap: (FrogWindow) -> Void
     private var tick: Timer?
     private var phase: TimeInterval = 0
-    private var dir: CGFloat = 1
+    private var wander = WanderState(speed: 55)
     private var tongueLeft: TimeInterval = 0
     private var flyAngle: Double = 0
     private var drawView: FrogDrawView?
@@ -417,18 +371,7 @@ public final class FrogWindow: NSPanel {
     public init(startPos: CGPoint, onTap: @escaping (FrogWindow) -> Void) {
         self.position = startPos
         self.onTap = onTap
-        super.init(
-            contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = FrogDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
         self.drawView = view
         contentView = view
@@ -441,13 +384,11 @@ public final class FrogWindow: NSPanel {
             guard let self = self else { t.invalidate(); return }
             self.phase += 1.0 / 60.0
             self.flyAngle += (1.0 / 60.0) * 2.4
-            if Int(self.phase) % 3 == 0 && Int(self.phase * 60.0) % 60 == 0 {
-                self.dir = Bool.random() ? 1 : -1
-            }
             // 깡충 점프 이동
             let hopCycle = sin(self.phase * 5.0)
+            let dx = self.wander.tick(1.0 / 60.0)
             if hopCycle > 0.3 {
-                self.position.x += self.dir * 55.0 / 60.0
+                self.position.x += dx
             }
             let hop = max(0, hopCycle) * 14.0
             self.setFrameOrigin(NSPoint(x: self.position.x - self.panelW / 2, y: self.position.y + hop))
@@ -466,7 +407,7 @@ public final class FrogWindow: NSPanel {
                     SoundAndEffectsManager.shared.play(.gulp)
                 }
             }
-            self.drawView?.facingRight = self.dir > 0
+            self.drawView?.facingRight = self.wander.direction > 0
             self.drawView?.hop = hop
             self.drawView?.tongueOut = self.tongueLeft > 0
             self.drawView?.fly = self.flyOffset()
@@ -546,13 +487,13 @@ private final class FrogDrawView: NSView {
 
 // MARK: - 거북: 느릿 보행, 클릭 시 인갑 조각 +2XP
 
-public final class TurtleWindow: NSPanel {
+public final class TurtleWindow: EntityWindow {
     public var position: CGPoint
     private let onTap: (TurtleWindow) -> Void
     private var tick: Timer?
     private var phase: TimeInterval = 0
-    private var dir: CGFloat = 1
-    private var cooldown: TimeInterval = 0
+    private var wander = WanderState(speed: 12)
+    private var shellCooldown = Cooldown()
     private var drawView: TurtleDrawView?
     private let panelW: CGFloat = 72
     private let panelH: CGFloat = 44
@@ -560,18 +501,7 @@ public final class TurtleWindow: NSPanel {
     public init(startPos: CGPoint, onTap: @escaping (TurtleWindow) -> Void) {
         self.position = startPos
         self.onTap = onTap
-        super.init(
-            contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = TurtleDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
         self.drawView = view
         contentView = view
@@ -582,14 +512,12 @@ public final class TurtleWindow: NSPanel {
         SoundAndEffectsManager.shared.play(.splash)
         tick = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] t in
             guard let self = self else { t.invalidate(); return }
-            self.phase += 1.0 / 60.0
-            if self.cooldown > 0 { self.cooldown -= 1.0 / 60.0 }
-            if Int(self.phase) % 6 == 0 && Int(self.phase * 60.0) % 60 == 0 {
-                self.dir = Bool.random() ? 1 : -1
-            }
-            self.position.x += self.dir * 12.0 / 60.0
+            let dt = 1.0 / 60.0
+            self.phase += dt
+            self.shellCooldown.tick(dt)
+            self.position.x += self.wander.tick(dt)
             self.setFrameOrigin(NSPoint(x: self.position.x - self.panelW / 2, y: self.position.y))
-            self.drawView?.facingRight = self.dir > 0
+            self.drawView?.facingRight = self.wander.direction > 0
             self.drawView?.step = sin(self.phase * 3.0)
             self.drawView?.needsDisplay = true
         }
@@ -597,8 +525,8 @@ public final class TurtleWindow: NSPanel {
     }
 
     public func collectShell() -> Bool {
-        guard cooldown <= 0 else { return false }
-        cooldown = 3.0
+        guard shellCooldown.ready else { return false }
+        shellCooldown.trigger(3.0)
         return true
     }
 
@@ -697,7 +625,7 @@ public final class FootprintTrail {
     }
 }
 
-public final class FootprintWindow: NSPanel {
+public final class FootprintWindow: EntityWindow {
     public var position: CGPoint
     public let isLast: Bool
     public let index: Int
@@ -709,18 +637,7 @@ public final class FootprintWindow: NSPanel {
         self.index = index
         self.onTap = onTap
         let size = NSSize(width: 28, height: 28)
-        super.init(
-            contentRect: NSRect(x: floorPos.x - size.width / 2, y: floorPos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: floorPos.x - size.width / 2, y: floorPos.y, width: size.width, height: size.height), ignoresMouse: false)
         let view = FootprintDrawView(frame: NSRect(origin: .zero, size: size), isLast: isLast, flip: index % 2 == 1)
         contentView = view
     }

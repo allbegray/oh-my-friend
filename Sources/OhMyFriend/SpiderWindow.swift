@@ -6,7 +6,7 @@ public protocol SpiderWindowDelegate: AnyObject {
     func spiderWindowDidLeave(_ window: SpiderWindow)
 }
 
-public final class SpiderWindow: NSPanel {
+public final class SpiderWindow: EntityWindow {
     public private(set) var position: CGPoint
     public var surfaceTop: CGFloat = 0
     public var surfaceBottom: CGFloat = 0
@@ -25,18 +25,7 @@ public final class SpiderWindow: NSPanel {
         self.surfaceBottom = surfaceBottom
         self.spiderDelegate = delegate
         let size = NSSize(width: 56, height: 44)
-        super.init(
-            contentRect: NSRect(x: startPos.x - 28, y: startPos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - 28, y: startPos.y, width: size.width, height: size.height), ignoresMouse: false)
         let view = SpiderDrawView(frame: NSRect(origin: .zero, size: size))
         self.drawView = view
         contentView = view

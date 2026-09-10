@@ -40,33 +40,21 @@ public final class SpawnCompass {
     }
 }
 
-public final class CompassToastWindow: NSPanel {
+public final class CompassToastWindow: EntityWindow {
     private let message: String
 
     public init(message: String, at pos: CGPoint) {
         self.message = message
         let size = NSSize(width: 220, height: 64)
-        super.init(
-            contentRect: NSRect(
-                x: pos.x - size.width / 2.0,
-                y: pos.y,
-                width: size.width,
-                height: size.height
-            ),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = true
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: pos.x - size.width / 2.0, y: pos.y, width: size.width, height: size.height), ignoresMouse: true)
         contentView = CompassToastDrawView(
             frame: NSRect(origin: .zero, size: size),
             message: message
         )
+    }
+
+    public required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
     }
 
     public func show() {

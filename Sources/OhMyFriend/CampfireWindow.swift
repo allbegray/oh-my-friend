@@ -1,30 +1,19 @@
 import AppKit
 import CoreGraphics
 
-public final class CampfireWindow: NSPanel {
+public final class CampfireWindow: EntityWindow {
     private var flickerTimer: Timer?
     private var phase: TimeInterval = 0
     private var drawView: CampfireDrawView?
 
     public init(floorPos: CGPoint) {
         let size = NSSize(width: 76, height: 64)
-        super.init(
-            contentRect: NSRect(
+        super.init(contentRect: NSRect(
                 x: floorPos.x - size.width / 2.0,
                 y: floorPos.y,
                 width: size.width,
                 height: size.height
-            ),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = true
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+            ), ignoresMouse: true)
         let view = CampfireDrawView(frame: NSRect(origin: .zero, size: size))
         self.drawView = view
         contentView = view

@@ -1,7 +1,7 @@
 import AppKit
 import CoreGraphics
 
-public final class GolemWindow: NSPanel {
+public final class GolemWindow: EntityWindow {
     public var anchor: CGPoint = .zero
     private var guardTimer: Timer?
     private var phase: TimeInterval = 0
@@ -13,18 +13,7 @@ public final class GolemWindow: NSPanel {
         self.anchor = startPos
         self.onThrow = onThrow
         let size = NSSize(width: 64, height: 92)
-        super.init(
-            contentRect: NSRect(x: startPos.x - 32, y: startPos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = true
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - 32, y: startPos.y, width: size.width, height: size.height), ignoresMouse: true)
         let view = GolemDrawView(frame: NSRect(origin: .zero, size: size))
         self.drawView = view
         contentView = view

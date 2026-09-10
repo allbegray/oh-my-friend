@@ -1,7 +1,7 @@
 import AppKit
 import CoreGraphics
 
-public final class ChestEntityWindow: NSPanel {
+public final class ChestEntityWindow: EntityWindow {
     private let floorPos: CGPoint
     private let onOpened: () -> Void
     private var isOpened = false
@@ -17,18 +17,7 @@ public final class ChestEntityWindow: NSPanel {
             width: size.width,
             height: size.height
         )
-        super.init(
-            contentRect: frame,
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: frame, ignoresMouse: false)
         let view = ChestDrawView(frame: NSRect(origin: .zero, size: size))
         self.drawView = view
         contentView = view

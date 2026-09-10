@@ -2,7 +2,7 @@ import AppKit
 
 // MARK: - 화면 공간에 놓인 TNT 블록 (마인크래프트 primed TNT)
 // 창 표면에 내려놓은 TNT를 작은 투명 패널로 그린다. 도화선 진행에 따라 하얗게 점멸한다.
-public final class TNTEntityWindow: NSPanel {
+public final class TNTEntityWindow: EntityWindow {
     private let tntView: TNTEntityView
 
     /// - Parameter screenPoint: TNT 블록 중심의 화면(Cocoa) 좌표
@@ -11,20 +11,9 @@ public final class TNTEntityWindow: NSPanel {
         let frameRect = CGRect(x: screenPoint.x - side / 2, y: screenPoint.y - side / 2, width: side, height: side)
         tntView = TNTEntityView(frame: NSRect(origin: .zero, size: frameRect.size))
 
-        super.init(
-            contentRect: frameRect,
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
+        super.init(contentRect: frameRect, ignoresMouse: true)
 
-        level = .floating
-        isOpaque = false
-        backgroundColor = .clear
-        hasShadow = false
-        ignoresMouseEvents = true
         isReleasedWhenClosed = false
-        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
 
         contentView = tntView
     }

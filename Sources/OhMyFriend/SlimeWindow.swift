@@ -37,7 +37,7 @@ public protocol SlimeWindowDelegate: AnyObject {
     func attackSlime(_ slime: SlimeWindow)
 }
 
-public final class SlimeWindow: NSPanel {
+public final class SlimeWindow: EntityWindow {
     public let slimeSize: SlimeSize
     public private(set) var position: CGPoint
     public weak var slimeDelegate: SlimeWindowDelegate?
@@ -56,18 +56,7 @@ public final class SlimeWindow: NSPanel {
         self.hp = size.hitPoints
         let s = size.panelSize
         let frame = NSRect(x: startPos.x - s / 2.0, y: startPos.y, width: s, height: s)
-        super.init(
-            contentRect: frame,
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: frame, ignoresMouse: false)
         let view = SlimeDrawView(frame: NSRect(origin: .zero, size: frame.size))
         self.drawView = view
         contentView = view

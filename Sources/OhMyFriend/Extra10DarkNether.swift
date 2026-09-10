@@ -7,23 +7,12 @@ import Foundation
 
 // MARK: - 위더 디버프 토스트 (플레이어 머리 위 🖤 20초)
 
-public final class WitherDebuffToastWindow: NSPanel {
+public final class WitherDebuffToastWindow: EntityWindow {
     private var lifeTimer: Timer?
 
     public init(above pos: CGPoint) {
         let size = NSSize(width: 92, height: 36)
-        super.init(
-            contentRect: NSRect(x: pos.x - 46, y: pos.y + 70, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = true
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: pos.x - 46, y: pos.y + 70, width: size.width, height: size.height), ignoresMouse: true)
         contentView = WitherDebuffDrawView(frame: NSRect(origin: .zero, size: size))
     }
 
@@ -58,12 +47,12 @@ private final class WitherDebuffDrawView: NSView {
 
 // MARK: - 위더스켈레톤 (검은 갑주 검사 + 접근 시 🖤 디버프, 클릭 2타 석탄 +3XP)
 
-public final class WitherSkeletonWindow: NSPanel {
+public final class WitherSkeletonWindow: EntityWindow {
     public private(set) var position: CGPoint
-    private var hp = 2
+    private var hits = HitCounter(maxHits: 2)
     private var phase: TimeInterval = 0
-    private var dir: CGFloat = 1
-    private var debuffCooldown: TimeInterval = 0
+    private var wander = WanderState(speed: 34)
+    private var debuffGate = Cooldown()
     private var walkTimer: Timer?
     private let onDefeat: () -> Void
     private let onProximity: () -> Void
@@ -75,18 +64,7 @@ public final class WitherSkeletonWindow: NSPanel {
         self.onDefeat = onDefeat
         self.onProximity = onProximity
         let size = NSSize(width: 64, height: 84)
-        super.init(
-            contentRect: NSRect(x: startPos.x - 32, y: startPos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - 32, y: startPos.y, width: size.width, height: size.height), ignoresMouse: false)
         let view = WitherSkeletonDrawView(frame: NSRect(origin: .zero, size: size))
         self.drawView = view
         contentView = view
@@ -97,17 +75,17 @@ public final class WitherSkeletonWindow: NSPanel {
         SoundAndEffectsManager.shared.play(.pop)
         walkTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] t in
             guard let self = self else { t.invalidate(); return }
-            self.phase += 1.0 / 60.0
-            self.debuffCooldown = max(0, self.debuffCooldown - 1.0 / 60.0)
-            if Int(self.phase * 60) % 180 == 0 { self.dir = Bool.random() ? 1 : -1 }
-            self.position.x += self.dir * 34.0 / 60.0
+            let dt = 1.0 / 60.0
+            self.phase += dt
+            self.debuffGate.tick(dt)
+            self.position.x += self.wander.tick(dt)
             self.setFrameOrigin(NSPoint(x: self.position.x - 32, y: self.position.y))
             let me = RewardCenter.me()
-            if self.debuffCooldown <= 0 && hypot(me.x - self.position.x, me.y - self.position.y) < 140 {
-                self.debuffCooldown = 20.0
+            if self.debuffGate.ready && hypot(me.x - self.position.x, me.y - self.position.y) < 140 {
+                self.debuffGate.trigger(20.0)
                 self.onProximity()
             }
-            self.drawView?.facingRight = self.dir > 0
+            self.drawView?.facingRight = self.wander.direction > 0
             self.drawView?.bob = sin(self.phase * 5.0)
             self.drawView?.needsDisplay = true
         }
@@ -115,8 +93,7 @@ public final class WitherSkeletonWindow: NSPanel {
     }
 
     public override func mouseDown(with event: NSEvent) {
-        hp -= 1
-        if hp <= 0 {
+        if hits.hit() {
             disappear(defeated: true)
         } else {
             SoundAndEffectsManager.shared.play(.pop)
@@ -179,11 +156,11 @@ private final class WitherSkeletonDrawView: NSView {
 
 // MARK: - 블레이즈 (공중 부유+회전 막대, 화염탄, 클릭 2타 막대 +4XP)
 
-public final class BlazeWindow: NSPanel {
+public final class BlazeWindow: EntityWindow {
     public var anchor: CGPoint = .zero
-    private var hp = 2
+    private var hits = HitCounter(maxHits: 2)
     private var phase: TimeInterval = 0
-    private var shootTimer: TimeInterval = 5.0
+    private var shootGate = Cooldown()
     private var flyTimer: Timer?
     private let onShoot: (CGPoint) -> Void
     private let onDefeat: () -> Void
@@ -195,18 +172,7 @@ public final class BlazeWindow: NSPanel {
         self.onShoot = onShoot
         self.onDefeat = onDefeat
         let size = NSSize(width: 72, height: 72)
-        super.init(
-            contentRect: NSRect(x: startPos.x - 36, y: startPos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - 36, y: startPos.y, width: size.width, height: size.height), ignoresMouse: false)
         let view = BlazeDrawView(frame: NSRect(origin: .zero, size: size))
         self.drawView = view
         contentView = view
@@ -215,17 +181,19 @@ public final class BlazeWindow: NSPanel {
     public func start() {
         orderFrontRegardless()
         SoundAndEffectsManager.shared.play(.pop)
+        shootGate.trigger(5.0)
         flyTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] t in
             guard let self = self else { t.invalidate(); return }
-            self.phase += 1.0 / 60.0
-            self.shootTimer -= 1.0 / 60.0
+            let dt = 1.0 / 60.0
+            self.phase += dt
+            self.shootGate.tick(dt)
             let cx = self.anchor.x + sin(self.phase * 0.8) * 70.0
             let cy = self.anchor.y + 90 + sin(self.phase * 1.3) * 18.0
             self.setFrameOrigin(NSPoint(x: cx - 36, y: cy))
             self.drawView?.spin = self.phase * 2.4
             self.drawView?.needsDisplay = true
-            if self.shootTimer <= 0 {
-                self.shootTimer = Double.random(in: 4.0...6.0)
+            if self.shootGate.ready {
+                self.shootGate.trigger(Double.random(in: 4.0...6.0))
                 self.onShoot(CGPoint(x: cx, y: cy))
             }
         }
@@ -235,8 +203,7 @@ public final class BlazeWindow: NSPanel {
     public var centerPos: CGPoint { CGPoint(x: frame.midX, y: frame.midY) }
 
     public override func mouseDown(with event: NSEvent) {
-        hp -= 1
-        if hp <= 0 {
+        if hits.hit() {
             disappear(defeated: true)
         } else {
             SoundAndEffectsManager.shared.play(.pop)
@@ -285,7 +252,7 @@ private final class BlazeDrawView: NSView {
 
 // 블레이즈 화염탄 미니 패널 (클릭 쳐내기 격추)
 
-public final class DarkFireballWindow: NSPanel {
+public final class DarkFireballWindow: EntityWindow {
     private let from: CGPoint
     private let target: CGPoint
     private let onArrive: (Bool) -> Void
@@ -296,18 +263,7 @@ public final class DarkFireballWindow: NSPanel {
         self.target = target
         self.onArrive = onArrive
         let size: CGFloat = 30.0
-        super.init(
-            contentRect: NSRect(x: from.x - 15, y: from.y - 15, width: size, height: size),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: from.x - 15, y: from.y - 15, width: size, height: size), ignoresMouse: false)
         contentView = DarkFireballDrawView(frame: NSRect(origin: .zero, size: NSSize(width: size, height: size)))
     }
 
@@ -361,12 +317,12 @@ private final class DarkFireballDrawView: NSView {
 
 // MARK: - 익사자 (지상 보행 + 3초 간격 미니 삼지창, 클릭 2타 파편 +4XP)
 
-public final class DrownedWindow: NSPanel {
+public final class DrownedWindow: EntityWindow {
     public private(set) var position: CGPoint
-    private var hp = 2
+    private var hits = HitCounter(maxHits: 2)
     private var phase: TimeInterval = 0
-    private var dir: CGFloat = 1
-    private var throwTimer: TimeInterval = 3.0
+    private var wander = WanderState(speed: 26)
+    private var throwGate = Cooldown()
     private var walkTimer: Timer?
     private let onThrow: (CGPoint) -> Void
     private let onDefeat: () -> Void
@@ -378,18 +334,7 @@ public final class DrownedWindow: NSPanel {
         self.onThrow = onThrow
         self.onDefeat = onDefeat
         let size = NSSize(width: 60, height: 72)
-        super.init(
-            contentRect: NSRect(x: startPos.x - 30, y: startPos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - 30, y: startPos.y, width: size.width, height: size.height), ignoresMouse: false)
         let view = DrownedDrawView(frame: NSRect(origin: .zero, size: size))
         self.drawView = view
         contentView = view
@@ -398,18 +343,19 @@ public final class DrownedWindow: NSPanel {
     public func start() {
         orderFrontRegardless()
         SoundAndEffectsManager.shared.play(.splash)
+        throwGate.trigger(3.0)
         walkTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] t in
             guard let self = self else { t.invalidate(); return }
-            self.phase += 1.0 / 60.0
-            self.throwTimer -= 1.0 / 60.0
-            if Int(self.phase * 60) % 200 == 0 { self.dir = Bool.random() ? 1 : -1 }
-            self.position.x += self.dir * 26.0 / 60.0
+            let dt = 1.0 / 60.0
+            self.phase += dt
+            self.throwGate.tick(dt)
+            self.position.x += self.wander.tick(dt)
             self.setFrameOrigin(NSPoint(x: self.position.x - 30, y: self.position.y))
-            self.drawView?.facingRight = self.dir > 0
+            self.drawView?.facingRight = self.wander.direction > 0
             self.drawView?.bob = sin(self.phase * 4.0)
             self.drawView?.needsDisplay = true
-            if self.throwTimer <= 0 {
-                self.throwTimer = 3.0
+            if self.throwGate.ready {
+                self.throwGate.trigger(3.0)
                 self.onThrow(CGPoint(x: self.position.x, y: self.position.y + 44))
             }
         }
@@ -417,8 +363,7 @@ public final class DrownedWindow: NSPanel {
     }
 
     public override func mouseDown(with event: NSEvent) {
-        hp -= 1
-        if hp <= 0 {
+        if hits.hit() {
             disappear(defeated: true)
         } else {
             SoundAndEffectsManager.shared.play(.splash)
@@ -475,7 +420,7 @@ private final class DrownedDrawView: NSView {
 
 // 익사자 미니 삼지창 투척체 (맞으면 넉백 emoji)
 
-public final class MiniTridentWindow: NSPanel {
+public final class MiniTridentWindow: EntityWindow {
     private let from: CGPoint
     private let target: CGPoint
     private let onArrive: (Bool) -> Void
@@ -486,18 +431,7 @@ public final class MiniTridentWindow: NSPanel {
         self.target = target
         self.onArrive = onArrive
         let size = NSSize(width: 32, height: 32)
-        super.init(
-            contentRect: NSRect(x: from.x - 16, y: from.y - 16, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: from.x - 16, y: from.y - 16, width: size.width, height: size.height), ignoresMouse: false)
         contentView = MiniTridentDrawView(frame: NSRect(origin: .zero, size: size))
     }
 
@@ -552,10 +486,10 @@ private final class MiniTridentDrawView: NSView {
 
 // MARK: - 브리즈 (공중 지그재그 콤보 + 바람탄 테니스 반사 즉사 +5XP / 직격 넉백)
 
-public final class BreezeWindow: NSPanel {
+public final class BreezeWindow: EntityWindow {
     public var anchor: CGPoint = .zero
     private var phase: TimeInterval = 0
-    private var shootTimer: TimeInterval = 4.0
+    private var shootGate = Cooldown()
     private var flyTimer: Timer?
     private let onShoot: (CGPoint) -> Void
     private let onLeave: () -> Void
@@ -567,18 +501,7 @@ public final class BreezeWindow: NSPanel {
         self.onShoot = onShoot
         self.onLeave = onLeave
         let size = NSSize(width: 64, height: 64)
-        super.init(
-            contentRect: NSRect(x: startPos.x - 32, y: startPos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - 32, y: startPos.y, width: size.width, height: size.height), ignoresMouse: false)
         let view = BreezeDrawView(frame: NSRect(origin: .zero, size: size))
         self.drawView = view
         contentView = view
@@ -587,17 +510,19 @@ public final class BreezeWindow: NSPanel {
     public func start() {
         orderFrontRegardless()
         SoundAndEffectsManager.shared.play(.pop)
+        shootGate.trigger(4.0)
         flyTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] t in
             guard let self = self else { t.invalidate(); return }
-            self.phase += 1.0 / 60.0
-            self.shootTimer -= 1.0 / 60.0
+            let dt = 1.0 / 60.0
+            self.phase += dt
+            self.shootGate.tick(dt)
             let cx = self.anchor.x + sin(self.phase * 1.7) * 110.0
             let cy = self.anchor.y + 100 + abs(sin(self.phase * 2.3)) * 50.0
             self.setFrameOrigin(NSPoint(x: cx - 32, y: cy))
             self.drawView?.spin = self.phase * 3.0
             self.drawView?.needsDisplay = true
-            if self.shootTimer <= 0 {
-                self.shootTimer = Double.random(in: 3.5...5.0)
+            if self.shootGate.ready {
+                self.shootGate.trigger(Double.random(in: 3.5...5.0))
                 self.onShoot(CGPoint(x: cx, y: cy))
             }
         }
@@ -653,7 +578,7 @@ private final class BreezeDrawView: NSView {
 
 // 브리즈 바람탄 (클릭 테니스 반사)
 
-public final class WindChargeWindow: NSPanel {
+public final class WindChargeWindow: EntityWindow {
     private let from: CGPoint
     private let target: CGPoint
     private let onArrive: (Bool) -> Void
@@ -664,18 +589,7 @@ public final class WindChargeWindow: NSPanel {
         self.target = target
         self.onArrive = onArrive
         let size: CGFloat = 30.0
-        super.init(
-            contentRect: NSRect(x: from.x - 15, y: from.y - 15, width: size, height: size),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: from.x - 15, y: from.y - 15, width: size, height: size), ignoresMouse: false)
         contentView = WindChargeDrawView(frame: NSRect(origin: .zero, size: NSSize(width: size, height: size)))
     }
 
@@ -731,11 +645,11 @@ private final class WindChargeDrawView: NSView {
 
 // MARK: - 실버피시 (바닥 파고들기 숨기/랜덤 출몰, 출몰 클릭 1타 +1XP)
 
-public final class SilverfishWindow: NSPanel {
+public final class SilverfishWindow: EntityWindow {
     public private(set) var position: CGPoint
     public private(set) var emerged: Bool = true
     private var phase: TimeInterval = 0
-    private var toggleTimer: TimeInterval = 4.0
+    private var emergeGate = Cooldown()
     private var crawlTimer: Timer?
     private let onDefeat: () -> Void
     private var drawView: SilverfishDrawView?
@@ -745,18 +659,7 @@ public final class SilverfishWindow: NSPanel {
         self.position = startPos
         self.onDefeat = onDefeat
         let size = NSSize(width: 48, height: 32)
-        super.init(
-            contentRect: NSRect(x: startPos.x - 24, y: startPos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - 24, y: startPos.y, width: size.width, height: size.height), ignoresMouse: false)
         let view = SilverfishDrawView(frame: NSRect(origin: .zero, size: size))
         self.drawView = view
         contentView = view
@@ -765,17 +668,19 @@ public final class SilverfishWindow: NSPanel {
     public func start() {
         orderFrontRegardless()
         SoundAndEffectsManager.shared.play(.pop)
+        emergeGate.trigger(4.0)
         crawlTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] t in
             guard let self = self else { t.invalidate(); return }
-            self.phase += 1.0 / 60.0
-            self.toggleTimer -= 1.0 / 60.0
+            let dt = 1.0 / 60.0
+            self.phase += dt
+            self.emergeGate.tick(dt)
             if self.emerged {
                 self.position.x += sin(self.phase * 6.0) * 24.0 / 60.0
                 self.setFrameOrigin(NSPoint(x: self.position.x - 24, y: self.position.y))
             }
-            if self.toggleTimer <= 0 {
+            if self.emergeGate.ready {
                 self.emerged.toggle()
-                self.toggleTimer = Double.random(in: 3.0...6.0)
+                self.emergeGate.trigger(Double.random(in: 3.0...6.0))
                 SoundAndEffectsManager.shared.play(.pop)
             }
             self.drawView?.emerged = self.emerged

@@ -220,7 +220,7 @@ public final class RedstoneManager {
 
 // MARK: - 레버 패널
 
-private final class RS13LeverWindow: NSPanel {
+private final class RS13LeverWindow: EntityWindow {
     var isOn: Bool { didSet { drawView?.isOn = isOn; drawView?.needsDisplay = true } }
     private let onToggle: () -> Void
     private var drawView: RS13LeverDrawView?
@@ -229,18 +229,7 @@ private final class RS13LeverWindow: NSPanel {
         self.isOn = isOn
         self.onToggle = onToggle
         let size = NSSize(width: 64, height: 72)
-        super.init(
-            contentRect: NSRect(x: floorPos.x - size.width / 2, y: floorPos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        level = .floating
-        isOpaque = false
-        backgroundColor = .clear
-        hasShadow = false
-        ignoresMouseEvents = false
-        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: floorPos.x - size.width / 2, y: floorPos.y, width: size.width, height: size.height), ignoresMouse: false)
         let v = RS13LeverDrawView(frame: NSRect(origin: .zero, size: size))
         v.isOn = isOn
         drawView = v
@@ -276,25 +265,14 @@ private final class RS13LeverDrawView: NSView {
 
 // MARK: - 램프 패널
 
-private final class RS13LampWindow: NSPanel {
+private final class RS13LampWindow: EntityWindow {
     var isLit: Bool { didSet { drawView?.isLit = isLit; drawView?.needsDisplay = true } }
     private var drawView: RS13LampDrawView?
 
     init(floorPos: CGPoint, isLit: Bool) {
         self.isLit = isLit
         let size = NSSize(width: 64, height: 72)
-        super.init(
-            contentRect: NSRect(x: floorPos.x - size.width / 2, y: floorPos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        level = .floating
-        isOpaque = false
-        backgroundColor = .clear
-        hasShadow = false
-        ignoresMouseEvents = true
-        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: floorPos.x - size.width / 2, y: floorPos.y, width: size.width, height: size.height), ignoresMouse: true)
         let v = RS13LampDrawView(frame: NSRect(origin: .zero, size: size))
         v.isLit = isLit
         drawView = v
@@ -333,7 +311,7 @@ private final class RS13LampDrawView: NSView {
 
 // MARK: - 음표 블록
 
-private final class RS13NoteBlockWindow: NSPanel {
+private final class RS13NoteBlockWindow: EntityWindow {
     var noteName: String { didSet { drawView?.noteName = noteName; drawView?.needsDisplay = true } }
     var onClosed: (() -> Void)?
     private let onHit: () -> Void
@@ -345,18 +323,7 @@ private final class RS13NoteBlockWindow: NSPanel {
         self.noteName = noteName
         self.onHit = onHit
         let size = NSSize(width: 72, height: 80)
-        super.init(
-            contentRect: NSRect(x: floorPos.x - size.width / 2, y: floorPos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        level = .floating
-        isOpaque = false
-        backgroundColor = .clear
-        hasShadow = false
-        ignoresMouseEvents = false
-        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: floorPos.x - size.width / 2, y: floorPos.y, width: size.width, height: size.height), ignoresMouse: false)
         let v = RS13NoteDrawView(frame: NSRect(origin: .zero, size: size))
         v.noteName = noteName
         drawView = v
@@ -418,7 +385,7 @@ private final class RS13NoteDrawView: NSView {
 
 // MARK: - 그림 액자
 
-private final class RS13PaintingWindow: NSPanel {
+private final class RS13PaintingWindow: EntityWindow {
     var index: Int { didSet { drawView?.index = index; drawView?.needsDisplay = true } }
     var onClosed: (() -> Void)?
     private let onNext: () -> Void
@@ -430,18 +397,7 @@ private final class RS13PaintingWindow: NSPanel {
         self.index = index
         self.onNext = onNext
         let size = NSSize(width: 96, height: 72)
-        super.init(
-            contentRect: NSRect(x: floorPos.x - size.width / 2, y: floorPos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        level = .floating
-        isOpaque = false
-        backgroundColor = .clear
-        hasShadow = false
-        ignoresMouseEvents = false
-        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: floorPos.x - size.width / 2, y: floorPos.y, width: size.width, height: size.height), ignoresMouse: false)
         let v = RS13PaintingDrawView(frame: NSRect(origin: .zero, size: size))
         v.index = index
         drawView = v
@@ -525,7 +481,7 @@ private final class RS13PaintingDrawView: NSView {
 
 // MARK: - 배너 미리보기
 
-private final class RS13BannerWindow: NSPanel {
+private final class RS13BannerWindow: EntityWindow {
     private let dye: NSColor
     private let pattern: String
 
@@ -533,18 +489,7 @@ private final class RS13BannerWindow: NSPanel {
         self.dye = dye
         self.pattern = pattern
         let size = NSSize(width: 72, height: 104)
-        super.init(
-            contentRect: NSRect(x: floorPos.x - size.width / 2, y: floorPos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        level = .floating
-        isOpaque = false
-        backgroundColor = .clear
-        hasShadow = false
-        ignoresMouseEvents = true
-        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: floorPos.x - size.width / 2, y: floorPos.y, width: size.width, height: size.height), ignoresMouse: true)
         contentView = RS13BannerDrawView(frame: NSRect(origin: .zero, size: size), dye: dye, pattern: pattern)
     }
 
@@ -598,7 +543,7 @@ private final class RS13BannerDrawView: NSView {
 
 // MARK: - 트립와이어 + 경보 램프
 
-private final class RS13TripwireWindow: NSPanel {
+private final class RS13TripwireWindow: EntityWindow {
     private let onTrip: () -> Void
     private var timer: Timer?
     private var elapsed: TimeInterval = 0
@@ -606,18 +551,7 @@ private final class RS13TripwireWindow: NSPanel {
     init(floorPos: CGPoint, onTrip: @escaping () -> Void) {
         self.onTrip = onTrip
         let size = NSSize(width: 220, height: 40)
-        super.init(
-            contentRect: NSRect(x: floorPos.x - size.width / 2, y: floorPos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        level = .floating
-        isOpaque = false
-        backgroundColor = .clear
-        hasShadow = false
-        ignoresMouseEvents = false
-        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: floorPos.x - size.width / 2, y: floorPos.y, width: size.width, height: size.height), ignoresMouse: false)
         contentView = RS13TripwireDrawView(frame: NSRect(origin: .zero, size: size))
     }
 
@@ -667,7 +601,7 @@ private final class RS13TripwireDrawView: NSView {
     }
 }
 
-private final class RS13AlarmLampWindow: NSPanel {
+private final class RS13AlarmLampWindow: EntityWindow {
     private var timer: Timer?
     private var blink = false
     private var ticks = 0
@@ -675,18 +609,7 @@ private final class RS13AlarmLampWindow: NSPanel {
 
     init(floorPos: CGPoint) {
         let size = NSSize(width: 64, height: 64)
-        super.init(
-            contentRect: NSRect(x: floorPos.x - size.width / 2, y: floorPos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        level = .floating
-        isOpaque = false
-        backgroundColor = .clear
-        hasShadow = false
-        ignoresMouseEvents = true
-        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: floorPos.x - size.width / 2, y: floorPos.y, width: size.width, height: size.height), ignoresMouse: true)
         let v = RS13AlarmLampDrawView(frame: NSRect(origin: .zero, size: size))
         drawView = v
         contentView = v

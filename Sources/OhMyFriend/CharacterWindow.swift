@@ -1,6 +1,6 @@
 import AppKit
 
-public final class CharacterWindow: NSPanel {
+public final class CharacterWindow: EntityWindow {
     public let characterView: CharacterView
     public private(set) var currentScale: CGFloat = 1.0
 
@@ -10,19 +10,8 @@ public final class CharacterWindow: NSPanel {
         let frame = NSRect(x: 200, y: 200, width: baseSize, height: baseSize)
         self.characterView = CharacterView(frame: NSRect(origin: .zero, size: frame.size), skin: skin)
 
-        super.init(
-            contentRect: frame,
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
+        super.init(contentRect: frame, ignoresMouse: false)
 
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         self.isReleasedWhenClosed = false
 
         contentView = characterView

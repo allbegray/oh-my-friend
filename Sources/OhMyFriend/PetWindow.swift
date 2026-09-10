@@ -1,6 +1,6 @@
 import AppKit
 
-public final class PetWindow: NSPanel {
+public final class PetWindow: EntityWindow {
     public let petView: PetView
     public private(set) var currentScale: CGFloat = 1.0
 
@@ -10,19 +10,8 @@ public final class PetWindow: NSPanel {
         let frame = NSRect(x: 250, y: 200, width: baseSize, height: baseSize)
         self.petView = PetView(frame: NSRect(origin: .zero, size: frame.size), kind: kind)
 
-        super.init(
-            contentRect: frame,
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
+        super.init(contentRect: frame, ignoresMouse: false)
 
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         self.isReleasedWhenClosed = false
 
         contentView = petView

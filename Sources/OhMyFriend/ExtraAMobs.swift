@@ -10,9 +10,9 @@ public final class MobsAManager {
 
     private var warden: AWardenWindow?
     private var wardenDim: AWardenDimOverlay?
-    private var allay: AAllayWindow?
-    private var sniffer: ASnifferWindow?
-    private var golem: AIronGolemWindow?
+    private let allaySlot = ToggleSlot<AAllayWindow>()
+    private let snifferSlot = ToggleSlot<ASnifferWindow>()
+    private let golemSlot = ToggleSlot<AIronGolemWindow>()
     private var stray: AStrayWindow?
     private var strayArrow: AStrayArrowWindow?
     private var husk: AHuskWindow?
@@ -75,8 +75,7 @@ public final class MobsAManager {
     }
 
     private func handleWardenTap(_ w: AWardenWindow) {
-        w.hit()
-        if w.hits >= 3 {
+        if w.hit() {
             RewardCenter.grant(xp: 5, "🦯 워든 격퇴!")
             SoundAndEffectsManager.shared.play(.explode)
             w.close()
@@ -90,13 +89,12 @@ public final class MobsAManager {
 
     // MARK: - 알레이
     public func toggleAllay() {
-        if let w = allay, w.isVisible { w.close(); allay = nil; return }
-        allay = nil
-        let w = AAllayWindow(startPos: spawnPos(dx: 60)) { [weak self] tapped in
-            self?.handleAllayTap(tapped)
-        }
-        allay = w
-        w.start()
+        let pos = spawnPos(dx: 60)
+        allaySlot.toggle(make: {
+            AAllayWindow(startPos: pos) { [weak self] tapped in
+                self?.handleAllayTap(tapped)
+            }
+        }, start: { $0.start() })
     }
 
     private func handleAllayTap(_ w: AAllayWindow) {
@@ -107,13 +105,12 @@ public final class MobsAManager {
 
     // MARK: - 스니퍼
     public func toggleSniffer() {
-        if let w = sniffer, w.isVisible { w.close(); sniffer = nil; return }
-        sniffer = nil
-        let w = ASnifferWindow(startPos: spawnPos(dx: -60)) { [weak self] tapped in
-            self?.handleSnifferTap(tapped)
-        }
-        sniffer = w
-        w.start()
+        let pos = spawnPos(dx: -60)
+        snifferSlot.toggle(make: {
+            ASnifferWindow(startPos: pos) { [weak self] tapped in
+                self?.handleSnifferTap(tapped)
+            }
+        }, start: { $0.start() })
     }
 
     private func handleSnifferTap(_ w: ASnifferWindow) {
@@ -128,13 +125,12 @@ public final class MobsAManager {
 
     // MARK: - 철골렘
     public func toggleGolem() {
-        if let w = golem, w.isVisible { w.close(); golem = nil; return }
-        golem = nil
-        let w = AIronGolemWindow(startPos: spawnPos(dx: 80)) { [weak self] tapped in
-            self?.handleGolemTap(tapped)
-        }
-        golem = w
-        w.start()
+        let pos = spawnPos(dx: 80)
+        golemSlot.toggle(make: {
+            AIronGolemWindow(startPos: pos) { [weak self] tapped in
+                self?.handleGolemTap(tapped)
+            }
+        }, start: { $0.start() })
     }
 
     private func handleGolemTap(_ w: AIronGolemWindow) {
@@ -176,8 +172,7 @@ public final class MobsAManager {
     }
 
     private func handleStrayTap(_ w: AStrayWindow) {
-        w.hit()
-        if w.hits >= 2 {
+        if w.hit() {
             RewardCenter.grant(xp: 3, "❄️ 스트레이 격퇴!")
             SoundAndEffectsManager.shared.play(.chime)
             w.close(); stray = nil
@@ -301,8 +296,7 @@ public final class MobsAManager {
     }
 
     private func handleHorseTrapTap(_ w: ASkeletonHorseTrapWindow) {
-        w.hit()
-        if w.hits >= 3 {
+        if w.hit() {
             RewardCenter.grant(xp: 4, "🐴 안장 획득!")
             SoundAndEffectsManager.shared.play(.chime)
             w.close(); horseTrap = nil
@@ -315,20 +309,9 @@ public final class MobsAManager {
 
 // MARK: - 워든: 등장 디밍 + 스컬크 파티클 + 3타 격퇴
 
-public final class AWardenDimOverlay: NSPanel {
+public final class AWardenDimOverlay: EntityWindow {
     public init(center: CGPoint) {
-        super.init(
-            contentRect: NSRect(x: center.x - 250, y: center.y - 150, width: 500, height: 300),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = true
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: center.x - 250, y: center.y - 150, width: 500, height: 300), ignoresMouse: true)
         contentView = AWardenDimView(frame: NSRect(x: 0, y: 0, width: 500, height: 300))
     }
 
@@ -349,9 +332,10 @@ private final class AWardenDimView: NSView {
     }
 }
 
-public final class AWardenWindow: NSPanel {
+public final class AWardenWindow: EntityWindow {
     public var position: CGPoint
-    public private(set) var hits: Int = 0
+    private var counter = HitCounter(maxHits: 3)
+    public var hits: Int { counter.hits }
     public var onDefeated: (() -> Void)?
     private let onTap: (AWardenWindow) -> Void
     private var tick: Timer?
@@ -363,18 +347,7 @@ public final class AWardenWindow: NSPanel {
     public init(startPos: CGPoint, onTap: @escaping (AWardenWindow) -> Void) {
         self.position = startPos
         self.onTap = onTap
-        super.init(
-            contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = AWardenDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
         self.drawView = view
         contentView = view
@@ -393,10 +366,12 @@ public final class AWardenWindow: NSPanel {
         RunLoop.main.add(tick!, forMode: .common)
     }
 
-    public func hit() {
-        hits += 1
-        drawView?.hits = hits
+    @discardableResult
+    public func hit() -> Bool {
+        let defeated = counter.hit()
+        drawView?.hits = counter.hits
         drawView?.needsDisplay = true
+        return defeated
     }
 
     public override func mouseDown(with event: NSEvent) {
@@ -448,7 +423,7 @@ private final class AWardenDrawView: NSView {
 
 // MARK: - 알레이: 주인 추적 + 전리품 배달 + 춤
 
-public final class AAllayWindow: NSPanel {
+public final class AAllayWindow: EntityWindow {
     public var position: CGPoint
     private let onTap: (AAllayWindow) -> Void
     private var tick: Timer?
@@ -463,18 +438,7 @@ public final class AAllayWindow: NSPanel {
     public init(startPos: CGPoint, onTap: @escaping (AAllayWindow) -> Void) {
         self.position = startPos
         self.onTap = onTap
-        super.init(
-            contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = AAllayDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
         self.drawView = view
         contentView = view
@@ -552,13 +516,12 @@ private final class AAllayDrawView: NSView {
 
 // MARK: - 스니퍼: 땅 파기 후 고대 씨앗
 
-public final class ASnifferWindow: NSPanel {
+public final class ASnifferWindow: EntityWindow {
     public var position: CGPoint
     private let onTap: (ASnifferWindow) -> Void
     private var tick: Timer?
     private var phase: TimeInterval = 0
-    private var digProgress: TimeInterval = 0
-    private let digDuration: TimeInterval = 6.0
+    private var digCooldown = Cooldown()
     private var drawView: ASnifferDrawView?
     private let panelW: CGFloat = 88
     private let panelH: CGFloat = 56
@@ -566,18 +529,7 @@ public final class ASnifferWindow: NSPanel {
     public init(startPos: CGPoint, onTap: @escaping (ASnifferWindow) -> Void) {
         self.position = startPos
         self.onTap = onTap
-        super.init(
-            contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = ASnifferDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
         self.drawView = view
         contentView = view
@@ -586,12 +538,11 @@ public final class ASnifferWindow: NSPanel {
     public func start() {
         orderFrontRegardless()
         SoundAndEffectsManager.shared.play(.splash)
+        digCooldown.trigger(6.0)
         tick = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] t in
             guard let self = self else { t.invalidate(); return }
             self.phase += 1.0 / 60.0
-            if !self.isReady {
-                self.digProgress += 1.0 / 60.0
-            }
+            self.digCooldown.tick(1.0 / 60.0)
             self.drawView?.phase = self.phase
             self.drawView?.ready = self.isReady
             self.drawView?.needsDisplay = true
@@ -599,11 +550,11 @@ public final class ASnifferWindow: NSPanel {
         RunLoop.main.add(tick!, forMode: .common)
     }
 
-    public var isReady: Bool { digProgress >= digDuration }
+    public var isReady: Bool { digCooldown.ready }
 
     public func harvest() -> Bool {
         guard isReady else { return false }
-        digProgress = 0
+        digCooldown.trigger(6.0)
         return true
     }
 
@@ -661,7 +612,7 @@ private final class ASnifferDrawView: NSView {
 
 // MARK: - 철골렘: 플레이어 근처 고정 + 순찰 펀치 + 장미
 
-public final class AIronGolemWindow: NSPanel {
+public final class AIronGolemWindow: EntityWindow {
     public var position: CGPoint
     private let onTap: (AIronGolemWindow) -> Void
     private var tick: Timer?
@@ -674,18 +625,7 @@ public final class AIronGolemWindow: NSPanel {
     public init(startPos: CGPoint, onTap: @escaping (AIronGolemWindow) -> Void) {
         self.position = startPos
         self.onTap = onTap
-        super.init(
-            contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = AIronGolemDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
         self.drawView = view
         contentView = view
@@ -765,16 +705,17 @@ private final class AIronGolemDrawView: NSView {
 
 // MARK: - 스트레이 + 슬로우 화살 미니 패널
 
-public final class AStrayWindow: NSPanel {
+public final class AStrayWindow: EntityWindow {
     public var position: CGPoint
-    public private(set) var hits: Int = 0
+    private var counter = HitCounter(maxHits: 2)
+    public var hits: Int { counter.hits }
     public var onFire: ((CGPoint) -> Void)?
     private let onTap: (AStrayWindow) -> Void
     private var tick: Timer?
     private var phase: TimeInterval = 0
-    private var fireLeft: TimeInterval = 4.0
+    private var fireCooldown = Cooldown()
     private var slowLeft: TimeInterval = 0
-    private var dir: CGFloat = 1
+    private var wander = WanderState(speed: 26.0)
     private var drawView: AStrayDrawView?
     private let panelW: CGFloat = 64
     private let panelH: CGFloat = 56
@@ -782,18 +723,7 @@ public final class AStrayWindow: NSPanel {
     public init(startPos: CGPoint, onTap: @escaping (AStrayWindow) -> Void) {
         self.position = startPos
         self.onTap = onTap
-        super.init(
-            contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = AStrayDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
         self.drawView = view
         contentView = view
@@ -802,31 +732,31 @@ public final class AStrayWindow: NSPanel {
     public func start() {
         orderFrontRegardless()
         SoundAndEffectsManager.shared.play(.pop)
+        fireCooldown.trigger(4.0)
         tick = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] t in
             guard let self = self else { t.invalidate(); return }
             self.phase += 1.0 / 60.0
             if self.slowLeft > 0 { self.slowLeft -= 1.0 / 60.0 }
-            if Int(self.phase) % 4 == 0 && Int(self.phase * 60.0) % 60 == 0 {
-                self.dir = Bool.random() ? 1 : -1
-            }
-            let speed: CGFloat = self.slowLeft > 0 ? 8.0 : 26.0
-            self.position.x += self.dir * speed / 60.0
+            let dt = 1.0 / 60.0
+            self.wander.speed = self.slowLeft > 0 ? 8.0 : 26.0
+            self.position.x += self.wander.tick(dt)
             self.setFrameOrigin(NSPoint(x: self.position.x - self.panelW / 2, y: self.position.y))
-            self.fireLeft -= 1.0 / 60.0
-            if self.fireLeft <= 0 {
-                self.fireLeft = 6.0
+            self.fireCooldown.tick(dt)
+            if self.fireCooldown.ready {
+                self.fireCooldown.trigger(6.0)
                 self.onFire?(CGPoint(x: self.position.x, y: self.position.y + 24))
             }
             self.drawView?.slowed = self.slowLeft > 0
-            self.drawView?.facingRight = self.dir > 0
+            self.drawView?.facingRight = self.wander.direction > 0
             self.drawView?.phase = self.phase
             self.drawView?.needsDisplay = true
         }
         RunLoop.main.add(tick!, forMode: .common)
     }
 
-    public func hit() {
-        hits += 1
+    @discardableResult
+    public func hit() -> Bool {
+        return counter.hit()
     }
 
     public func applySlow() {
@@ -882,7 +812,7 @@ private final class AStrayDrawView: NSView {
     }
 }
 
-public final class AStrayArrowWindow: NSPanel {
+public final class AStrayArrowWindow: EntityWindow {
     private var tick: Timer?
     private var life: TimeInterval = 0
     private let onArrive: () -> Void
@@ -891,18 +821,7 @@ public final class AStrayArrowWindow: NSPanel {
 
     public init(startPos: CGPoint, onArrive: @escaping () -> Void) {
         self.onArrive = onArrive
-        super.init(
-            contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = true
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: true)
         contentView = AStrayArrowView(frame: NSRect(x: 0, y: 0, width: panelW, height: panelH))
     }
 
@@ -941,14 +860,14 @@ private final class AStrayArrowView: NSView {
 
 // MARK: - 허스크: 허기 디버프 20초 (시간 만료 자동 해제)
 
-public final class AHuskWindow: NSPanel {
+public final class AHuskWindow: EntityWindow {
     public var position: CGPoint
     public private(set) var isHungry = false
     private let onTap: (AHuskWindow) -> Void
     private var tick: Timer?
     private var phase: TimeInterval = 0
     private var hungerLeft: TimeInterval = 0
-    private var dir: CGFloat = 1
+    private var wander = WanderState(speed: 20.0)
     private var drawView: AHuskDrawView?
     private let panelW: CGFloat = 64
     private let panelH: CGFloat = 60
@@ -956,18 +875,7 @@ public final class AHuskWindow: NSPanel {
     public init(startPos: CGPoint, onTap: @escaping (AHuskWindow) -> Void) {
         self.position = startPos
         self.onTap = onTap
-        super.init(
-            contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = AHuskDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
         self.drawView = view
         contentView = view
@@ -986,10 +894,7 @@ public final class AHuskWindow: NSPanel {
                     RewardCenter.say("🍖 허기 해제!")
                 }
             }
-            if Int(self.phase) % 5 == 0 && Int(self.phase * 60.0) % 60 == 0 {
-                self.dir = Bool.random() ? 1 : -1
-            }
-            self.position.x += self.dir * 20.0 / 60.0
+            self.position.x += self.wander.tick(1.0 / 60.0)
             self.setFrameOrigin(NSPoint(x: self.position.x - self.panelW / 2, y: self.position.y))
             self.drawView?.hungry = self.isHungry
             self.drawView?.remain = self.hungerLeft
@@ -1048,14 +953,14 @@ private final class AHuskDrawView: NSView {
 
 // MARK: - 보고드: 독화살 + 버섯 (시간 만료 해제)
 
-public final class ABoggedWindow: NSPanel {
+public final class ABoggedWindow: EntityWindow {
     public var position: CGPoint
     public private(set) var isPoisoned = false
     private let onTap: (ABoggedWindow) -> Void
     private var tick: Timer?
     private var phase: TimeInterval = 0
     private var poisonLeft: TimeInterval = 0
-    private var dir: CGFloat = 1
+    private var wander = WanderState(speed: 22.0)
     private var drawView: ABoggedDrawView?
     private let panelW: CGFloat = 60
     private let panelH: CGFloat = 56
@@ -1063,18 +968,7 @@ public final class ABoggedWindow: NSPanel {
     public init(startPos: CGPoint, onTap: @escaping (ABoggedWindow) -> Void) {
         self.position = startPos
         self.onTap = onTap
-        super.init(
-            contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = ABoggedDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
         self.drawView = view
         contentView = view
@@ -1093,10 +987,7 @@ public final class ABoggedWindow: NSPanel {
                     RewardCenter.say("🍄 독 해제!")
                 }
             }
-            if Int(self.phase) % 4 == 0 && Int(self.phase * 60.0) % 60 == 0 {
-                self.dir = Bool.random() ? 1 : -1
-            }
-            self.position.x += self.dir * 22.0 / 60.0
+            self.position.x += self.wander.tick(1.0 / 60.0)
             self.setFrameOrigin(NSPoint(x: self.position.x - self.panelW / 2, y: self.position.y))
             self.drawView?.poisoned = self.isPoisoned
             self.drawView?.phase = self.phase
@@ -1154,7 +1045,7 @@ private final class ABoggedDrawView: NSView {
 
 // MARK: - 크리킹: 밤에만 눈 고정 얼음 3초, 낮 소멸
 
-public final class ACreakingWindow: NSPanel {
+public final class ACreakingWindow: EntityWindow {
     public var position: CGPoint
     public private(set) var isFrozen = false
     private let onTap: (ACreakingWindow) -> Void
@@ -1168,18 +1059,7 @@ public final class ACreakingWindow: NSPanel {
     public init(startPos: CGPoint, onTap: @escaping (ACreakingWindow) -> Void) {
         self.position = startPos
         self.onTap = onTap
-        super.init(
-            contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = ACreakingDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
         self.drawView = view
         contentView = view
@@ -1261,7 +1141,7 @@ private final class ACreakingDrawView: NSView {
 
 // MARK: - 엔더마이트: 작게 기어다님 + 1타
 
-public final class AEndermiteWindow: NSPanel {
+public final class AEndermiteWindow: EntityWindow {
     public var position: CGPoint
     private let onTap: (AEndermiteWindow) -> Void
     private var tick: Timer?
@@ -1274,18 +1154,7 @@ public final class AEndermiteWindow: NSPanel {
     public init(startPos: CGPoint, onTap: @escaping (AEndermiteWindow) -> Void) {
         self.position = startPos
         self.onTap = onTap
-        super.init(
-            contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = AEndermiteDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
         self.drawView = view
         contentView = view
@@ -1358,23 +1227,12 @@ private final class AEndermiteDrawView: NSView {
 
 // MARK: - 해골마 트랩: 번개 + 기마 2기 + 안장
 
-public final class ATrapFlashOverlay: NSPanel {
+public final class ATrapFlashOverlay: EntityWindow {
     private var tick: Timer?
     private var life: TimeInterval = 0
 
     public init(center: CGPoint) {
-        super.init(
-            contentRect: NSRect(x: center.x - 200, y: center.y - 100, width: 400, height: 300),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = true
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: center.x - 200, y: center.y - 100, width: 400, height: 300), ignoresMouse: true)
         contentView = ATrapFlashView(frame: NSRect(x: 0, y: 0, width: 400, height: 300))
     }
 
@@ -1420,14 +1278,15 @@ private final class ATrapFlashView: NSView {
     }
 }
 
-public final class ASkeletonHorseTrapWindow: NSPanel {
+public final class ASkeletonHorseTrapWindow: EntityWindow {
     public var position: CGPoint
-    public private(set) var hits: Int = 0
+    private var counter = HitCounter(maxHits: 3)
+    public var hits: Int { counter.hits }
     public var onDefeated: (() -> Void)?
     private let onTap: (ASkeletonHorseTrapWindow) -> Void
     private var tick: Timer?
     private var phase: TimeInterval = 0
-    private var dir: CGFloat = 1
+    private var wander = WanderState(speed: 34.0)
     private var drawView: ASkeletonHorseTrapDrawView?
     private let panelW: CGFloat = 88
     private let panelH: CGFloat = 60
@@ -1435,18 +1294,7 @@ public final class ASkeletonHorseTrapWindow: NSPanel {
     public init(startPos: CGPoint, onTap: @escaping (ASkeletonHorseTrapWindow) -> Void) {
         self.position = startPos
         self.onTap = onTap
-        super.init(
-            contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = ASkeletonHorseTrapDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
         self.drawView = view
         contentView = view
@@ -1457,13 +1305,10 @@ public final class ASkeletonHorseTrapWindow: NSPanel {
         tick = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] t in
             guard let self = self else { t.invalidate(); return }
             self.phase += 1.0 / 60.0
-            if Int(self.phase) % 4 == 0 && Int(self.phase * 60.0) % 60 == 0 {
-                self.dir = Bool.random() ? 1 : -1
-            }
-            self.position.x += self.dir * 34.0 / 60.0
+            self.position.x += self.wander.tick(1.0 / 60.0)
             let trot = abs(sin(self.phase * 8.0)) * 5.0
             self.setFrameOrigin(NSPoint(x: self.position.x - self.panelW / 2, y: self.position.y + trot))
-            self.drawView?.facingRight = self.dir > 0
+            self.drawView?.facingRight = self.wander.direction > 0
             self.drawView?.hits = self.hits
             self.drawView?.phase = self.phase
             self.drawView?.needsDisplay = true
@@ -1471,10 +1316,12 @@ public final class ASkeletonHorseTrapWindow: NSPanel {
         RunLoop.main.add(tick!, forMode: .common)
     }
 
-    public func hit() {
-        hits += 1
-        drawView?.hits = hits
+    @discardableResult
+    public func hit() -> Bool {
+        let defeated = counter.hit()
+        drawView?.hits = counter.hits
         drawView?.needsDisplay = true
+        return defeated
     }
 
     public override func mouseDown(with event: NSEvent) {

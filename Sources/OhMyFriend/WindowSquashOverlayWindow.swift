@@ -1,7 +1,7 @@
 import AppKit
 import CoreGraphics
 
-public final class WindowSquashOverlayWindow: NSPanel {
+public final class WindowSquashOverlayWindow: EntityWindow {
     private let targetFrame: CGRect
     private let duration: TimeInterval
     private let completion: () -> Void
@@ -16,23 +16,15 @@ public final class WindowSquashOverlayWindow: NSPanel {
 
         // 패널 여백 추가
         let padded = targetFrame.insetBy(dx: -40, dy: -40)
-        super.init(
-            contentRect: padded,
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = true
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: padded, ignoresMouse: true)
 
         overlayView.frame = NSRect(origin: .zero, size: padded.size)
         overlayView.targetInView = CGRect(x: 40, y: 40, width: targetFrame.width, height: targetFrame.height)
         contentView = overlayView
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
     }
 
     public func start() {

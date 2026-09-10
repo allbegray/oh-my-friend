@@ -8,14 +8,14 @@ import Foundation
 public final class NetherBManager {
     public static let shared = NetherBManager()
 
-    private var piglin: BPiglinWindow?
+    private let piglinSlot = ToggleSlot<BPiglinWindow>()
     private var hoglin: BHoglinWindow?
     private var wither: BWitherWindow?
     private var beacon: BBeaconWindow?
     private var magmaCubes: [BMagmaCubeWindow] = []
-    private var strider: BStriderWindow?
+    private let striderSlot = ToggleSlot<BStriderWindow>()
     private var fortress: BFortressWindow?
-    private var soulSand: BSoulSandWindow?
+    private let soulSandSlot = ToggleSlot<BSoulSandWindow>()
     private var basalt: BBasaltWindow?
     private var debris: BAncientDebrisWindow?
 
@@ -54,15 +54,12 @@ public final class NetherBManager {
     // MARK: - 👺 피글린: 황금 사과 들고 클릭 시 랜덤 교환 +3XP, 빈손이면 경계
 
     public func togglePiglin() {
-        if let w = piglin, w.isVisible {
-            w.close(); piglin = nil; return
-        }
-        piglin = nil
-        let w = BPiglinWindow(startPos: spawnPos(dx: -60)) { [weak self] tapped in
-            self?.handlePiglinTap(tapped)
-        }
-        piglin = w
-        w.start()
+        let pos = spawnPos(dx: -60)
+        piglinSlot.toggle(make: {
+            BPiglinWindow(startPos: pos) { [weak self] tapped in
+                self?.handlePiglinTap(tapped)
+            }
+        }, start: { $0.start() })
     }
 
     private func handlePiglinTap(_ w: BPiglinWindow) {
@@ -225,15 +222,12 @@ public final class NetherBManager {
     // MARK: - 🌋 스트라이더: 하단 배회 + 클릭 탑승 토글 + 용암 걷기
 
     public func toggleStrider() {
-        if let w = strider, w.isVisible {
-            w.close(); strider = nil; return
-        }
-        strider = nil
-        let w = BStriderWindow(startPos: spawnPos(dx: 80)) { [weak self] tapped in
-            self?.handleStriderTap(tapped)
-        }
-        strider = w
-        w.start()
+        let pos = spawnPos(dx: 80)
+        striderSlot.toggle(make: {
+            BStriderWindow(startPos: pos) { [weak self] tapped in
+                self?.handleStriderTap(tapped)
+            }
+        }, start: { $0.start() })
     }
 
     private func handleStriderTap(_ w: BStriderWindow) {
@@ -277,15 +271,12 @@ public final class NetherBManager {
     // MARK: - 🌬️ 영혼모래: 바닥 타일 1개 + 클릭 시 3초 🐌 + 해제
 
     public func toggleSoulSand() {
-        if let w = soulSand, w.isVisible {
-            w.close(); soulSand = nil; return
-        }
-        soulSand = nil
-        let w = BSoulSandWindow(startPos: spawnPos(dx: 0)) { [weak self] tapped in
-            self?.handleSoulSandTap(tapped)
-        }
-        soulSand = w
-        w.start()
+        let pos = spawnPos(dx: 0)
+        soulSandSlot.toggle(make: {
+            BSoulSandWindow(startPos: pos) { [weak self] tapped in
+                self?.handleSoulSandTap(tapped)
+            }
+        }, start: { $0.start() })
     }
 
     private func handleSoulSandTap(_ w: BSoulSandWindow) {
@@ -357,13 +348,13 @@ public final class NetherBManager {
 
 // MARK: - 👺 피글린
 
-public final class BPiglinWindow: NSPanel {
+public final class BPiglinWindow: EntityWindow {
     public var position: CGPoint
     private let onTap: (BPiglinWindow) -> Void
     private var tick: Timer?
     private var phase: TimeInterval = 0
-    private var dir: CGFloat = 1
     private var mood: TimeInterval = 0
+    private var wander = WanderState(speed: 20.0)
     private var drawView: BPiglinDrawView?
     private let panelW: CGFloat = 64
     private let panelH: CGFloat = 56
@@ -371,18 +362,7 @@ public final class BPiglinWindow: NSPanel {
     public init(startPos: CGPoint, onTap: @escaping (BPiglinWindow) -> Void) {
         self.position = startPos
         self.onTap = onTap
-        super.init(
-            contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = BPiglinDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
         self.drawView = view
         contentView = view
@@ -395,12 +375,9 @@ public final class BPiglinWindow: NSPanel {
             guard let self = self else { t.invalidate(); return }
             self.phase += 1.0 / 60.0
             if self.mood > 0 { self.mood -= 1.0 / 60.0 }
-            if Int(self.phase) % 4 == 0 && Int(self.phase * 60.0) % 60 == 0 {
-                self.dir = Bool.random() ? 1 : -1
-            }
-            self.position.x += self.dir * 20.0 / 60.0
+            self.position.x += self.wander.tick(1.0 / 60.0)
             self.setFrameOrigin(NSPoint(x: self.position.x - self.panelW / 2, y: self.position.y))
-            self.drawView?.facingRight = self.dir > 0
+            self.drawView?.facingRight = self.wander.direction > 0
             self.drawView?.happy = self.mood > 0
             self.drawView?.bob = sin(self.phase * 3.0)
             self.drawView?.needsDisplay = true
@@ -455,32 +432,22 @@ private final class BPiglinDrawView: NSView {
 
 // MARK: - 🐗 호글린
 
-public final class BHoglinWindow: NSPanel {
+public final class BHoglinWindow: EntityWindow {
     public var position: CGPoint
+    private var counter = HitCounter(maxHits: 2)
     public private(set) var hits = 0
     private let onTap: (BHoglinWindow) -> Void
     private var tick: Timer?
     private var phase: TimeInterval = 0
-    private var dir: CGFloat = 1
     private var drawView: BHoglinDrawView?
+    private var wander = WanderState(speed: 34.0)
     private let panelW: CGFloat = 84
     private let panelH: CGFloat = 56
 
     public init(startPos: CGPoint, onTap: @escaping (BHoglinWindow) -> Void) {
         self.position = startPos
         self.onTap = onTap
-        super.init(
-            contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = BHoglinDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
         self.drawView = view
         contentView = view
@@ -492,12 +459,9 @@ public final class BHoglinWindow: NSPanel {
         tick = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] t in
             guard let self = self else { t.invalidate(); return }
             self.phase += 1.0 / 60.0
-            if Int(self.phase) % 3 == 0 && Int(self.phase * 60.0) % 60 == 0 {
-                self.dir = Bool.random() ? 1 : -1
-            }
-            self.position.x += self.dir * 34.0 / 60.0
+            self.position.x += self.wander.tick(1.0 / 60.0)
             self.setFrameOrigin(NSPoint(x: self.position.x - self.panelW / 2, y: self.position.y))
-            self.drawView?.facingRight = self.dir > 0
+            self.drawView?.facingRight = self.wander.direction > 0
             self.drawView?.phase = self.phase
             self.drawView?.hits = self.hits
             self.drawView?.needsDisplay = true
@@ -506,7 +470,8 @@ public final class BHoglinWindow: NSPanel {
     }
 
     public func strike() -> Int {
-        hits += 1
+        _ = counter.hit()
+        hits = counter.hits
         drawView?.needsDisplay = true
         return hits
     }
@@ -562,7 +527,7 @@ private final class BHoglinDrawView: NSView {
 
 // MARK: - 🟥 위더
 
-public final class BWitherWindow: NSPanel {
+public final class BWitherWindow: EntityWindow {
     public var position: CGPoint
     public private(set) var hp = 5
     public private(set) var isAwake = false
@@ -578,18 +543,7 @@ public final class BWitherWindow: NSPanel {
     public init(startPos: CGPoint, onTap: @escaping (BWitherWindow) -> Void) {
         self.position = startPos
         self.onTap = onTap
-        super.init(
-            contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = BWitherDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
         self.drawView = view
         contentView = view
@@ -685,7 +639,7 @@ private final class BWitherDrawView: NSView {
 
 // MARK: - 🧱 비콘
 
-public final class BBeaconWindow: NSPanel {
+public final class BBeaconWindow: EntityWindow {
     public var position: CGPoint
     private var tick: Timer?
     private var phase: TimeInterval = 0
@@ -695,18 +649,7 @@ public final class BBeaconWindow: NSPanel {
 
     public init(startPos: CGPoint) {
         self.position = startPos
-        super.init(
-            contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = BBeaconDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
         self.drawView = view
         contentView = view
@@ -756,7 +699,7 @@ public enum BMagmaSize: Int {
     case large = 2
 }
 
-public final class BMagmaCubeWindow: NSPanel {
+public final class BMagmaCubeWindow: EntityWindow {
     public var position: CGPoint
     public let size: BMagmaSize
     private let onTap: (BMagmaCubeWindow) -> Void
@@ -775,18 +718,7 @@ public final class BMagmaCubeWindow: NSPanel {
         case .medium: panelW = 52; panelH = 46
         case .small: panelW = 34; panelH = 30
         }
-        super.init(
-            contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = BMagmaCubeDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)), size: size)
         self.drawView = view
         contentView = view
@@ -847,13 +779,13 @@ private final class BMagmaCubeDrawView: NSView {
 
 // MARK: - 🌋 스트라이더
 
-public final class BStriderWindow: NSPanel {
+public final class BStriderWindow: EntityWindow {
     public var position: CGPoint
     public private(set) var isRidden = false
     private let onTap: (BStriderWindow) -> Void
     private var tick: Timer?
     private var phase: TimeInterval = 0
-    private var dir: CGFloat = 1
+    private var wander = WanderState(speed: 22.0)
     private var drawView: BStriderDrawView?
     private let panelW: CGFloat = 76
     private let panelH: CGFloat = 52
@@ -861,18 +793,7 @@ public final class BStriderWindow: NSPanel {
     public init(startPos: CGPoint, onTap: @escaping (BStriderWindow) -> Void) {
         self.position = startPos
         self.onTap = onTap
-        super.init(
-            contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = BStriderDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
         self.drawView = view
         contentView = view
@@ -884,13 +805,10 @@ public final class BStriderWindow: NSPanel {
         tick = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] t in
             guard let self = self else { t.invalidate(); return }
             self.phase += 1.0 / 60.0
-            if Int(self.phase) % 5 == 0 && Int(self.phase * 60.0) % 60 == 0 {
-                self.dir = Bool.random() ? 1 : -1
-            }
-            let speed: CGFloat = self.isRidden ? 52 : 22
-            self.position.x += self.dir * speed / 60.0
+            self.wander.speed = self.isRidden ? 52 : 22
+            self.position.x += self.wander.tick(1.0 / 60.0)
             self.setFrameOrigin(NSPoint(x: self.position.x - self.panelW / 2, y: self.position.y))
-            self.drawView?.facingRight = self.dir > 0
+            self.drawView?.facingRight = self.wander.direction > 0
             self.drawView?.phase = self.phase
             self.drawView?.ridden = self.isRidden
             self.drawView?.needsDisplay = true
@@ -948,7 +866,7 @@ private final class BStriderDrawView: NSView {
 
 // MARK: - 🏰 네더 요새
 
-public final class BFortressWindow: NSPanel {
+public final class BFortressWindow: EntityWindow {
     public var position: CGPoint
     public private(set) var room = 0
     private let onTap: (BFortressWindow) -> Void
@@ -961,18 +879,7 @@ public final class BFortressWindow: NSPanel {
     public init(startPos: CGPoint, onTap: @escaping (BFortressWindow) -> Void) {
         self.position = startPos
         self.onTap = onTap
-        super.init(
-            contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = BFortressDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
         self.drawView = view
         contentView = view
@@ -1037,7 +944,7 @@ private final class BFortressDrawView: NSView {
 
 // MARK: - 🌬️ 영혼모래
 
-public final class BSoulSandWindow: NSPanel {
+public final class BSoulSandWindow: EntityWindow {
     public var position: CGPoint
     public private(set) var slowLeft: TimeInterval = 0
     public var isSlowed: Bool { slowLeft > 0 }
@@ -1051,18 +958,7 @@ public final class BSoulSandWindow: NSPanel {
     public init(startPos: CGPoint, onTap: @escaping (BSoulSandWindow) -> Void) {
         self.position = startPos
         self.onTap = onTap
-        super.init(
-            contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = BSoulSandDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
         self.drawView = view
         contentView = view
@@ -1126,13 +1022,13 @@ private final class BSoulSandDrawView: NSView {
 
 // MARK: - 🪨 현무암
 
-public final class BBasaltWindow: NSPanel {
+public final class BBasaltWindow: EntityWindow {
     public var position: CGPoint
     private let onTap: (BBasaltWindow) -> Void
     private var tick: Timer?
     private var phase: TimeInterval = 0
     private var lifeLeft: TimeInterval = 10.0
-    private var cooldown: TimeInterval = 0
+    private var cooldown = Cooldown()
     private var drawView: BBasaltDrawView?
     private let panelW: CGFloat = 64
     private let panelH: CGFloat = 72
@@ -1140,18 +1036,7 @@ public final class BBasaltWindow: NSPanel {
     public init(startPos: CGPoint, onTap: @escaping (BBasaltWindow) -> Void) {
         self.position = startPos
         self.onTap = onTap
-        super.init(
-            contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = BBasaltDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
         self.drawView = view
         contentView = view
@@ -1163,7 +1048,7 @@ public final class BBasaltWindow: NSPanel {
         tick = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] t in
             guard let self = self else { t.invalidate(); return }
             self.phase += 1.0 / 60.0
-            if self.cooldown > 0 { self.cooldown -= 1.0 / 60.0 }
+            self.cooldown.tick(1.0 / 60.0)
             self.lifeLeft -= 1.0 / 60.0
             if self.lifeLeft <= 0 {
                 self.close()
@@ -1176,8 +1061,8 @@ public final class BBasaltWindow: NSPanel {
     }
 
     public func collect() -> Bool {
-        guard cooldown <= 0 else { return false }
-        cooldown = 3.0
+        guard cooldown.ready else { return false }
+        cooldown.trigger(3.0)
         return true
     }
 
@@ -1214,7 +1099,7 @@ private final class BBasaltDrawView: NSView {
 
 // MARK: - ⛏️ 고대 잔해
 
-public final class BAncientDebrisWindow: NSPanel {
+public final class BAncientDebrisWindow: EntityWindow {
     public var position: CGPoint
     public private(set) var progress = 0
     private let onTap: (BAncientDebrisWindow) -> Void
@@ -1228,18 +1113,7 @@ public final class BAncientDebrisWindow: NSPanel {
     public init(startPos: CGPoint, onTap: @escaping (BAncientDebrisWindow) -> Void) {
         self.position = startPos
         self.onTap = onTap
-        super.init(
-            contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = BAncientDebrisDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
         self.drawView = view
         contentView = view

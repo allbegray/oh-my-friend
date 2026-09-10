@@ -107,7 +107,12 @@ Sources/OhMyFriend/
 ├── ExtraGDecor.swift                   # G 건축꾸미기 10종 + DecorGManager
 ├── ExtraHMagic.swift                   # H 마법전투 10종 + MagicHManager
 ├── ExtraIStructures.swift              # I 구조물보스 10종 + StructuresIManager
-└── ExtraJMeta.swift                    # J 생활메타 10종 + MetaJManager
+├── ExtraJMeta.swift                    # J 생활메타 10종 + MetaJManager
+├── EntityWindow.swift                  # 전 패널 공용 베이스(투명 무테 플로팅 상용구)
+├── EntityKit.swift                     # 배회·타격·쿨다운·토글 순수 타입 + 슬롯
+├── PlayerState.swift                   # 플레이어 재화·버프·강화 13필드
+├── MenuBuilder.swift                   # 메뉴 구축 521줄 분리(선언적 entries)
+└── MobDirector.swift                   # 앰비언트 몹 자동 스폰 6종 분리
 ```
 ```
 
@@ -119,6 +124,7 @@ Sources/OhMyFriend/
 ## 실행 기록
 
 ### 2026-09-10
+- **[아키텍처 심화] 5종 일괄 개선(v0.21.0, 동작 변경 없음)**: `EntityWindow`(206곳 상용구 응축) + `ItemSpec` 레지스트리(4 switch→조회) + 액션 메뉴 선언적 전환(105→44) + `EntityKit`(106개소 전환) + 분해(`PlayerState`·`MenuBuilder`·`MobDirector`). AppController 4,370→3,522줄. 검증: `swift build` 에러 0건, 번들 생성 및 4초 실행 스모크 테스트.
 - **[신규 100선] A~J 100종 일괄 구축(v0.20.0)**: 배치 단일 파일 10개(ExtraA~ExtraJ, 분야 접두어 클래스·Manager `entries()`·`RewardCenter` 브리지로 기존 코드 무수정 병렬 안전) + `ExtraMenus.buildExtraMenu2()` 중앙 서브메뉴("✨ 신규 100선 (A~J)"). A신규몹·B네더·C엔드·D바다·E동물·F레드스톤·G건축·H마법·I구조물·J메타. 검증: `swift build` 에러 0건, 번들 생성 및 4초 실행 스모크 테스트. 백로그 전량 완료.
 - **[고증 9~17차] 잔여 백로그 44종 일괄 구축(v0.19.0)**: `ExtraBacklog.swift` 공용 허브 + `ExtraMenus.swift` 중앙 서브메뉴("🎉 추가 모션 9~17차") + 배치 단일 파일 9개(Extra9~Extra17, 각 Manager 소유 수명주기·`entries()` 메뉴 기술자·`RewardCenter` 브리지로 기존 코드 무수정 병렬 안전). 9차 야생동물·10차 어둠네더·11차 물과비·12차 소셜(발전과제 v0.13.0 제외)·13차 레드스톤·14차 겨울·15차 사막·16차 엔드·17차 이벤트. `HeldItem.carrot/salmon/sponge` 3D 모델 추가. 검증: `swift build` 에러 0건, 번들 생성 및 4초 실행 스모크 테스트. 백로그 전량 완료.
 - **[고증 8차] 감자·수박·호박·사과나무·빵 구축**: `PotatoWindow.swift`(25초/단계·캠프파이어 구운감자 +3XP·20% 썩은감자 꽝), `MelonWindow.swift`(덩굴·3~5 슬라이스·25% 반짝임 다음 양조 1.5배), `PumpkinWindow.swift` + `PumpkinWard`(심기/쓰기 단일 메뉴·엔더맨 응시 면역 가드·잭오랜턴 골렘·호박파이 체인), `TreeWindow.swift` + `AppleWindow`(30초/단계 성장·15초 낙과·`HeldItem.axe` 도끼 벌목), `BreadWindow.swift`(`playerWheat` 3개 + 캠프파이어 5초 굽기·+4XP/파이 +6XP). 양조 반짝임 증폭(`hasGlisteringMelon`) 추가, 메뉴 5종 추가. 검증: `swift build` 통과.

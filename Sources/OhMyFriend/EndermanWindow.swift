@@ -1,6 +1,6 @@
 import AppKit
 
-public final class EndermanWindow: NSPanel {
+public final class EndermanWindow: EntityWindow {
     public let endermanView: EndermanView
     public private(set) var currentScale: CGFloat = 1.0
 
@@ -11,19 +11,8 @@ public final class EndermanWindow: NSPanel {
         let frame = NSRect(x: 400, y: 200, width: baseWidth, height: baseHeight)
         self.endermanView = EndermanView(frame: NSRect(origin: .zero, size: frame.size))
 
-        super.init(
-            contentRect: frame,
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
+        super.init(contentRect: frame, ignoresMouse: false)
 
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         self.isReleasedWhenClosed = false
 
         contentView = endermanView

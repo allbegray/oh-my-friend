@@ -7,9 +7,18 @@ import CoreGraphics
 public struct ExtraMenuEntry {
     public let title: () -> String
     public let run: () -> Void
-    public init(_ title: @escaping () -> String, _ run: @escaping () -> Void) {
+    public let keyEquivalent: String
+    public let isEnabled: () -> Bool
+    public init(
+        _ title: @escaping () -> String,
+        _ run: @escaping () -> Void,
+        keyEquivalent: String = "",
+        isEnabled: @escaping () -> Bool = { true }
+    ) {
         self.title = title
         self.run = run
+        self.keyEquivalent = keyEquivalent
+        self.isEnabled = isEnabled
     }
 }
 
@@ -27,10 +36,14 @@ public final class RewardCenter {
 
 public final class ClosureMenuItem: NSMenuItem {
     private let run: () -> Void
-    public init(title: String, run: @escaping () -> Void) {
+    public init(title: String, run: @escaping () -> Void, keyEquivalent: String = "", isEnabled: Bool = true) {
         self.run = run
-        super.init(title: title, action: #selector(fire), keyEquivalent: "")
+        super.init(title: title, action: #selector(fire), keyEquivalent: keyEquivalent)
         self.target = self
+        self.isEnabled = isEnabled
+    }
+    public convenience init(_ entry: ExtraMenuEntry) {
+        self.init(title: entry.title(), run: entry.run, keyEquivalent: entry.keyEquivalent, isEnabled: entry.isEnabled())
     }
     public required init(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
     @objc private func fire() { run() }

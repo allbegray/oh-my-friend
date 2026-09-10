@@ -6,7 +6,7 @@ public protocol GhastWindowDelegate: AnyObject {
     func ghastDidLeave(_ window: GhastWindow)
 }
 
-public final class GhastWindow: NSPanel {
+public final class GhastWindow: EntityWindow {
     public var anchor: CGPoint = .zero
     public weak var ghastDelegate: GhastWindowDelegate?
 
@@ -23,18 +23,7 @@ public final class GhastWindow: NSPanel {
         self.ghastDelegate = delegate
         self.onShoot = onShoot
         let size = NSSize(width: 110, height: 90)
-        super.init(
-            contentRect: NSRect(x: startPos.x - 55, y: startPos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: startPos.x - 55, y: startPos.y, width: size.width, height: size.height), ignoresMouse: false)
         let view = GhastDrawView(frame: NSRect(origin: .zero, size: size))
         self.drawView = view
         contentView = view
@@ -124,7 +113,7 @@ private final class GhastDrawView: NSView {
     }
 }
 
-public final class FireballWindow: NSPanel {
+public final class FireballWindow: EntityWindow {
     private let from: CGPoint
     private let target: CGPoint
     private let onArrive: (Bool) -> Void
@@ -136,18 +125,7 @@ public final class FireballWindow: NSPanel {
         self.target = target
         self.onArrive = onArrive
         let size: CGFloat = 34.0
-        super.init(
-            contentRect: NSRect(x: from.x - 17, y: from.y - 17, width: size, height: size),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: from.x - 17, y: from.y - 17, width: size, height: size), ignoresMouse: false)
         contentView = FireballDrawView(frame: NSRect(origin: .zero, size: NSSize(width: size, height: size)))
     }
 

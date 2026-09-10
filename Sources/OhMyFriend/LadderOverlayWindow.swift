@@ -4,7 +4,7 @@ import AppKit
 // 캐릭터 창(캐릭터와 함께 이동)과 달리 화면 위 고정 위치에 머무는 투명 패널.
 // 창문 발판에서 아래 발판까지 내려가는 동안 두 개의 레일과 가로대를 그려 사다리를 표현하고,
 // 가로대는 캐릭터가 내려간 만큼만 아래로 자라난다.
-public final class LadderOverlayWindow: NSPanel {
+public final class LadderOverlayWindow: EntityWindow {
     private let ladderView: LadderEffectView
     private var isRetiring = false
 
@@ -12,21 +12,10 @@ public final class LadderOverlayWindow: NSPanel {
     public init(ladderRect: CGRect) {
         ladderView = LadderEffectView(frame: NSRect(origin: .zero, size: ladderRect.size))
 
-        super.init(
-            contentRect: ladderRect,
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
+        super.init(contentRect: ladderRect, ignoresMouse: true, level: NSWindow.Level(rawValue: NSWindow.Level.floating.rawValue - 1))
 
         // 등반하는 캐릭터 창(.floating)보다 한 단계 아래, 대상 앱 창보다는 위
-        level = NSWindow.Level(rawValue: NSWindow.Level.floating.rawValue - 1)
-        isOpaque = false
-        backgroundColor = .clear
-        hasShadow = false
-        ignoresMouseEvents = true
         isReleasedWhenClosed = false
-        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
 
         contentView = ladderView
     }

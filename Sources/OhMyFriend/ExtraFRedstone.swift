@@ -379,7 +379,7 @@ public final class RedstoneFManager {
 
 // MARK: - 1. 피스톤 문 패널
 
-private final class FRedPistonDoorWindow: NSPanel {
+private final class FRedPistonDoorWindow: EntityWindow {
     private(set) var isOpen = false
     private var slide: CGFloat = 0
     private var autoMode = true
@@ -391,18 +391,7 @@ private final class FRedPistonDoorWindow: NSPanel {
     init(floorPos: CGPoint, onToggle: @escaping () -> Void) {
         self.onToggle = onToggle
         let size = NSSize(width: 120, height: 120)
-        super.init(
-            contentRect: NSRect(x: floorPos.x - size.width / 2, y: floorPos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        level = .floating
-        isOpaque = false
-        backgroundColor = .clear
-        hasShadow = false
-        ignoresMouseEvents = false
-        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: floorPos.x - size.width / 2, y: floorPos.y, width: size.width, height: size.height), ignoresMouse: false)
         let v = FRedPistonDoorDrawView(frame: NSRect(origin: .zero, size: size))
         drawView = v
         contentView = v
@@ -494,7 +483,7 @@ private final class FRedPistonDoorDrawView: NSView {
 
 // MARK: - 2. 옵저버 팜 패널
 
-private final class FRedObserverWindow: NSPanel {
+private final class FRedObserverWindow: EntityWindow {
     private(set) var stage = 0
     var onClosed: (() -> Void)?
     private let onMature: () -> Void
@@ -507,18 +496,7 @@ private final class FRedObserverWindow: NSPanel {
         self.onMature = onMature
         self.onTap = onTap
         let size = NSSize(width: 96, height: 104)
-        super.init(
-            contentRect: NSRect(x: floorPos.x - size.width / 2, y: floorPos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        level = .floating
-        isOpaque = false
-        backgroundColor = .clear
-        hasShadow = false
-        ignoresMouseEvents = false
-        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: floorPos.x - size.width / 2, y: floorPos.y, width: size.width, height: size.height), ignoresMouse: false)
         let v = FRedObserverDrawView(frame: NSRect(origin: .zero, size: size))
         drawView = v
         contentView = v
@@ -610,7 +588,7 @@ private final class FRedObserverDrawView: NSView {
 
 // MARK: - 3. 호퍼 패널
 
-private final class FRedHopperWindow: NSPanel {
+private final class FRedHopperWindow: EntityWindow {
     var count = 0 { didSet { drawView?.count = count; drawView?.needsDisplay = true } }
     var onClosed: (() -> Void)?
     private let onSuck: () -> Void
@@ -623,18 +601,7 @@ private final class FRedHopperWindow: NSPanel {
         self.count = count
         self.onSuck = onSuck
         let size = NSSize(width: 96, height: 96)
-        super.init(
-            contentRect: NSRect(x: floorPos.x - size.width / 2, y: floorPos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        level = .floating
-        isOpaque = false
-        backgroundColor = .clear
-        hasShadow = false
-        ignoresMouseEvents = false
-        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: floorPos.x - size.width / 2, y: floorPos.y, width: size.width, height: size.height), ignoresMouse: false)
         let v = FRedHopperDrawView(frame: NSRect(origin: .zero, size: size))
         v.count = count
         drawView = v
@@ -705,7 +672,7 @@ private final class FRedHopperDrawView: NSView {
 
 // MARK: - 4. 디스펜서 패널
 
-private final class FRedDispenserWindow: NSPanel {
+private final class FRedDispenserWindow: EntityWindow {
     private(set) var arrows = 5
     var onClosed: (() -> Void)?
     private let onFire: () -> Void
@@ -716,18 +683,7 @@ private final class FRedDispenserWindow: NSPanel {
     init(floorPos: CGPoint, onFire: @escaping () -> Void) {
         self.onFire = onFire
         let size = NSSize(width: 120, height: 88)
-        super.init(
-            contentRect: NSRect(x: floorPos.x - size.width / 2, y: floorPos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        level = .floating
-        isOpaque = false
-        backgroundColor = .clear
-        hasShadow = false
-        ignoresMouseEvents = false
-        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: floorPos.x - size.width / 2, y: floorPos.y, width: size.width, height: size.height), ignoresMouse: false)
         let v = FRedDispenserDrawView(frame: NSRect(origin: .zero, size: size))
         drawView = v
         contentView = v
@@ -815,7 +771,7 @@ private final class FRedDispenserDrawView: NSView {
 
 // MARK: - 5. 비교기 패널
 
-private final class FRedComparatorWindow: NSPanel {
+private final class FRedComparatorWindow: EntityWindow {
     var fill = 0 { didSet { drawView?.fill = fill; drawView?.needsDisplay = true } }
     var onClosed: (() -> Void)?
     private let onFill: () -> Void
@@ -827,18 +783,7 @@ private final class FRedComparatorWindow: NSPanel {
         self.fill = fill
         self.onFill = onFill
         let size = NSSize(width: 120, height: 96)
-        super.init(
-            contentRect: NSRect(x: floorPos.x - size.width / 2, y: floorPos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        level = .floating
-        isOpaque = false
-        backgroundColor = .clear
-        hasShadow = false
-        ignoresMouseEvents = false
-        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: floorPos.x - size.width / 2, y: floorPos.y, width: size.width, height: size.height), ignoresMouse: false)
         let v = FRedComparatorDrawView(frame: NSRect(origin: .zero, size: size))
         v.fill = fill
         drawView = v
@@ -915,7 +860,7 @@ private final class FRedComparatorDrawView: NSView {
 
 // MARK: - 6. 중계기 패널
 
-private final class FRedRepeaterWindow: NSPanel {
+private final class FRedRepeaterWindow: EntityWindow {
     private(set) var ticks: Int
     private(set) var isLit = false
     var onClosed: (() -> Void)?
@@ -929,18 +874,7 @@ private final class FRedRepeaterWindow: NSPanel {
         self.ticks = ticks
         self.onTap = onTap
         let size = NSSize(width: 120, height: 80)
-        super.init(
-            contentRect: NSRect(x: floorPos.x - size.width / 2, y: floorPos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        level = .floating
-        isOpaque = false
-        backgroundColor = .clear
-        hasShadow = false
-        ignoresMouseEvents = false
-        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: floorPos.x - size.width / 2, y: floorPos.y, width: size.width, height: size.height), ignoresMouse: false)
         let v = FRedRepeaterDrawView(frame: NSRect(origin: .zero, size: size))
         v.ticks = ticks
         drawView = v
@@ -1032,7 +966,7 @@ private final class FRedRepeaterDrawView: NSView {
 
 // MARK: - 7. 일광 센서 패널
 
-private final class FRedDaylightWindow: NSPanel {
+private final class FRedDaylightWindow: EntityWindow {
     private(set) var isDay = true
     var onClosed: (() -> Void)?
     private var drawView: FRedDaylightDrawView?
@@ -1041,18 +975,7 @@ private final class FRedDaylightWindow: NSPanel {
 
     init(floorPos: CGPoint) {
         let size = NSSize(width: 96, height: 96)
-        super.init(
-            contentRect: NSRect(x: floorPos.x - size.width / 2, y: floorPos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        level = .floating
-        isOpaque = false
-        backgroundColor = .clear
-        hasShadow = false
-        ignoresMouseEvents = false
-        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: floorPos.x - size.width / 2, y: floorPos.y, width: size.width, height: size.height), ignoresMouse: false)
         isDay = FRedDaylightWindow.dayNow()
         let v = FRedDaylightDrawView(frame: NSRect(origin: .zero, size: size))
         v.isDay = isDay
@@ -1149,7 +1072,7 @@ private final class FRedDaylightDrawView: NSView {
 
 // MARK: - 8. 크래프터 패널 (자체 재료 3종 버튼 + 조합)
 
-private final class FRedCrafterWindow: NSPanel {
+private final class FRedCrafterWindow: EntityWindow {
     private(set) var inserted = [Bool](repeating: false, count: 3)
     private(set) var lastProduct = "🍞 빵 완성!"
     var insertedCount: Int { inserted.filter { $0 }.count }
@@ -1163,18 +1086,7 @@ private final class FRedCrafterWindow: NSPanel {
     init(floorPos: CGPoint, onCraft: @escaping () -> Void) {
         self.onCraft = onCraft
         let size = NSSize(width: 160, height: 110)
-        super.init(
-            contentRect: NSRect(x: floorPos.x - size.width / 2, y: floorPos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        level = .floating
-        isOpaque = false
-        backgroundColor = .clear
-        hasShadow = false
-        ignoresMouseEvents = false
-        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: floorPos.x - size.width / 2, y: floorPos.y, width: size.width, height: size.height), ignoresMouse: false)
         let v = FRedCrafterDrawView(frame: NSRect(origin: .zero, size: size))
         drawView = v
         contentView = v
@@ -1285,7 +1197,7 @@ private final class FRedCrafterDrawView: NSView {
 
 // MARK: - 9. 구리 전구 패널
 
-private final class FRedCopperBulbWindow: NSPanel {
+private final class FRedCopperBulbWindow: EntityWindow {
     private(set) var stage = 0
     var waxed = false
     var brightnessText: String {
@@ -1305,18 +1217,7 @@ private final class FRedCopperBulbWindow: NSPanel {
     init(floorPos: CGPoint, onTap: @escaping () -> Void) {
         self.onTap = onTap
         let size = NSSize(width: 88, height: 104)
-        super.init(
-            contentRect: NSRect(x: floorPos.x - size.width / 2, y: floorPos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        level = .floating
-        isOpaque = false
-        backgroundColor = .clear
-        hasShadow = false
-        ignoresMouseEvents = false
-        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: floorPos.x - size.width / 2, y: floorPos.y, width: size.width, height: size.height), ignoresMouse: false)
         let v = FRedCopperBulbDrawView(frame: NSRect(origin: .zero, size: size))
         drawView = v
         contentView = v
@@ -1393,7 +1294,7 @@ private final class FRedCopperBulbDrawView: NSView {
 
 // MARK: - 10. 트라이얼 스포너 패널
 
-private final class FRedTrialSpawnerWindow: NSPanel {
+private final class FRedTrialSpawnerWindow: EntityWindow {
     private(set) var wave = 1
     private(set) var left = 1
     var onClosed: (() -> Void)?
@@ -1407,18 +1308,7 @@ private final class FRedTrialSpawnerWindow: NSPanel {
         self.left = left
         self.onHit = onHit
         let size = NSSize(width: 140, height: 130)
-        super.init(
-            contentRect: NSRect(x: floorPos.x - size.width / 2, y: floorPos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        level = .floating
-        isOpaque = false
-        backgroundColor = .clear
-        hasShadow = false
-        ignoresMouseEvents = false
-        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: floorPos.x - size.width / 2, y: floorPos.y, width: size.width, height: size.height), ignoresMouse: false)
         let v = FRedTrialSpawnerDrawView(frame: NSRect(origin: .zero, size: size))
         v.wave = wave
         v.left = left

@@ -9,16 +9,16 @@ import Foundation
 public final class MagicHManager {
     public static let shared = MagicHManager()
 
-    private var netherite: HNetheriteWindow?
-    private var channeling: HChannelingWindow?
-    private var mace: HMaceWindow?
-    private var wind: HWindChargeWindow?
-    private var lingering: HLingeringZoneWindow?
-    private var splash: HSplashPotionWindow?
-    private var curse: HCurseWindow?
-    private var lucky: HLuckyOreWindow?
-    private var mending: HMendingWindow?
-    private var farm: HXpFarmWindow?
+    private let netherite = ToggleSlot<HNetheriteWindow>()
+    private let channeling = ToggleSlot<HChannelingWindow>()
+    private let mace = ToggleSlot<HMaceWindow>()
+    private let wind = ToggleSlot<HWindChargeWindow>()
+    private let lingering = ToggleSlot<HLingeringZoneWindow>()
+    private let splash = ToggleSlot<HSplashPotionWindow>()
+    private let curse = ToggleSlot<HCurseWindow>()
+    private let lucky = ToggleSlot<HLuckyOreWindow>()
+    private let mending = ToggleSlot<HMendingWindow>()
+    private let farm = ToggleSlot<HXpFarmWindow>()
     private var mendingBank = 20
 
     private init() {}
@@ -53,227 +53,173 @@ public final class MagicHManager {
     // MARK: - 1 네더라이트: 대장간 패널 + 클릭 3회 강화 의식 +4XP
 
     public func toggleNetherite() {
-        if let w = netherite, w.isVisible {
-            w.close(); netherite = nil; return
-        }
-        netherite = nil
-        let w = HNetheriteWindow(floorPos: spawnPos(dx: -80)) { [weak self] in
-            RewardCenter.grant(xp: 4, "⬛ 네더라이트 업그레이드!")
-            SoundAndEffectsManager.shared.play(.chime)
-            self?.netherite?.close()
-            self?.netherite = nil
-        }
-        netherite = w
-        w.place()
+        netherite.toggle(make: {
+            HNetheriteWindow(floorPos: self.spawnPos(dx: -80)) { [weak self] in
+                RewardCenter.grant(xp: 4, "⬛ 네더라이트 업그레이드!")
+                SoundAndEffectsManager.shared.play(.chime)
+                self?.netherite.clear()
+            }
+        }, start: { $0.place() })
     }
 
     // MARK: - 2 채널링: 번개 연출 + 과녁 클릭 직격 판정 +5XP
 
     public func toggleChanneling() {
-        if let w = channeling, w.isVisible {
-            w.close(); channeling = nil; return
-        }
-        channeling = nil
-        let w = HChannelingWindow(floorPos: spawnPos(dx: 80)) { [weak self] hit in
-            if hit {
-                RewardCenter.grant(xp: 5, "⚡ 채널링 직격!")
-                SoundAndEffectsManager.shared.play(.alert)
-            } else {
-                RewardCenter.say("⚡ 빗나갔다...")
-                SoundAndEffectsManager.shared.play(.pop)
+        channeling.toggle(make: {
+            HChannelingWindow(floorPos: self.spawnPos(dx: 80)) { [weak self] hit in
+                if hit {
+                    RewardCenter.grant(xp: 5, "⚡ 채널링 직격!")
+                    SoundAndEffectsManager.shared.play(.alert)
+                } else {
+                    RewardCenter.say("⚡ 빗나갔다...")
+                    SoundAndEffectsManager.shared.play(.pop)
+                }
+                self?.channeling.clear()
             }
-            self?.channeling?.close()
-            self?.channeling = nil
-        }
-        channeling = w
-        w.place()
+        }, start: { $0.place() })
     }
 
     // MARK: - 3 메이스: 클릭 점프(상승→강하) + 높이 게이지 + 밀도/파열 2지선다
 
     public func toggleMace() {
-        if let w = mace, w.isVisible {
-            w.close(); mace = nil; return
-        }
-        mace = nil
-        let w = HMaceWindow(floorPos: spawnPos(dx: 0)) { smashed, damage in
-            if smashed {
-                RewardCenter.grant(xp: 3, "🔨 스매시! \(damage)뎀!")
-                SoundAndEffectsManager.shared.play(.alert)
+        mace.toggle(make: {
+            HMaceWindow(floorPos: self.spawnPos(dx: 0)) { smashed, damage in
+                if smashed {
+                    RewardCenter.grant(xp: 3, "🔨 스매시! \(damage)뎀!")
+                    SoundAndEffectsManager.shared.play(.alert)
+                }
             }
-        }
-        mace = w
-        w.place()
+        }, start: { $0.place() })
     }
 
     // MARK: - 4 윈드 차지: 클릭당 +80pt 공중 점프, 최대 3단, 쿨 3초
 
     public func toggleWind() {
-        if let w = wind, w.isVisible {
-            w.close(); wind = nil; return
-        }
-        wind = nil
-        let w = HWindChargeWindow(floorPos: spawnPos(dx: 0)) {
-            let me = RewardCenter.me()
-            guard me != .zero else { return false }
-            RewardCenter.movePlayer?(CGPoint(x: me.x, y: me.y + 80))
-            return true
-        }
-        wind = w
-        w.place()
+        wind.toggle(make: {
+            HWindChargeWindow(floorPos: self.spawnPos(dx: 0)) {
+                let me = RewardCenter.me()
+                guard me != .zero else { return false }
+                RewardCenter.movePlayer?(CGPoint(x: me.x, y: me.y + 80))
+                return true
+            }
+        }, start: { $0.place() })
     }
 
     // MARK: - 5 잔류형: 30초 범위 존 + 존 안 클릭 버프
 
     public func toggleLingering() {
-        if let w = lingering, w.isVisible {
-            w.close(); lingering = nil; return
-        }
-        lingering = nil
-        let w = HLingeringZoneWindow(floorPos: spawnPos(dx: 0)) {
-            RewardCenter.say("🧪 잔류 버프!")
-            SoundAndEffectsManager.shared.play(.gulp)
-        }
-        lingering = w
-        w.place()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 30) { [weak self] in
-            self?.lingering?.close()
-            self?.lingering = nil
-        }
+        lingering.toggle(make: {
+            HLingeringZoneWindow(floorPos: self.spawnPos(dx: 0)) {
+                RewardCenter.say("🧪 잔류 버프!")
+                SoundAndEffectsManager.shared.play(.gulp)
+            }
+        }, start: { [weak self] w in
+            w.place()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 30) { [weak self] in
+                self?.lingering.clear()
+            }
+        })
     }
 
     // MARK: - 6 스플래시: 포물선 미니병 + 범위 적용 단체 버프
 
     public func toggleSplash() {
-        if let w = splash, w.isVisible {
-            w.close(); splash = nil; return
-        }
-        splash = nil
-        let w = HSplashPotionWindow(floorPos: spawnPos(dx: 0)) {
-            RewardCenter.grant(xp: 2, "💥 스플래시 단체 버프!")
-            SoundAndEffectsManager.shared.play(.splash)
-        }
-        splash = w
-        w.place()
+        splash.toggle(make: {
+            HSplashPotionWindow(floorPos: self.spawnPos(dx: 0)) {
+                RewardCenter.grant(xp: 2, "💥 스플래시 단체 버프!")
+                SoundAndEffectsManager.shared.play(.splash)
+            }
+        }, start: { $0.place() })
     }
 
     // MARK: - 7 저주: 결박(갑옷 emoji 고정 기분) + 소멸 경고 + 스릴 +2XP
 
     public func toggleCurse() {
-        if let w = curse, w.isVisible {
-            w.close(); curse = nil; return
-        }
-        curse = nil
-        let w = HCurseWindow(floorPos: spawnPos(dx: 0)) { step in
-            if step == 0 {
-                RewardCenter.grant(xp: 2, "📜 결박의 저주... ⛓️ 갑옷 고정!")
-                SoundAndEffectsManager.shared.play(.alert)
-            } else {
-                RewardCenter.say("📜 소멸의 저주... 죽으면 사라진다!")
-                SoundAndEffectsManager.shared.play(.pop)
+        curse.toggle(make: {
+            HCurseWindow(floorPos: self.spawnPos(dx: 0)) { step in
+                if step == 0 {
+                    RewardCenter.grant(xp: 2, "📜 결박의 저주... ⛓️ 갑옷 고정!")
+                    SoundAndEffectsManager.shared.play(.alert)
+                } else {
+                    RewardCenter.say("📜 소멸의 저주... 죽으면 사라진다!")
+                    SoundAndEffectsManager.shared.play(.pop)
+                }
             }
-        }
-        curse = w
-        w.place()
+        }, start: { $0.place() })
     }
 
     // MARK: - 8 행운: 광석 5회 채굴(2배 드롭 확률) + 실크터치 모드
 
     public func toggleLucky() {
-        if let w = lucky, w.isVisible {
-            w.close(); lucky = nil; return
-        }
-        lucky = nil
-        let w = HLuckyOreWindow(floorPos: spawnPos(dx: 0)) { [weak self] mined, doubled, finished in
-            let silk = RewardCenter.heldItemName?().contains("실크") ?? false
-            if silk {
-                RewardCenter.say("🍀 실크터치! 원석 그대로!")
-                SoundAndEffectsManager.shared.play(.pop)
-                return
+        lucky.toggle(make: {
+            HLuckyOreWindow(floorPos: self.spawnPos(dx: 0)) { [weak self] mined, doubled, finished in
+                let silk = RewardCenter.heldItemName?().contains("실크") ?? false
+                if silk {
+                    RewardCenter.say("🍀 실크터치! 원석 그대로!")
+                    SoundAndEffectsManager.shared.play(.pop)
+                    return
+                }
+                if doubled {
+                    RewardCenter.grant(xp: 2, "🍀 행운 2배 드롭! (\(mined)/5)")
+                } else {
+                    RewardCenter.say("⛏️ 채굴! (\(mined)/5)")
+                }
+                SoundAndEffectsManager.shared.play(.chime)
+                if finished {
+                    RewardCenter.grant(xp: 2, "🍀 광석 완파!")
+                    self?.lucky.clear()
+                }
             }
-            if doubled {
-                RewardCenter.grant(xp: 2, "🍀 행운 2배 드롭! (\(mined)/5)")
-            } else {
-                RewardCenter.say("⛏️ 채굴! (\(mined)/5)")
-            }
-            SoundAndEffectsManager.shared.play(.chime)
-            if finished {
-                RewardCenter.grant(xp: 2, "🍀 광석 완파!")
-                self?.lucky?.close()
-                self?.lucky = nil
-            }
-        }
-        lucky = w
-        w.place()
+        }, start: { $0.place() })
     }
 
     // MARK: - 9 수선: 자체 XP 뱅크에서 5 소모 후 수리 완료
 
     public func toggleMending() {
-        if let w = mending, w.isVisible {
-            w.close(); mending = nil; return
-        }
-        mending = nil
-        let w = HMendingWindow(floorPos: spawnPos(dx: 0), bank: { [weak self] in self?.mendingBank ?? 0 }) { [weak self] done in
-            guard let self = self else { return }
-            if self.mendingBank >= 5 {
-                self.mendingBank -= 5
-                RewardCenter.say("✨ 수선 완료! (뱅크 \(self.mendingBank))")
-                SoundAndEffectsManager.shared.play(.chime)
-                done(true, self.mendingBank)
-            } else {
-                RewardCenter.say("✨ XP 부족! (뱅크 \(self.mendingBank))")
-                SoundAndEffectsManager.shared.play(.pop)
-                done(false, self.mendingBank)
+        mending.toggle(make: {
+            HMendingWindow(floorPos: self.spawnPos(dx: 0), bank: { [weak self] in self?.mendingBank ?? 0 }) { [weak self] done in
+                guard let self = self else { return }
+                if self.mendingBank >= 5 {
+                    self.mendingBank -= 5
+                    RewardCenter.say("✨ 수선 완료! (뱅크 \(self.mendingBank))")
+                    SoundAndEffectsManager.shared.play(.chime)
+                    done(true, self.mendingBank)
+                } else {
+                    RewardCenter.say("✨ XP 부족! (뱅크 \(self.mendingBank))")
+                    SoundAndEffectsManager.shared.play(.pop)
+                    done(false, self.mendingBank)
+                }
             }
-        }
-        mending = w
-        w.place()
+        }, start: { $0.place() })
     }
 
     // MARK: - 10 경험치 농장: 자체 몹 3마리 순환 + 10초당 +1XP 최대 10회 자동 흡수
 
     public func toggleFarm() {
-        if let w = farm, w.isVisible {
-            w.close(); farm = nil; return
-        }
-        farm = nil
-        let w = HXpFarmWindow(floorPos: spawnPos(dx: 0)) { [weak self] count in
-            RewardCenter.grant(xp: 1, "🌾 농장 흡수 (\(count)/10)")
-            SoundAndEffectsManager.shared.play(.pop)
-            if count >= 10 {
-                self?.farm?.close()
-                self?.farm = nil
+        farm.toggle(make: {
+            HXpFarmWindow(floorPos: self.spawnPos(dx: 0)) { [weak self] count in
+                RewardCenter.grant(xp: 1, "🌾 농장 흡수 (\(count)/10)")
+                SoundAndEffectsManager.shared.play(.pop)
+                if count >= 10 {
+                    self?.farm.clear()
+                }
             }
-        }
-        farm = w
-        w.place()
+        }, start: { $0.place() })
     }
 }
 
 // MARK: - 1 네더라이트 대장간 패널 (클릭 3회 의식)
 
-public final class HNetheriteWindow: NSPanel {
+public final class HNetheriteWindow: EntityWindow {
     private let onUpgrade: () -> Void
-    private var rites = 0
+    private var rites = HitCounter(maxHits: 3)
     private var drawView: HNetheriteDrawView?
     private let panelW: CGFloat = 128
     private let panelH: CGFloat = 96
 
     public init(floorPos: CGPoint, onUpgrade: @escaping () -> Void) {
         self.onUpgrade = onUpgrade
-        super.init(
-            contentRect: NSRect(x: floorPos.x - panelW / 2, y: floorPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: floorPos.x - panelW / 2, y: floorPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = HNetheriteDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
         self.drawView = view
         contentView = view
@@ -285,11 +231,11 @@ public final class HNetheriteWindow: NSPanel {
     }
 
     public override func mouseDown(with event: NSEvent) {
-        rites += 1
-        drawView?.rites = rites
+        let done = rites.hit()
+        drawView?.rites = rites.hits
         drawView?.needsDisplay = true
-        if rites < 3 {
-            RewardCenter.say("⬛ 강화 의식... (\(rites)/3)")
+        if !done {
+            RewardCenter.say("⬛ 강화 의식... (\(rites.hits)/3)")
             SoundAndEffectsManager.shared.play(.pop)
         } else {
             onUpgrade()
@@ -328,7 +274,7 @@ private final class HNetheriteDrawView: NSView {
 
 // MARK: - 2 채널링 번개 + 과녁 (클릭 직격 판정)
 
-public final class HChannelingWindow: NSPanel {
+public final class HChannelingWindow: EntityWindow {
     private let onStrike: (Bool) -> Void
     private var tick: Timer?
     private var phase: TimeInterval = 0
@@ -338,18 +284,7 @@ public final class HChannelingWindow: NSPanel {
 
     public init(floorPos: CGPoint, onStrike: @escaping (Bool) -> Void) {
         self.onStrike = onStrike
-        super.init(
-            contentRect: NSRect(x: floorPos.x - panelW / 2, y: floorPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: floorPos.x - panelW / 2, y: floorPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = HChannelingDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
         self.drawView = view
         contentView = view
@@ -412,7 +347,7 @@ private final class HChannelingDrawView: NSView {
 
 // MARK: - 3 메이스 (클릭 상승→강하 + 게이지 + 밀도/파열 교대)
 
-public final class HMaceWindow: NSPanel {
+public final class HMaceWindow: EntityWindow {
     private let onSmash: (Bool, Int) -> Void
     private var tick: Timer?
     private var anim: TimeInterval = -1
@@ -423,18 +358,7 @@ public final class HMaceWindow: NSPanel {
 
     public init(floorPos: CGPoint, onSmash: @escaping (Bool, Int) -> Void) {
         self.onSmash = onSmash
-        super.init(
-            contentRect: NSRect(x: floorPos.x - panelW / 2, y: floorPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: floorPos.x - panelW / 2, y: floorPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = HMaceDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
         self.drawView = view
         contentView = view
@@ -519,27 +443,16 @@ private final class HMaceDrawView: NSView {
 
 // MARK: - 4 윈드 차지 (클릭당 +80pt, 3단 후 3초 쿨)
 
-public final class HWindChargeWindow: NSPanel {
+public final class HWindChargeWindow: EntityWindow {
     private let onJump: () -> Bool
     private var jumpsUsed = 0
-    private var cooling = false
+    private var cooldown = Cooldown()
     private var drawView: HWindChargeDrawView?
 
     public init(floorPos: CGPoint, onJump: @escaping () -> Bool) {
         self.onJump = onJump
         let size = NSSize(width: 72, height: 72)
-        super.init(
-            contentRect: NSRect(x: floorPos.x - size.width / 2, y: floorPos.y, width: size.width, height: size.height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: floorPos.x - size.width / 2, y: floorPos.y, width: size.width, height: size.height), ignoresMouse: false)
         let view = HWindChargeDrawView(frame: NSRect(origin: .zero, size: size))
         self.drawView = view
         contentView = view
@@ -551,7 +464,7 @@ public final class HWindChargeWindow: NSPanel {
     }
 
     public override func mouseDown(with event: NSEvent) {
-        if cooling {
+        if !cooldown.ready {
             RewardCenter.say("💨 쿨타임...")
             return
         }
@@ -564,12 +477,12 @@ public final class HWindChargeWindow: NSPanel {
             RewardCenter.say("💨 윈드 차지! (\(jumpsUsed)/3단)")
             SoundAndEffectsManager.shared.play(.pop)
             if jumpsUsed >= 3 {
-                cooling = true
+                cooldown.trigger(3.0)
                 drawView?.cooling = true
                 drawView?.needsDisplay = true
                 DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
                     self?.jumpsUsed = 0
-                    self?.cooling = false
+                    self?.cooldown.tick(3.0)
                     self?.drawView?.jumpsUsed = 0
                     self?.drawView?.cooling = false
                     self?.drawView?.needsDisplay = true
@@ -603,7 +516,7 @@ private final class HWindChargeDrawView: NSView {
 
 // MARK: - 5 잔류형 물약 범위 존 (30초, 존 안 클릭 버프)
 
-public final class HLingeringZoneWindow: NSPanel {
+public final class HLingeringZoneWindow: EntityWindow {
     private let onBuff: () -> Void
     private var tick: Timer?
     private var phase: TimeInterval = 0
@@ -613,18 +526,7 @@ public final class HLingeringZoneWindow: NSPanel {
 
     public init(floorPos: CGPoint, onBuff: @escaping () -> Void) {
         self.onBuff = onBuff
-        super.init(
-            contentRect: NSRect(x: floorPos.x - panelW / 2, y: floorPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: floorPos.x - panelW / 2, y: floorPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = HLingeringDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
         self.drawView = view
         contentView = view
@@ -672,7 +574,7 @@ private final class HLingeringDrawView: NSView {
 
 // MARK: - 6 스플래시 투척 (포물선 미니병 + 범위 적용)
 
-public final class HSplashPotionWindow: NSPanel {
+public final class HSplashPotionWindow: EntityWindow {
     private let onSplash: () -> Void
     private var tick: Timer?
     private var t: TimeInterval = 0
@@ -683,18 +585,7 @@ public final class HSplashPotionWindow: NSPanel {
 
     public init(floorPos: CGPoint, onSplash: @escaping () -> Void) {
         self.onSplash = onSplash
-        super.init(
-            contentRect: NSRect(x: floorPos.x - panelW / 2, y: floorPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: floorPos.x - panelW / 2, y: floorPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = HSplashDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
         self.drawView = view
         contentView = view
@@ -763,7 +654,7 @@ private final class HSplashDrawView: NSView {
 
 // MARK: - 7 저주 (결박→소멸 클릭 진행)
 
-public final class HCurseWindow: NSPanel {
+public final class HCurseWindow: EntityWindow {
     private let onStep: (Int) -> Void
     private var steps = 0
     private var drawView: HCurseDrawView?
@@ -772,18 +663,7 @@ public final class HCurseWindow: NSPanel {
 
     public init(floorPos: CGPoint, onStep: @escaping (Int) -> Void) {
         self.onStep = onStep
-        super.init(
-            contentRect: NSRect(x: floorPos.x - panelW / 2, y: floorPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: floorPos.x - panelW / 2, y: floorPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = HCurseDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
         self.drawView = view
         contentView = view
@@ -835,27 +715,16 @@ private final class HCurseDrawView: NSView {
 
 // MARK: - 8 행운 광석 (5회 채굴, 2배 드롭 확률)
 
-public final class HLuckyOreWindow: NSPanel {
+public final class HLuckyOreWindow: EntityWindow {
     private let onMine: (Int, Bool, Bool) -> Void
-    private var mined = 0
+    private var mined = HitCounter(maxHits: 5)
     private var drawView: HLuckyOreDrawView?
     private let panelW: CGFloat = 84
     private let panelH: CGFloat = 84
 
     public init(floorPos: CGPoint, onMine: @escaping (Int, Bool, Bool) -> Void) {
         self.onMine = onMine
-        super.init(
-            contentRect: NSRect(x: floorPos.x - panelW / 2, y: floorPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: floorPos.x - panelW / 2, y: floorPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = HLuckyOreDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
         self.drawView = view
         contentView = view
@@ -867,13 +736,12 @@ public final class HLuckyOreWindow: NSPanel {
     }
 
     public override func mouseDown(with event: NSEvent) {
-        guard mined < 5 else { return }
-        mined += 1
+        guard mined.hits < 5 else { return }
+        let finished = mined.hit()
         let doubled = Double.random(in: 0..<1) < 0.5
-        drawView?.mined = mined
-        drawView?.lastDoubled = doubled
+        drawView?.mined = mined.hits
         drawView?.needsDisplay = true
-        onMine(mined, doubled, mined >= 5)
+        onMine(mined.hits, doubled, finished)
     }
 }
 
@@ -904,7 +772,7 @@ private final class HLuckyOreDrawView: NSView {
 
 // MARK: - 9 수선 모루 (자체 XP 뱅크 5 소모)
 
-public final class HMendingWindow: NSPanel {
+public final class HMendingWindow: EntityWindow {
     private let bank: () -> Int
     private let onRepair: (@escaping (Bool, Int) -> Void) -> Void
     private var drawView: HMendingDrawView?
@@ -914,18 +782,7 @@ public final class HMendingWindow: NSPanel {
     public init(floorPos: CGPoint, bank: @escaping () -> Int, onRepair: @escaping (@escaping (Bool, Int) -> Void) -> Void) {
         self.bank = bank
         self.onRepair = onRepair
-        super.init(
-            contentRect: NSRect(x: floorPos.x - panelW / 2, y: floorPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: floorPos.x - panelW / 2, y: floorPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = HMendingDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
         self.drawView = view
         contentView = view
@@ -971,7 +828,7 @@ private final class HMendingDrawView: NSView {
 
 // MARK: - 10 경험치 농장 (몹 3마리 순환 + 10초당 자동 흡수 최대 10회)
 
-public final class HXpFarmWindow: NSPanel {
+public final class HXpFarmWindow: EntityWindow {
     private let onAbsorb: (Int) -> Void
     private var tick: Timer?
     private var phase: TimeInterval = 0
@@ -983,18 +840,7 @@ public final class HXpFarmWindow: NSPanel {
 
     public init(floorPos: CGPoint, onAbsorb: @escaping (Int) -> Void) {
         self.onAbsorb = onAbsorb
-        super.init(
-            contentRect: NSRect(x: floorPos.x - panelW / 2, y: floorPos.y, width: panelW, height: panelH),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.level = .floating
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
-        self.ignoresMouseEvents = false
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        super.init(contentRect: NSRect(x: floorPos.x - panelW / 2, y: floorPos.y, width: panelW, height: panelH), ignoresMouse: false)
         let view = HXpFarmDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
         self.drawView = view
         contentView = view
