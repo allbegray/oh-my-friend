@@ -88,7 +88,7 @@ public final class CharacterBehaviorController {
 
     // MARK: - Direct Triggers (Called by View, Menu or Shortcuts)
     public func triggerBackflip(physics: PhysicsEngine, characterNode: MinecraftCharacterNode) {
-        guard !isClimbing else { return }
+        guard !isClimbing, !isTNTActive else { return }
         physics.jump(impulse: 560)
         SoundAndEffectsManager.shared.play(.jump)
         characterNode.showOverheadEmoji("🤸‍♂️", duration: 1.5)
@@ -96,14 +96,14 @@ public final class CharacterBehaviorController {
     }
 
     public func triggerSneakDance(characterNode: MinecraftCharacterNode) {
-        guard !isClimbing else { return }
+        guard !isClimbing, !isTNTActive else { return }
         characterNode.showOverheadEmoji("🕺", duration: 2.0)
         SoundAndEffectsManager.shared.play(.pop)
         state = .sneakDance(repsLeft: 4, isDown: true, timer: 0.15)
     }
 
     public func triggerWave(characterNode: MinecraftCharacterNode) {
-        guard !isClimbing else { return }
+        guard !isClimbing, !isTNTActive else { return }
         characterNode.showOverheadEmoji("👋", duration: 2.0)
         SoundAndEffectsManager.shared.play(.heart)
         state = .wave(timeLeft: 2.5)
@@ -119,13 +119,13 @@ public final class CharacterBehaviorController {
     }
 
     public func triggerEating(characterNode: MinecraftCharacterNode) {
-        guard !isClimbing else { return }
+        guard !isClimbing, !isTNTActive else { return }
         characterNode.showOverheadEmoji("🍎", duration: 2.5)
         state = .eating(timeLeft: 2.8)
     }
 
     public func triggerPlaceAndMine(characterNode: MinecraftCharacterNode) {
-        guard !isClimbing else { return }
+        guard !isClimbing, !isTNTActive else { return }
         characterNode.showOverheadEmoji("⛏️", duration: 2.5)
         characterNode.placedBlockNode.isHidden = false
         SoundAndEffectsManager.shared.play(.pop)
@@ -533,6 +533,8 @@ public final class CharacterBehaviorController {
             }
         }
         // 5. Finite State Machine
+        // TNT 진행 중 상태가 폭발/중단 콜백 없이 다른 상태로 덮어써졌는지 감시한다.
+        let wasTNTActive = isTNTActive
         switch state {
         case .cheer(let currentWpm, var timeLeft, let cooldown):
             timeLeft -= dt
@@ -893,6 +895,13 @@ public final class CharacterBehaviorController {
 
         case .fall, .dragged:
             break
+        }
+
+        // TNT 연출이 콜백(폭발/중단) 없이 다른 상태로 덮어써졌다면 연출을 정리한다.
+        // 이 정리 없이 상태만 바뀌면 도화선 패널이 하얗게 멈춘 채 닫히지 않고,
+        // AppController.isBreakInProgress 가 계속 true 로 남아 이후 TNT 메뉴가 영영 무반응이 된다.
+        if wasTNTActive && !isTNTActive && tntCompletion != nil {
+            finishTNT(platform: nil)
         }
     }
 
