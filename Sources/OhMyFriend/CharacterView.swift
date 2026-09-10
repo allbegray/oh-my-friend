@@ -17,10 +17,28 @@ public final class CharacterView: SCNView {
     public let characterNode = MinecraftCharacterNode()
 
     private var isDraggingCharacter: Bool = false
-    private var dragStartMousePos: CGPoint = .zero
-    private var lastDragPos: CGPoint = .zero
-    private var lastDragTime: TimeInterval = 0
-    private var dragVelocity: CGPoint = .zero
+
+    /// 놓는 순간의 '던지기 속도' 계산용 최근 이동 샘플 (시간, 화면 좌표)
+    private var dragSamples: [(t: TimeInterval, p: CGPoint)] = []
+
+    /// 속도 관측 창(초). 마지막 이동이 이보다 오래됐다면 멈춰서 놓은 것으로 본다.
+    private static let throwVelocityWindow: TimeInterval = 0.09
+    private static let throwVelocityMaxSpeed: CGFloat = 800.0
+
+    /// 최근 드래그 샘플로 던지기 속도를 구한다.
+    /// 관측 창 안에 이동 샘플이 없으면(= 마지막 이동이 오래됐으면) 0을 돌려주어 '던지기'가 아니라 '놓기'로 취급된다.
+    public static func throwVelocity(from samples: [(t: TimeInterval, p: CGPoint)], now: TimeInterval) -> CGPoint {
+        let recent = samples.filter { now - $0.t <= throwVelocityWindow }
+        guard let first = recent.first, let last = recent.last else { return .zero }
+        let dt = last.t - first.t
+        guard dt >= 0.005 else { return .zero }
+        let vx = (last.p.x - first.p.x) / CGFloat(dt)
+        let vy = (last.p.y - first.p.y) / CGFloat(dt)
+        return CGPoint(
+            x: max(-throwVelocityMaxSpeed, min(throwVelocityMaxSpeed, vx)),
+            y: max(-throwVelocityMaxSpeed, min(throwVelocityMaxSpeed, vy))
+        )
+    }
 
     public init(frame: NSRect, skin: SkinTexture) {
         super.init(frame: frame, options: nil)
@@ -86,10 +104,7 @@ public final class CharacterView: SCNView {
 
         let mouseScreen = NSEvent.mouseLocation
         isDraggingCharacter = true
-        dragStartMousePos = mouseScreen
-        lastDragPos = mouseScreen
-        lastDragTime = ProcessInfo.processInfo.systemUptime
-        dragVelocity = .zero
+        dragSamples = [(ProcessInfo.processInfo.systemUptime, mouseScreen)]
 
         characterDelegate?.characterViewDidStartDrag(self, at: mouseScreen)
     }
@@ -97,20 +112,12 @@ public final class CharacterView: SCNView {
     public override func mouseDragged(with event: NSEvent) {
         guard isDraggingCharacter else { return }
         let currentMouse = NSEvent.mouseLocation
-        let currentTime = ProcessInfo.processInfo.systemUptime
-        let dt = currentTime - lastDragTime
+        let now = ProcessInfo.processInfo.systemUptime
 
-        if dt > 0 {
-            let instantVx = (currentMouse.x - lastDragPos.x) / CGFloat(dt)
-            let instantVy = (currentMouse.y - lastDragPos.y) / CGFloat(dt)
-            dragVelocity = CGPoint(
-                x: dragVelocity.x * 0.4 + instantVx * 0.6,
-                y: dragVelocity.y * 0.4 + instantVy * 0.6
-            )
-        }
-
-        lastDragPos = currentMouse
-        lastDragTime = currentTime
+        dragSamples.append((now, currentMouse))
+        // 관측 창보다 오래된 샘플은 버린다 (메모리 상한 + 정지 판정 정확도)
+        let cutoff = now - Self.throwVelocityWindow
+        dragSamples.removeAll { $0.t < cutoff }
 
         characterDelegate?.characterViewDidDrag(self, to: currentMouse)
     }
@@ -119,12 +126,8 @@ public final class CharacterView: SCNView {
         guard isDraggingCharacter else { return }
         isDraggingCharacter = false
 
-        // Throw velocity with clamp
-        let maxSpeed: CGFloat = 800.0
-        let throwV = CGPoint(
-            x: max(-maxSpeed, min(maxSpeed, dragVelocity.x)),
-            y: max(-maxSpeed, min(maxSpeed, dragVelocity.y))
-        )
+        let throwV = Self.throwVelocity(from: dragSamples, now: ProcessInfo.processInfo.systemUptime)
+        dragSamples.removeAll()
 
         characterDelegate?.characterViewDidEndDrag(self, throwVelocity: throwV)
     }

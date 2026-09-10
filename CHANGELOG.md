@@ -14,6 +14,12 @@
   - 연기·불똥 개수도 창별 파편 예산에 비례해 줄인다(창 12개일 때 연기 18 → 5, 불똥 26 → 6).
   - 결과: 단일 창 폭발 프레임 12~14ms → 4.2ms, 창 4개 동시 48ms → 10ms, 창 12개 동시 145ms → 20ms 내외.
 
+### 수정
+- **드래그로 창문 안에 놓아도 사다리 등반이 아예 동작하지 않던 문제 수정** (원인 2가지, 둘 다 실측 재현):
+  1. `CharacterBehaviorController.beginLadderClimb`가 `wasAirborne` 플래그를 내리지 않아, 놓은 다음 프레임의 "방금 착지함" 처리(`landedCrouch`)가 **방금 시작한 `.climb` 상태를 즉시 덮어썼다.** 그 결과 FSM은 `idle`로 빠지고 물리 엔진만 `.climbing`에 남아 중력·착지 판정이 영구히 멈췄다(헤드리스 드라이버: y가 500pt에서 고정, 180프레임 동안 `phys=climbing`). 등반 진입 시 `wasAirborne = false`로 정리하여 수정.
+  2. `CharacterView`가 던지기 속도를 이동 중 EMA(지수 이동 평균)로 누적해 두었다가 `mouseUp`에서 그대로 비교했다. 실제로는 **손을 멈춘 뒤(≥90ms) 놓아도 과거 이동 속도가 남아** `dropSnapSpeedLimit`(260pt/s)을 넘겨 "던지기"로 판정되는 일이 잦았다. 속도 계산을 **최근 이동 샘플(기본 0.09초 관측 창) 기반** `CharacterView.throwVelocity(from:now:)`로 교체하여, 멈춘 뒤 놓으면 속도 0(=놓기), 이동 중 빠르게 놓으면 실제 속도(=던지기)가 되도록 수정.
+- **오른팔이 렌더링되지 않던 문제 수정**: `MinecraftCharacterNode.setupHierarchy`에서 `rightArmJoint`를 `bodyAnchor`에 붙이는 코드가 누락되어(**왼팔·양다리는 모두 `bodyAnchor.addChildNode`가 있는데 오른팔만 없었다**) 오른팔(관절·메시·2차 레이어 소매·손에 든 아이템·TNT)이 씬 그래프에서 떨어져 나가 있었다. 마인크래프트 스킨 2차 레이어 작업([H1]) 이후 지금까지 캐릭터는 **한쪽 팔만** 렌더링되었고, 등반 모션이 양팔을 대칭으로 들기 때문에 눈에 띄었다. `bodyAnchor.addChildNode(rightArmJoint)` 추가로 수정. 부수적으로 그동안 보이지 않던 오른팔 손 아이템(곡괭이/검/사과/횃불)과 TNT 치켜들기 모션도 정상 표시된다.
+
 ## [v0.3.1] - 2026-09-10
 
 ### 추가

@@ -319,6 +319,9 @@ public final class CharacterBehaviorController {
         climbIsUp = isUp
         climbSnapshot = nil
         ladderCooldown = ladderCooldownDuration
+        // 드래그로 공중에 떠 있던 상태에서 바로 등반으로 넘어오므로, 착지 판정이
+        // 등반 상태를 landedCrouch로 덮어쓰지 않도록 낙하 플래그를 내린다.
+        wasAirborne = false
 
         physics.beginClimb()
         SoundAndEffectsManager.shared.play(.pop)
