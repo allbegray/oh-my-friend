@@ -60,7 +60,10 @@ Sources/OhMyFriend/
 ├── CropEntityWindow.swift              # 밀 농사: 4단계 성장 작물(25초/단계), 성숙 클릭 수확
 ├── WeatherManager.swift                # 비·뇌우 랜덤 전환(150~300초) 및 번개 타이머
 ├── RainOverlayWindow.swift             # 빗줄기 + 번개 섬광·볼트 오버레이
-└── BeeEntityWindow.swift               # 벌 3마리 추적 + 30초 꿀 생산 벌집
+├── BeeEntityWindow.swift               # 벌 3마리 추적 + 30초 꿀 생산 벌집
+├── BrewStandWindow.swift               # 양조기 + 3색 물약병(신속/투명/힘 양조)
+├── FoxWindow.swift                     # 밤 여우(급속 지그재그 이동, 아이템 낚아채기·14초 추격전)
+└── GoatWindow.swift                    # 염소(풀뜯기→조준→돌진 3단 AI, 빈 양동이 우유 짜기)
 ```
 
 - **렌더링 & 애니메이션 파이프라인**: `CharacterView` 내부의 `SCNScene`에서 `MinecraftCharacterNode`가 관절 피벗(목, 어깨, 골반)을 기반으로 회전 및 위치를 실시간 보간합니다.
@@ -71,6 +74,7 @@ Sources/OhMyFriend/
 ## 실행 기록
 
 ### 2026-09-10
+- **[고증 추가 5종 3차] 양조·거래·여우·수레·염소 구축**: `BrewStandWindow.swift`(신속/투명/힘 물약 양조·시간제 효과), 에메랄드 재화 + NSAlert 주민 거래(검 3/사과 2/토템 5), `FoxWindow.swift`(밤 여우 낚아채기·14초 추격 회수전), Dock 광산 수레 10초 왕복 질주, `GoatWindow.swift`(3단 돌진 AI·빈 양동이 우유 짜기). 메뉴 5종 추가. 검증: `swift build` 통과, 번들 생성 및 4초 실행 스모크 테스트.
 - **[고증 추가 5종 2차] 말·인챈트·디펜스·풍선·멀티캐릭터 구축**: `PetKind.horse` + 3D 복셀 말(`buildHorseModel`) + 야생마 황금사과 길들이기 + 14초 260pt/s 승마 질주, `EnchantTableWindow.swift`(XP 10 날카로움/효율 강화·광택·데미지 반영, 크리퍼+5/스켈레톤+5/엔더맨+8/슬라임+3), 밤 웨이브 디펜스전(격퇴 카운트·클리어 보너스), `HeldItem.balloon` + `PhysicsEngine.isSlowFalling`(-60pt/s·퐁신 착지), **[L1] 멀티 캐릭터**(최대 2기 독립 FSM·물리·델리게이트 라우팅 `triple(for:)`). 메뉴 6종 추가. 검증: `swift build` 통과, 번들 생성 및 4초 실행 스모크 테스트. 백로그 전량 완료.
 - **[고증 추가 5종] 농사·길들이기·날씨·밤스킵·벌꿀 구축**: `CropEntityWindow.swift`(25초/단계 4단계 성장·클릭 수확), 야생 늑대 배회 + 뼈다귀 길들이기 펫 편입, `WeatherManager.swift`(150~300초 비·뇌우 전환) + `RainOverlayWindow.swift`(빗줄기·번개 섬광·볼트) + 뇌우 충전 크리퍼(폭발 1.6배), 밤 전원 6초 수면 시 15분 아침 스킵(`skipToMorning` + `wakeUpIfSleeping`), `BeeEntityWindow.swift`(벌 3마리 꽃 추적 + 30초 꿀 벌집). `HeldItem.flower` 추가, 메뉴 3종(밀 심기/야생 늑대/벌집) + "🌧️ 날씨 모드" 토글 추가. 검증: `swift build` 통과, 번들 생성 및 4초 실행 스모크 테스트.
 - **[H2/H3/H4/M1/M2/M3/M4/L2/L3] 백로그 9종(L1 제외) 일괄 구축**: `TridentEntityWindow.swift`, `JukeboxEntityWindow.swift`, `ChestEntityWindow.swift`, `SlimeWindow.swift`, `NetherPortalOverlayWindow.swift`, `DayNightCycleManager.swift` 신규 구현. 삼지창 충성 복귀 투척 + 웅크리기 급류 추진, 주크박스 8초 재생 + 캐릭터/펫 리듬 댄스, 실제 시간 낮밤(18시~06시 야간 횃불 자동 점등 + 몬스터 1.5배 출현), 클릭 오픈 보물 상자, 왼손 토템 폭발 부활, 3단계 분열 슬라임(최대 8마리), 밀 유혹 + 2회 먹이 아기 펫 탄생·60초 성장, 우유 60초 디버프 정화, 지옥문 왕복 연출 구현. `HeldItem` 4종(삼지창/밀/우유/빈양동이) 및 효과음 5종(`whoosh`/`splash`/`chime`/`gulp`/`portal`) 추가, 메뉴바 "✨ 재미있는 모션 실행"에 8종 액션 + "☀️/🌙 낮밤 모드" 서브메뉴 추가. 검증: `swift build` 통과, `scripts/build_app.sh` 번들 생성 및 4초 실행 스모크 테스트.

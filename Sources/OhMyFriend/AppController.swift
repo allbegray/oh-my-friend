@@ -3,7 +3,7 @@ import CoreGraphics
 import SceneKit
 import UniformTypeIdentifiers
 
-public final class AppController: NSObject, CharacterViewDelegate, PetViewDelegate, CreeperViewDelegate, EndermanViewDelegate, SkeletonViewDelegate, SlimeWindowDelegate, NSMenuDelegate {
+public final class AppController: NSObject, CharacterViewDelegate, PetViewDelegate, CreeperViewDelegate, EndermanViewDelegate, SkeletonViewDelegate, SlimeWindowDelegate, FoxWindowDelegate, NSMenuDelegate {
     private var window: CharacterWindow!
     private var physics: PhysicsEngine!
     private var behavior = CharacterBehaviorController()
@@ -356,6 +356,20 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
         updateBees()
         updateBalloonFall()
         updateBuddies(dt: dt, screen: screen, cursorPos: cursorPos)
+        updatePotions(dt: dt)
+        updateMinecart(dt: dt)
+        updateGoat()
+
+        // Fox: 밤에만 가끔 출현
+        if DayNightCycleManager.shared.isNight && foxWindow == nil {
+            foxSpawnTimer += dt
+            if foxSpawnTimer >= foxSpawnInterval {
+                foxSpawnTimer = 0
+                spawnFox()
+            }
+        } else if !DayNightCycleManager.shared.isNight {
+            foxSpawnTimer = 0
+        }
 
         // H4. Day/Night cycle (every ~5s)
         dayNightTimer += dt
@@ -935,6 +949,26 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
         dismissBuddyItem.target = self
         dismissBuddyItem.isEnabled = !buddyWindows.isEmpty
         actMenu.addItem(dismissBuddyItem)
+
+        let brewItem = NSMenuItem(title: "🧪 양조기 설치 (Brewing)", action: #selector(didSelectBrewStand), keyEquivalent: "")
+        brewItem.target = self
+        actMenu.addItem(brewItem)
+
+        let tradeItem = NSMenuItem(title: "🧑‍🌾 주민 거래 (에메랄드: \(playerEmeralds))", action: #selector(didSelectTrade), keyEquivalent: "")
+        tradeItem.target = self
+        actMenu.addItem(tradeItem)
+
+        let foxItem = NSMenuItem(title: "🦊 여우 소환 (Spawn Fox)", action: #selector(didSelectSpawnFox), keyEquivalent: "")
+        foxItem.target = self
+        actMenu.addItem(foxItem)
+
+        let cartItem = NSMenuItem(title: "🛒 광산 수레 타기 (Minecart)", action: #selector(didSelectMinecart), keyEquivalent: "")
+        cartItem.target = self
+        actMenu.addItem(cartItem)
+
+        let goatItem = NSMenuItem(title: "🐐 염소 소환 (Spawn Goat)", action: #selector(didSelectSpawnGoat), keyEquivalent: "")
+        goatItem.target = self
+        actMenu.addItem(goatItem)
         let actSubmenuItem = NSMenuItem(title: "✨ 재미있는 모션 실행", action: nil, keyEquivalent: "")
         actSubmenuItem.submenu = actMenu
         menu.addItem(actSubmenuItem)
@@ -1813,6 +1847,10 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
             damage += min(pickaxeEfficiency, 2)
             playerEmoji += " ✨효율!"
         }
+        if strengthTimer > 0 {
+            damage += 2
+            playerEmoji += " 💪힘!"
+        }
 
         window.characterView.characterNode.showOverheadEmoji(playerEmoji, duration: 1.2)
 
@@ -2075,6 +2113,7 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
 
     private func handleSkeletonDefeated() {
         playerXP += 5
+        playerEmeralds += 1
         if isDefenseMode {
             defenseKills += 1
             let needed = 2 + defenseWave
@@ -2465,6 +2504,282 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
         wasAirborneLastTick = !onGround
     }
 
+    // MARK: - Brewing (양조·물약)
+    private var brewStandWindow: BrewStandWindow?
+    private var swiftTimer: TimeInterval = 0
+    private var invisTimer: TimeInterval = 0
+    private var strengthTimer: TimeInterval = 0
+
+    @objc private func didSelectBrewStand() {
+        if let stand = brewStandWindow {
+            stand.close()
+            brewStandWindow = nil
+            return
+        }
+        let pos = CGPoint(x: physics.position.x - 110, y: physics.position.y)
+        let stand = BrewStandWindow(floorPos: pos) { [weak self] in
+            self?.tryBrewPotion()
+        }
+        brewStandWindow = stand
+        stand.place()
+        window.characterView.characterNode.showOverheadEmoji("🧪 양조기! 재료(🍎/🌺/🦴)를 들어봐!", duration: 2.5)
+    }
+
+    private func tryBrewPotion() {
+        let charNode = window.characterView.characterNode
+        switch charNode.currentHeldItem {
+        case .goldenApple:
+            charNode.currentHeldItem = .none
+            swiftTimer = 90.0
+            charNode.showOverheadEmoji("⚡ 신속 물약! 빨라졌다!", duration: 2.2)
+            SoundAndEffectsManager.shared.play(.gulp)
+        case .flower:
+            charNode.currentHeldItem = .none
+            invisTimer = 60.0
+            charNode.showOverheadEmoji("👻 투명 물약! 안 보여!", duration: 2.2)
+            SoundAndEffectsManager.shared.play(.gulp)
+        case .bone:
+            charNode.currentHeldItem = .none
+            strengthTimer = 90.0
+            charNode.showOverheadEmoji("💪 힘 물약! 세졌다!", duration: 2.2)
+            SoundAndEffectsManager.shared.play(.gulp)
+        default:
+            charNode.showOverheadEmoji("🧪 사과·꽃·뼈다귀를 들어봐!", duration: 2.0)
+            SoundAndEffectsManager.shared.play(.pop)
+        }
+    }
+
+    private func updatePotions(dt: TimeInterval) {
+        let charNode = window.characterView.characterNode
+        if swiftTimer > 0 {
+            swiftTimer -= dt
+            behavior.walkSpeed = 170.0
+            if swiftTimer <= 0 {
+                behavior.walkSpeed = 85.0
+                charNode.showOverheadEmoji("⚡ 신속 끝!", duration: 1.5)
+            }
+        }
+        if invisTimer > 0 {
+            invisTimer -= dt
+            window.alphaValue = 0.35
+            if invisTimer <= 0 {
+                window.alphaValue = 1.0
+                charNode.showOverheadEmoji("👻 다시 보였다!", duration: 1.5)
+            }
+        }
+        if strengthTimer > 0 {
+            strengthTimer -= dt
+            if strengthTimer <= 0 {
+                charNode.showOverheadEmoji("💪 힘 끝!", duration: 1.5)
+            }
+        }
+    }
+
+    // MARK: - Trading (주민 거래)
+    public var playerEmeralds: Int = 0
+
+    @objc private func didSelectTrade() {
+        guard let platform = physics.currentPlatform,
+              case let .window(_, appName, ownerPid) = platform.kind,
+              ownerPid != getpid() else {
+            window.characterView.characterNode.showOverheadEmoji("🧑‍🌾 창문 위에서 불러봐!", duration: 2.0)
+            return
+        }
+        let alert = NSAlert()
+        alert.messageText = "🧑‍🌾 \(appName) 주민과의 거래"
+        alert.informativeText = "보유 에메랄드: \(playerEmeralds)개\n흡! 좋은 물건 있어!"
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "🗡️ 다이아 검 (3)")
+        alert.addButton(withTitle: "🍎 황금사과 (2)")
+        alert.addButton(withTitle: "✨ 토템 (5)")
+        alert.addButton(withTitle: "취소")
+        NSApp.activate(ignoringOtherApps: true)
+        let choice = alert.runModal()
+        let charNode = window.characterView.characterNode
+        switch choice {
+        case .alertFirstButtonReturn:
+            guard playerEmeralds >= 3 else {
+                charNode.showOverheadEmoji("🧑‍🌾 에메랄드가 모자라! 흡!", duration: 2.0)
+                return
+            }
+            playerEmeralds -= 3
+            charNode.currentHeldItem = .diamondSword
+            charNode.showOverheadEmoji("🗡️ 거래 성사! 흡!", duration: 2.2)
+            SoundAndEffectsManager.shared.play(.heart)
+        case .alertSecondButtonReturn:
+            guard playerEmeralds >= 2 else {
+                charNode.showOverheadEmoji("🧑‍🌾 에메랄드가 모자라! 흡!", duration: 2.0)
+                return
+            }
+            playerEmeralds -= 2
+            charNode.currentHeldItem = .goldenApple
+            charNode.showOverheadEmoji("🍎 거래 성사! 흡!", duration: 2.2)
+            SoundAndEffectsManager.shared.play(.heart)
+        case .alertThirdButtonReturn:
+            guard playerEmeralds >= 5 else {
+                charNode.showOverheadEmoji("🧑‍🌾 에메랄드가 모자라! 흡!", duration: 2.0)
+                return
+            }
+            playerEmeralds -= 5
+            charNode.isTotemEquipped = true
+            charNode.showOverheadEmoji("✨ 토템 거래 성사! 흡!", duration: 2.2)
+            SoundAndEffectsManager.shared.play(.chime)
+        default:
+            break
+        }
+        statusItem?.menu = buildContextMenu()
+    }
+
+    // MARK: - Fox (여우 장난)
+    private var foxWindow: FoxWindow?
+    private var foxStolenItem: HeldItem = .none
+    private var foxSpawnTimer: TimeInterval = 0
+    private let foxSpawnInterval: TimeInterval = 150.0
+
+    @objc private func didSelectSpawnFox() {
+        spawnFox()
+    }
+
+    private func spawnFox() {
+        guard foxWindow == nil else { return }
+        let charNode = window.characterView.characterNode
+        let startPos = CGPoint(x: physics.position.x + 200, y: physics.position.y)
+        let fox = FoxWindow(startPos: startPos, delegate: self)
+        foxWindow = fox
+        if charNode.currentHeldItem != .none {
+            foxStolenItem = charNode.currentHeldItem
+            charNode.currentHeldItem = .none
+            fox.carriedEmoji = "🎁"
+            charNode.showOverheadEmoji("🦊 앗! 내 아이템!", duration: 2.0)
+        } else {
+            foxStolenItem = .none
+            charNode.showOverheadEmoji("🦊 여우다! (잡아봐!)", duration: 2.0)
+        }
+        SoundAndEffectsManager.shared.play(.alert)
+        fox.spawn()
+    }
+
+    public func foxWindowDidClick(_ window: FoxWindow) {
+        let charNode = self.window.characterView.characterNode
+        if foxStolenItem != .none {
+            charNode.currentHeldItem = foxStolenItem
+            charNode.showOverheadEmoji("🦊 돌려받았다!", duration: 2.0)
+            foxStolenItem = .none
+        } else {
+            charNode.showOverheadEmoji("🦊 휴! 놀랐네!", duration: 1.6)
+        }
+        SoundAndEffectsManager.shared.play(.heart)
+        foxWindow = nil
+        window.disappear(escaped: false)
+    }
+
+    public func foxWindowDidEscape(_ window: FoxWindow) {
+        if foxStolenItem != .none {
+            self.window.characterView.characterNode.showOverheadEmoji("🦊 가져갔어... ㅠ", duration: 2.0)
+            foxStolenItem = .none
+        }
+        foxWindow = nil
+    }
+
+    // MARK: - Minecart (Dock 광산 수레)
+    private var isCartRiding: Bool = false
+    private var cartTimer: TimeInterval = 0
+    private var cartDir: CGFloat = 1
+    private var cartClackTimer: TimeInterval = 0
+
+    @objc private func didSelectMinecart() {
+        if isCartRiding {
+            stopMinecart()
+            return
+        }
+        guard let platform = physics.currentPlatform, case .dock = platform.kind else {
+            window.characterView.characterNode.showOverheadEmoji("🛒 Dock 위에서 타봐!", duration: 2.0)
+            return
+        }
+        isCartRiding = true
+        cartTimer = 10.0
+        cartClackTimer = 0
+        cartDir = window.characterView.characterNode.modelRoot.eulerAngles.y >= 0 ? 1 : -1
+        window.characterView.characterNode.isSitting = true
+        window.characterView.characterNode.showOverheadEmoji("🛒 덜컹덜컹 출발!", duration: 2.0)
+        SoundAndEffectsManager.shared.play(.jump)
+    }
+
+    private func stopMinecart() {
+        isCartRiding = false
+        window.characterView.characterNode.isSitting = false
+    }
+
+    private func updateMinecart(dt: TimeInterval) {
+        guard isCartRiding else { return }
+        cartTimer -= dt
+        cartClackTimer -= dt
+        if cartTimer <= 0 {
+            stopMinecart()
+            window.characterView.characterNode.showOverheadEmoji("🛒 종점 도착!", duration: 1.8)
+            return
+        }
+        guard let platform = physics.currentPlatform, case .dock = platform.kind else {
+            stopMinecart()
+            return
+        }
+        if physics.position.x > platform.xMax - 40 {
+            cartDir = -1
+        } else if physics.position.x < platform.xMin + 40 {
+            cartDir = 1
+        }
+        physics.position.x += cartDir * 300.0 * CGFloat(dt)
+        physics.position.y = platform.yTop
+        physics.velocity = .zero
+        window.characterView.characterNode.modelRoot.eulerAngles.y = cartDir > 0 ? (CGFloat.pi / 2.0) : (-CGFloat.pi / 2.0)
+        window.characterView.characterNode.walkSpeed = 0
+        if cartClackTimer <= 0 {
+            cartClackTimer = 0.5
+            SoundAndEffectsManager.shared.play(.pop)
+        }
+    }
+
+    // MARK: - Goat (염소 돌진·우유 짜기)
+    private var goatWindow: GoatWindow?
+
+    @objc private func didSelectSpawnGoat() {
+        if goatWindow != nil {
+            goatWindow?.close()
+            goatWindow = nil
+            return
+        }
+        let pos = CGPoint(x: physics.position.x + 220, y: physics.position.y)
+        let goat = GoatWindow(
+            startPos: pos,
+            onRam: { [weak self] in
+                guard let self = self else { return }
+                let dir: CGFloat = self.physics.position.x >= pos.x ? 1 : -1
+                self.physics.launch(vx: dir * 380.0, vy: 260.0)
+                self.window.characterView.characterNode.showOverheadEmoji("🐐 쿵! 받혔다!", duration: 2.0)
+                SoundAndEffectsManager.shared.play(.land)
+            },
+            onMilk: { [weak self] in
+                guard let self = self else { return }
+                let charNode = self.window.characterView.characterNode
+                if charNode.currentHeldItem == .emptyBucket {
+                    charNode.currentHeldItem = .milkBucket
+                    charNode.showOverheadEmoji("🐐 신선한 우유! 🥛", duration: 2.2)
+                    SoundAndEffectsManager.shared.play(.gulp)
+                } else {
+                    charNode.showOverheadEmoji("메에에! 🐐 (빈 양동이를 들어봐)", duration: 1.8)
+                    SoundAndEffectsManager.shared.play(.pop)
+                }
+            }
+        )
+        goatWindow = goat
+        goat.spawn()
+        window.characterView.characterNode.showOverheadEmoji("🐐 염소다! 조심해!", duration: 2.0)
+    }
+
+    private func updateGoat() {
+        goatWindow?.targetX = physics.position.x
+    }
+
     // MARK: - Fishing (낚시)
     @objc private func didSelectFishing() {
         behavior.triggerFishing(characterNode: window.characterView.characterNode)
@@ -2519,7 +2834,8 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
         let chest = ChestEntityWindow(floorPos: pos) { [weak self] in
             guard let self = self else { return }
             self.chestWindow = nil
-            self.window.characterView.characterNode.showOverheadEmoji("💎 대박! 다이아다!", duration: 2.5)
+            self.playerEmeralds += 2
+            self.window.characterView.characterNode.showOverheadEmoji("💎 대박! +에메랄드 2!", duration: 2.5)
             SoundAndEffectsManager.shared.play(.heart)
         }
         chestWindow = chest
@@ -2637,7 +2953,8 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
     public func slimeWindowDidDespawn(_ window: SlimeWindow) {
         slimeWindows.removeAll { $0 === window }
         playerXP += 3
-        self.window.characterView.characterNode.showOverheadEmoji("🟢 슬라임볼 +3XP!", duration: 2.0)
+        playerEmeralds += 1
+        self.window.characterView.characterNode.showOverheadEmoji("🟢 슬라임볼 +3XP +1에메!", duration: 2.0)
         SoundAndEffectsManager.shared.play(.pop)
     }
 
