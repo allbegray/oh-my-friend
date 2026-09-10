@@ -3,7 +3,7 @@ import CoreGraphics
 import SceneKit
 import UniformTypeIdentifiers
 
-public final class AppController: NSObject, CharacterViewDelegate, PetViewDelegate, CreeperViewDelegate, EndermanViewDelegate, SkeletonViewDelegate, SlimeWindowDelegate, FoxWindowDelegate, PhantomWindowDelegate, SpiderWindowDelegate, GhastWindowDelegate, ZombieWindowDelegate, NSMenuDelegate {
+public final class AppController: NSObject, CharacterViewDelegate, PetViewDelegate, CreeperViewDelegate, EndermanViewDelegate, SkeletonViewDelegate, SlimeWindowDelegate, FoxWindowDelegate, PhantomWindowDelegate, SpiderWindowDelegate, GhastWindowDelegate, ZombieWindowDelegate, SheepWindowDelegate, NSMenuDelegate {
     private var window: CharacterWindow!
     private var physics: PhysicsEngine!
     private var behavior = CharacterBehaviorController()
@@ -364,6 +364,7 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
         updateGhast()
         updateSiege(dt: dt)
         updateAxolotl()
+        updateGolemAnchor()
 
         // Fox: 밤에만 가끔 출현
         if DayNightCycleManager.shared.isNight && foxWindow == nil {
@@ -1012,6 +1013,26 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
         let axolotlItem = NSMenuItem(title: "🦎 아홀로틀 데려오기 (Axolotl)", action: #selector(didSelectAxolotl), keyEquivalent: "")
         axolotlItem.target = self
         actMenu.addItem(axolotlItem)
+
+        let sheepItem = NSMenuItem(title: "🐑 양 소환 (Spawn Sheep)", action: #selector(didSelectSpawnSheep), keyEquivalent: "")
+        sheepItem.target = self
+        actMenu.addItem(sheepItem)
+
+        let golemItem = NSMenuItem(title: "⛄ 눈 골렘 조립 (Snow Golem)", action: #selector(didSelectBuildGolem), keyEquivalent: "")
+        golemItem.target = self
+        actMenu.addItem(golemItem)
+
+        let hornItem = NSMenuItem(title: "🎺 뿔피리 불기 (뿔: \(playerHorns))", action: #selector(didSelectBlowHorn), keyEquivalent: "")
+        hornItem.target = self
+        actMenu.addItem(hornItem)
+
+        let bellItem = NSMenuItem(title: "🔔 종 울리기 (Bell)", action: #selector(didSelectRingBell), keyEquivalent: "")
+        bellItem.target = self
+        actMenu.addItem(bellItem)
+
+        let cakeItem = NSMenuItem(title: "🎂 케이크 놓기 (Cake)", action: #selector(didSelectCake), keyEquivalent: "")
+        cakeItem.target = self
+        actMenu.addItem(cakeItem)
         let actSubmenuItem = NSMenuItem(title: "✨ 재미있는 모션 실행", action: nil, keyEquivalent: "")
         actSubmenuItem.submenu = actMenu
         menu.addItem(actSubmenuItem)
@@ -1877,6 +1898,9 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
         case .balloon:
             damage = 1
             playerEmoji = "🎈 풍선 쿵!"
+        case .shears:
+            damage = 1
+            playerEmoji = "✂️ 가위 쿡!"
         case .none:
             damage = 1
             playerEmoji = "👊 펀치!"
@@ -2828,6 +2852,12 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
                 self.physics.launch(vx: dir * 380.0, vy: 260.0)
                 self.window.characterView.characterNode.showOverheadEmoji("🐐 쿵! 받혔다!", duration: 2.0)
                 SoundAndEffectsManager.shared.play(.land)
+                if Double.random(in: 0...1) < 0.4 {
+                    self.playerHorns += 1
+                    self.window.characterView.characterNode.showOverheadEmoji("🎺 뿔 획득! (총 \(self.playerHorns)개)", duration: 2.2)
+                    SoundAndEffectsManager.shared.play(.heart)
+                    self.statusItem?.menu = self.buildContextMenu()
+                }
             },
             onMilk: { [weak self] in
                 guard let self = self else { return }
@@ -3190,6 +3220,182 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
         guard axolotlWindow != nil else { return }
         window.characterView.characterNode.showOverheadEmoji("🦎 앙!", duration: 1.0)
         SoundAndEffectsManager.shared.play(.splash)
+    }
+
+    // MARK: - Sheep (양털 깎기)
+    private var sheepWindow: SheepWindow?
+
+    @objc private func didSelectSpawnSheep() {
+        if sheepWindow != nil {
+            sheepWindow?.close()
+            sheepWindow = nil
+            return
+        }
+        let pos = CGPoint(x: physics.position.x + 150, y: physics.position.y)
+        let sheep = SheepWindow(startPos: pos, delegate: self)
+        sheepWindow = sheep
+        sheep.start()
+        window.characterView.characterNode.showOverheadEmoji("🐑 메에! 양이다!", duration: 2.0)
+    }
+
+    public func sheepWindowDidClick(_ window: SheepWindow) {
+        let charNode = self.window.characterView.characterNode
+        if charNode.currentHeldItem == .shears && window.hasWool {
+            window.shear()
+            playerXP += 2
+            charNode.showOverheadEmoji("✂️ 양털 득템! +2XP!", duration: 2.0)
+            SoundAndEffectsManager.shared.play(.heart)
+        } else if !window.hasWool {
+            charNode.showOverheadEmoji("🐑 털 자라는 중...", duration: 1.5)
+            SoundAndEffectsManager.shared.play(.pop)
+        } else {
+            charNode.showOverheadEmoji("🐑 가위를 들어봐! ✂️", duration: 1.8)
+            SoundAndEffectsManager.shared.play(.pop)
+        }
+    }
+
+    // MARK: - Snow Golem (눈 골렘 수호자)
+    private var golemWindow: GolemWindow?
+
+    @objc private func didSelectBuildGolem() {
+        if let golem = golemWindow {
+            golem.close()
+            golemWindow = nil
+            return
+        }
+        let pos = CGPoint(x: physics.position.x - 100, y: physics.position.y)
+        let golem = GolemWindow(startPos: pos) { [weak self] from in
+            self?.golemThrowSnowball(from: from)
+        }
+        golemWindow = golem
+        golem.start()
+        window.characterView.characterNode.showOverheadEmoji("⛄ 골렘 조립! 지켜줘!", duration: 2.2)
+        SoundAndEffectsManager.shared.play(.heart)
+    }
+
+    private func golemThrowSnowball(from: CGPoint) {
+        struct Target {
+            let pos: CGPoint
+            let hit: () -> Void
+            let name: String
+        }
+        var targets: [Target] = []
+        if let cPhys = creeperPhysics, creeperWindow != nil {
+            targets.append(Target(pos: cPhys.position, hit: { [weak self] in
+                self?.attackCreeperWithCurrentWeapon()
+            }, name: "크리퍼"))
+        }
+        if let sPhys = skeletonPhysics, skeletonWindow != nil {
+            targets.append(Target(pos: sPhys.position, hit: { [weak self] in
+                self?.attackSkeletonWithCurrentWeapon()
+            }, name: "스켈레톤"))
+        }
+        for zombie in zombieWindows {
+            targets.append(Target(pos: zombie.position, hit: { [weak self] in
+                zombie.takeHit()
+                self?.window.characterView.characterNode.showOverheadEmoji("⛄ 눈덩이 퍽!", duration: 1.2)
+            }, name: "좀비"))
+        }
+        if let spider = spiderWindow {
+            targets.append(Target(pos: spider.position, hit: { [weak self] in
+                self?.attackSpider(spider)
+            }, name: "거미"))
+        }
+        let near = targets
+            .map { (t: $0, d: hypot($0.pos.x - from.x, $0.pos.y - from.y)) }
+            .filter { $0.d < 420 }
+            .min { $0.d < $1.d }
+        guard let best = near else { return }
+        window.characterView.characterNode.showOverheadEmoji("⛄ \(best.t.name)에 눈덩이!", duration: 1.4)
+        SoundAndEffectsManager.shared.play(.splash)
+        best.t.hit()
+    }
+
+    private func updateGolemAnchor() {
+        golemWindow?.anchor = CGPoint(x: physics.position.x - 100, y: physics.position.y)
+    }
+
+    // MARK: - Goat Horn (염소 뿔피리)
+    private var playerHorns: Int = 0
+
+    @objc private func didSelectBlowHorn() {
+        guard playerHorns > 0 else {
+            window.characterView.characterNode.showOverheadEmoji("🎺 뿔이 없어! (염소 돌진 시 확률 드롭)", duration: 2.2)
+            return
+        }
+        playerHorns -= 1
+        window.characterView.characterNode.showOverheadEmoji("🎺 부우우-! 물러가라!", duration: 2.5)
+        SoundAndEffectsManager.shared.play(.alert)
+        if creeperWindow != nil {
+            creeperWindow?.creeperView.creeperNode.showOverheadEmoji("😱 뿔피리다!", duration: 1.5)
+            despawnCreeper()
+        }
+        if skeletonWindow != nil {
+            skeletonWindow?.skeletonView.skeletonNode.showOverheadEmoji("😱 뿔피리다!", duration: 1.5)
+            despawnSkeleton()
+        }
+        if spiderWindow != nil {
+            spiderWindow?.close()
+            spiderWindow = nil
+        }
+        if !zombieWindows.isEmpty {
+            for zombie in zombieWindows { zombie.dismiss() }
+            zombieWindows = []
+        }
+        if phantomWindow != nil {
+            phantomWindow?.disappear(left: true)
+        }
+        if ghastWindow != nil {
+            ghastWindow?.disappear(defeated: false)
+        }
+        statusItem?.menu = buildContextMenu()
+    }
+
+    // MARK: - Bell (종 소집)
+    @objc private func didSelectRingBell() {
+        window.characterView.characterNode.showOverheadEmoji("🔔 땡땡땡! 모여라!", duration: 2.2)
+        SoundAndEffectsManager.shared.play(.chime)
+        if let pPhys = petPhysics, let pBehav = petBehavior, let pw = petWindow {
+            pBehav.teleport(
+                to: physics.position,
+                playerDirection: window.characterView.characterNode.modelRoot.eulerAngles.y,
+                petPhysics: pPhys,
+                petNode: pw.petView.petNode
+            )
+        }
+        for i in buddyPhysics.indices {
+            buddyPhysics[i].position = CGPoint(
+                x: physics.position.x + (i == 0 ? -70 : 70),
+                y: physics.position.y
+            )
+            buddyPhysics[i].velocity = .zero
+        }
+        if babyPetWindow != nil {
+            babyGrowTimer = min(babyGrowTimer, 30.0)
+        }
+    }
+
+    // MARK: - Cake (케이크 파티)
+    private var cakeWindow: CakeWindow?
+
+    @objc private func didSelectCake() {
+        if let cake = cakeWindow {
+            cake.close()
+            cakeWindow = nil
+            return
+        }
+        let pos = CGPoint(x: physics.position.x + 100, y: physics.position.y)
+        let cake = CakeWindow(floorPos: pos) { [weak self] in
+            guard let self = self else { return }
+            self.window.characterView.characterNode.showOverheadEmoji("🍰 한 입!", duration: 1.4)
+            SoundAndEffectsManager.shared.play(.gulp)
+            if let petNode = self.petWindow?.petView.petNode, Bool.random() {
+                petNode.showOverheadEmoji("🍰 냠!", duration: 1.4)
+            }
+        }
+        cakeWindow = cake
+        cake.place()
+        window.characterView.characterNode.showOverheadEmoji("🎂 케이크 파티!", duration: 2.0)
     }
 
     // MARK: - Fishing (낚시)

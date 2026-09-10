@@ -15,6 +15,7 @@ public enum HeldItem: String, CaseIterable {
     case emptyBucket = "빈 양동이 🪣"
     case flower = "빨간 꽃 🌺"
     case balloon = "풍선 🎈"
+    case shears = "가위 ✂️"
 }
 
 public final class MinecraftCharacterNode: SCNNode {
@@ -460,6 +461,10 @@ public final class MinecraftCharacterNode: SCNNode {
         case .balloon:
             let balloon = createBalloonModel()
             rightHandItemAnchor.addChildNode(balloon)
+
+        case .shears:
+            let shears = createShearsModel()
+            rightHandItemAnchor.addChildNode(shears)
         }
         EnchantmentGlintShader.apply(to: rightHandItemAnchor, enabled: isEnchantedGlintEnabled)
     }
@@ -676,8 +681,26 @@ public final class MinecraftCharacterNode: SCNNode {
         return root
     }
 
-    private func createBalloonModel() -> SCNNode {
+    private func createShearsModel() -> SCNNode {
         let root = SCNNode()
+        let ironMat = SCNMaterial()
+        ironMat.diffuse.contents = NSColor(red: 0.65, green: 0.66, blue: 0.68, alpha: 1.0)
+        for x in [-0.06, 0.06] as [CGFloat] {
+            let bladeBox = SCNBox(width: 0.05, height: 0.55, length: 0.05, chamferRadius: 0)
+            bladeBox.materials = [ironMat]
+            let blade = SCNNode(geometry: bladeBox)
+            blade.position = SCNVector3(x, 0.35, 0)
+            root.addChildNode(blade)
+        }
+        let pivotBox = SCNBox(width: 0.16, height: 0.08, length: 0.08, chamferRadius: 0)
+        pivotBox.materials = [ironMat]
+        let pivot = SCNNode(geometry: pivotBox)
+        pivot.position = SCNVector3(0, 0.08, 0)
+        root.addChildNode(pivot)
+        return root
+    }
+
+    private func createBalloonModel() -> SCNNode {        let root = SCNNode()
         let stringMat = SCNMaterial()
         stringMat.diffuse.contents = NSColor(white: 0.9, alpha: 0.9)
         let balloonMat = SCNMaterial()

@@ -69,7 +69,10 @@ Sources/OhMyFriend/
 ├── SpiderWindow.swift                  # 거미(창문 수직 크롤링, 낮 중립·밤 격퇴)
 ├── GhastWindow.swift                   # 가스트(부유+화염탄) + 화염탄 클릭 쳐내기
 ├── ZombieWindow.swift                  # 아기 좀비 3마리 추적 공성전(횃불 2배)
-└── AxolotlWindow.swift                 # 어깨 아홀로틀(전투 +1 엄호)
+├── AxolotlWindow.swift                 # 어깨 아홀로틀(전투 +1 엄호)
+├── SheepWindow.swift                   # 양(배회·가위 털깎기·60초 재생)
+├── GolemWindow.swift                   # 눈 골렘(3초 간격 근접몹 눈덩이 엄호)
+└── CakeWindow.swift                    # 7조각 케이크(클릭 나눔·펫 확률 나눔)
 ```
 
 - **렌더링 & 애니메이션 파이프라인**: `CharacterView` 내부의 `SCNScene`에서 `MinecraftCharacterNode`가 관절 피벗(목, 어깨, 골반)을 기반으로 회전 및 위치를 실시간 보간합니다.
@@ -80,6 +83,7 @@ Sources/OhMyFriend/
 ## 실행 기록
 
 ### 2026-09-10
+- **[고증 5차] 양·골렘·뿔피리·종·케이크 구축**: `SheepWindow.swift`(배회·가위 털깎기·60초 재생), `GolemWindow.swift`(3초 간격 근접몹 눈덩이 엄호), 염소 돌진 40% 뿔 드롭 + 전체몹 퇴각 피리, 종(펫 순간이동·친구 집결), `CakeWindow.swift`(7조각 나눔·펫 확률 나눔). 메뉴 5종 추가. 검증: `swift build` 통과, 번들 생성 및 4초 실행 스모크 테스트.
 - **[고증 4차] 팬텀·거미·가스트·좀비·아홀로틀 구축**: `PhantomWindow.swift`(자정 급강하·방패가드·막), `SpiderWindow.swift`(창문 수직 크롤링·낮중립), `GhastWindow.swift`(지옥문 부유·화염탄 클릭 테니스·눈물), `ZombieWindow.swift`(자정 3마리·횃불 2배·승리 보너스), `AxolotlWindow.swift`(빈양동이 어깨펫·전투 +1). 메뉴 5종 추가. 검증: `swift build` 통과, 번들 생성 및 4초 실행 스모크 테스트.
 - **[업적 시스템] 발전 과제 16종 도입**: `Advancements.swift`(과제 정의·해금·토스트 큐·체크리스트 창, UserDefaults 영속). 채굴·몹 4종·길들이기 2종·수확·낚시·양조·인챈트·거래·지옥문·승마·친구·밤스킵 16곳 훅 연결, 달성 시 우상단 토스트 + 차임. 메뉴 "🏆 발전 과제 (n/16)" 추가. 검증: `swift build` 통과, 번들 생성 및 4초 실행 스모크 테스트.
 - **[고증 추가 5종 3차] 양조·거래·여우·수레·염소 구축**: `BrewStandWindow.swift`(신속/투명/힘 물약 양조·시간제 효과), 에메랄드 재화 + NSAlert 주민 거래(검 3/사과 2/토템 5), `FoxWindow.swift`(밤 여우 낚아채기·14초 추격 회수전), Dock 광산 수레 10초 왕복 질주, `GoatWindow.swift`(3단 돌진 AI·빈 양동이 우유 짜기). 메뉴 5종 추가. 검증: `swift build` 통과, 번들 생성 및 4초 실행 스모크 테스트.
