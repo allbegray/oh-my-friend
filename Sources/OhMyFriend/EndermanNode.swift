@@ -54,7 +54,13 @@ public final class EndermanNode: SCNNode {
     }
 
     private func setupMaterials() {
-        blackMat.diffuse.contents = NSColor(red: 0.08, green: 0.08, blue: 0.08, alpha: 1.0)
+        let enderBase = NSColor(red: 0.08, green: 0.08, blue: 0.08, alpha: 1.0)
+        let grainMat = MobTexture.material(width: 16, height: 16, seed: 13) { _, _, r in
+            r < 0.12 ? MobTexture.shade(color: enderBase, by: 1.7) : enderBase
+        }
+        blackMat.diffuse.contents = grainMat.diffuse.contents
+        blackMat.diffuse.magnificationFilter = .nearest
+        blackMat.diffuse.minificationFilter = .nearest
         blackMat.lightingModel = .lambert
 
         purpleEyeMat.diffuse.contents = NSColor(red: 0.85, green: 0.20, blue: 0.95, alpha: 1.0) // Glowing purple eyes

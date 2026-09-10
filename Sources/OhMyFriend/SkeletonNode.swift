@@ -54,10 +54,22 @@ public final class SkeletonNode: SCNNode {
     }
 
     private func setupMaterials() {
-        boneMat.diffuse.contents = NSColor(red: 0.82, green: 0.82, blue: 0.80, alpha: 1.0)
+        let boneGrain = MobTexture.material(width: 16, height: 16, seed: 21) { _, _, r in
+            let base = NSColor(red: 0.82, green: 0.82, blue: 0.80, alpha: 1.0)
+            return r < 0.08 ? MobTexture.shade(color: base, by: 0.93) : base
+        }
+        boneMat.diffuse.contents = boneGrain.diffuse.contents
+        boneMat.diffuse.magnificationFilter = .nearest
+        boneMat.diffuse.minificationFilter = .nearest
         boneMat.lightingModel = .lambert
 
-        darkBoneMat.diffuse.contents = NSColor(red: 0.65, green: 0.65, blue: 0.62, alpha: 1.0)
+        let darkGrain = MobTexture.material(width: 16, height: 16, seed: 22) { _, _, r in
+            let base = NSColor(red: 0.65, green: 0.65, blue: 0.62, alpha: 1.0)
+            return r < 0.08 ? MobTexture.shade(color: base, by: 0.92) : base
+        }
+        darkBoneMat.diffuse.contents = darkGrain.diffuse.contents
+        darkBoneMat.diffuse.magnificationFilter = .nearest
+        darkBoneMat.diffuse.minificationFilter = .nearest
         darkBoneMat.lightingModel = .lambert
 
         socketMat.diffuse.contents = NSColor(red: 0.12, green: 0.12, blue: 0.12, alpha: 1.0)

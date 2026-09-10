@@ -47,10 +47,26 @@ public final class CreeperNode: SCNNode {
     }
 
     private func setupMaterials() {
-        greenMat.diffuse.contents = NSColor(red: 0.28, green: 0.68, blue: 0.25, alpha: 1.0)
+        let greenCamo = MobTexture.material(width: 16, height: 16, seed: 7) { _, _, r in
+            let base = NSColor(red: 0.28, green: 0.68, blue: 0.25, alpha: 1.0)
+            if r < 0.15 { return MobTexture.shade(color: base, by: 0.55) }
+            if r < 0.45 { return MobTexture.shade(color: base, by: 0.8) }
+            return base
+        }
+        greenMat.diffuse.contents = greenCamo.diffuse.contents
+        greenMat.diffuse.magnificationFilter = .nearest
+        greenMat.diffuse.minificationFilter = .nearest
         greenMat.lightingModel = .lambert
 
-        darkGreenMat.diffuse.contents = NSColor(red: 0.18, green: 0.48, blue: 0.16, alpha: 1.0)
+        let darkCamo = MobTexture.material(width: 16, height: 16, seed: 8) { _, _, r in
+            let base = NSColor(red: 0.18, green: 0.48, blue: 0.16, alpha: 1.0)
+            if r < 0.15 { return MobTexture.shade(color: base, by: 0.55) }
+            if r < 0.45 { return MobTexture.shade(color: base, by: 0.8) }
+            return base
+        }
+        darkGreenMat.diffuse.contents = darkCamo.diffuse.contents
+        darkGreenMat.diffuse.magnificationFilter = .nearest
+        darkGreenMat.diffuse.minificationFilter = .nearest
         darkGreenMat.lightingModel = .lambert
 
         blackMat.diffuse.contents = NSColor(red: 0.10, green: 0.10, blue: 0.10, alpha: 1.0)
