@@ -5,9 +5,10 @@ public final class CharacterWindow: EntityWindow {
     public private(set) var currentScale: CGFloat = 1.0
 
     private let baseSize: CGFloat = 160.0
+    private let baseHeight: CGFloat = 200.0
 
     public init(skin: SkinTexture) {
-        let frame = NSRect(x: 200, y: 200, width: baseSize, height: baseSize)
+        let frame = NSRect(x: 200, y: 200, width: baseSize, height: baseHeight)
         self.characterView = CharacterView(frame: NSRect(origin: .zero, size: frame.size), skin: skin)
 
         super.init(contentRect: frame, ignoresMouse: false)
@@ -19,16 +20,17 @@ public final class CharacterWindow: EntityWindow {
 
     public func setScale(_ scale: CGFloat) {
         self.currentScale = scale
-        let newSize = baseSize * scale
+        let newWidth = baseSize * scale
+        let newHeight = baseHeight * scale
 
         // Update window size preserving feet center
         let currentOrigin = frame.origin
         let centerX = currentOrigin.x + frame.width / 2.0
         let bottomY = currentOrigin.y
 
-        let newOrigin = CGPoint(x: centerX - newSize / 2.0, y: bottomY)
-        setFrame(NSRect(origin: newOrigin, size: NSSize(width: newSize, height: newSize)), display: true)
-        characterView.frame = NSRect(origin: .zero, size: NSSize(width: newSize, height: newSize))
+        let newOrigin = CGPoint(x: centerX - newWidth / 2.0, y: bottomY)
+        setFrame(NSRect(origin: newOrigin, size: NSSize(width: newWidth, height: newHeight)), display: true)
+        characterView.frame = NSRect(origin: .zero, size: NSSize(width: newWidth, height: newHeight))
     }
 
     /// Move window so that character's feet touch (footX, footY)

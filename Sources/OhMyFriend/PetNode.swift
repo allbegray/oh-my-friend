@@ -82,18 +82,8 @@ public final class PetNode: SCNNode {
     public func showOverheadEmoji(_ emoji: String, duration: TimeInterval = 1.8) {
         overheadEmojiNode.childNodes.forEach { $0.removeFromParentNode() }
 
-        let textGeom = SCNText(string: emoji, extrusionDepth: 0.04)
-        textGeom.font = NSFont.systemFont(ofSize: 0.38)
-        let mat = SCNMaterial()
-        mat.diffuse.contents = NSColor.white
-        textGeom.materials = [mat]
-
-        let tNode = SCNNode(geometry: textGeom)
-        let (minVec, maxVec) = textGeom.boundingBox
-        let w = maxVec.x - minVec.x
-        tNode.position = SCNVector3(-w / 2.0, 0, 0)
-
-        overheadEmojiNode.addChildNode(tNode)
+        let bubble = EmojiBubble.node(for: emoji)
+        overheadEmojiNode.addChildNode(bubble)
         overheadEmojiNode.isHidden = false
         overheadEmojiNode.opacity = 1.0
         overheadEmojiNode.position.y = 1.6

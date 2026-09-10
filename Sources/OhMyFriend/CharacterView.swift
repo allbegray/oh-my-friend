@@ -52,7 +52,7 @@ public final class CharacterView: SCNView {
     }
 
     private func setupScene() {
-        let (scene, stage) = makeStage(cameraY: 2.0, cameraZ: 6.2, fov: 36.0, pitch: -0.06)
+        let (scene, stage) = makeStage(cameraY: 2.15, cameraZ: 7.1, fov: 36.0, pitch: -0.06)
         self.scene = scene
         configure(self)
 

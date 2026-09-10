@@ -402,21 +402,8 @@ public final class MinecraftCharacterNode: SCNNode {
     public func showOverheadEmoji(_ emoji: String, duration: TimeInterval = 2.0) {
         overheadEmojiNode.childNodes.forEach { $0.removeFromParentNode() }
 
-        // Render emoji to text geometry
-        let fontSize: CGFloat = emoji.count > 6 ? 0.34 : 0.50
-        let textGeom = SCNText(string: emoji, extrusionDepth: 0.04)
-        textGeom.font = NSFont.boldSystemFont(ofSize: fontSize)
-        let mat = SCNMaterial()
-        mat.diffuse.contents = NSColor.white
-        mat.lightingModel = .constant
-
-        let tNode = SCNNode(geometry: textGeom)
-        // Center the text
-        let (minVec, maxVec) = textGeom.boundingBox
-        let w = maxVec.x - minVec.x
-        tNode.position = SCNVector3(-w / 2.0, 0, 0)
-
-        overheadEmojiNode.addChildNode(tNode)
+        let bubble = EmojiBubble.node(for: emoji, worldHeight: emoji.count > 6 ? 0.45 : 0.6)
+        overheadEmojiNode.addChildNode(bubble)
         overheadEmojiNode.isHidden = false
         overheadEmojiNode.opacity = 1.0
         overheadEmojiNode.position.y = 3.4
@@ -1060,8 +1047,8 @@ public final class MinecraftCharacterNode: SCNNode {
             bodyAnchor.eulerAngles = SCNVector3(-CGFloat.pi / 2.0, 0, 0)
 
             let sleepBreath = sin(animTime * 1.8) * 0.035
-            // 매트리스 위(Y=0.50)에 안착 및 호흡에 따른 가슴 오르내림
-            bodyAnchor.position = SCNVector3(0, 0.50 + sleepBreath, 0.20)
+            // 매트리스 위(Y=0.70)에 안착 및 호흡에 따른 가슴 오르내림 (침대 중앙 정렬: Z=1.60)
+            bodyAnchor.position = SCNVector3(0, 0.70 + sleepBreath, 1.60)
 
             // 팔은 옆에 편안하게 내려놓음
             rightArmJoint.eulerAngles = SCNVector3(0.15, 0, 0.10)
