@@ -35,6 +35,14 @@ struct MenuBuilder {
         galleryItem.target = app
         menu.addItem(galleryItem)
 
+        // 👕 외형 꾸미기 부모: 기본 스킨·색조 필터·크기·손 아이템을 한데 모은다.
+        // 부모를 루트에 먼저 두면 이후 섹션에서 내용을 채워도 실시간 반영된다.
+        let lookMenu = NSMenu()
+        lookMenu.autoenablesItems = false
+        let lookSubmenuItem = NSMenuItem(title: "👕 외형 꾸미기", action: nil, keyEquivalent: "")
+        lookSubmenuItem.submenu = lookMenu
+        menu.addItem(lookSubmenuItem)
+
         let skinMenu = NSMenu()
         for skin in BuiltinSkinType.allCases {
             let item = NSMenuItem(
@@ -73,7 +81,7 @@ struct MenuBuilder {
 
         let skinSubmenuItem = NSMenuItem(title: "👕 기본 스킨 빠른 선택", action: nil, keyEquivalent: "")
         skinSubmenuItem.submenu = skinMenu
-        menu.addItem(skinSubmenuItem)
+        lookMenu.addItem(skinSubmenuItem)
 
         // L2. Skin Color / Hue Filter Submenu
         let filterMenu = NSMenu()
@@ -100,7 +108,13 @@ struct MenuBuilder {
         }
         let filterSubmenuItem = NSMenuItem(title: "🎨 스킨 색조/필터 조절", action: nil, keyEquivalent: "")
         filterSubmenuItem.submenu = filterMenu
-        menu.addItem(filterSubmenuItem)
+        lookMenu.addItem(filterSubmenuItem)
+
+        // ⚙️ 설정 부모: 루트 추가는 extra2 뒤에서, 내용은 여기서부터 채운다.
+        let settingsMenu = NSMenu()
+        settingsMenu.autoenablesItems = false
+        let settingsSubmenuItem = NSMenuItem(title: "⚙️ 설정", action: nil, keyEquivalent: "")
+        settingsSubmenuItem.submenu = settingsMenu
 
         // 3. Behavior Mode Submenu
         let modeMenu = NSMenu()
@@ -120,7 +134,7 @@ struct MenuBuilder {
         let modeSubmenuItem = NSMenuItem(title: "🎭 행동 모드", action: nil, keyEquivalent: "")
         modeSubmenuItem.submenu = modeMenu
 
-        menu.addItem(modeSubmenuItem)
+        settingsMenu.addItem(modeSubmenuItem)
 
         // 4. Held Item Submenu
         let itemMenu = NSMenu()
@@ -139,7 +153,7 @@ struct MenuBuilder {
         }
         let itemSubmenuItem = NSMenuItem(title: "🗡️ 손에 아이템 들기", action: nil, keyEquivalent: "")
         itemSubmenuItem.submenu = itemMenu
-        menu.addItem(itemSubmenuItem)
+        lookMenu.addItem(itemSubmenuItem)
 
         // Off-hand Shield Toggle
         let shieldItem = NSMenuItem(
@@ -149,7 +163,7 @@ struct MenuBuilder {
         )
         shieldItem.target = app
         shieldItem.state = app.window.characterView.characterNode.isShieldEquipped ? .on : .off
-        menu.addItem(shieldItem)
+        settingsMenu.addItem(shieldItem)
 
 
         // Elytra Toggle
@@ -160,7 +174,7 @@ struct MenuBuilder {
         )
         elytraItem.target = app
         elytraItem.state = app.window.characterView.characterNode.isElytraEquipped ? .on : .off
-        menu.addItem(elytraItem)
+        settingsMenu.addItem(elytraItem)
         // Pet Companion Submenu
         let petMenu = NSMenu()
         for kind in PetKind.allCases {
@@ -201,86 +215,102 @@ struct MenuBuilder {
         petSubmenuItem.submenu = petMenu
         menu.addItem(petSubmenuItem)
 
-        // 5. Fun Interactions Submenu
-        let actEntries: [ExtraMenuEntry] = [
-            ExtraMenuEntry({ "🤸‍♂️ 공중제비 (Backflip)" }, { [weak app] in app?.didSelectBackflip() }, keyEquivalent: "b"),
-            ExtraMenuEntry({ "🕺 쉬프트 댄스 (Sneak Dance)" }, { [weak app] in app?.didSelectSneakDance() }, keyEquivalent: "t"),
-            ExtraMenuEntry({ "👋 손 흔들기 (Wave)" }, { [weak app] in app?.didSelectWave() }, keyEquivalent: "w"),
+        // 5. Fun Interactions Submenu: 주제별 5개 그룹(몹 13 + 농장 15 + 펫 12 + 액션 15 + 전투 8 = 63).
+        let mobEntries: [ExtraMenuEntry] = [
             ExtraMenuEntry({ "🏹 스켈레톤 소환 (Spawn Skeleton)" }, { [weak app] in app?.didSelectSpawnSkeleton() }),
-            ExtraMenuEntry({ "⛏️ 블록 설치하고 캐기" }, { [weak app] in app?.didSelectPlaceAndMine() }),
-            ExtraMenuEntry({ "🍎 사과 냠냠 먹기" }, { [weak app] in app?.didSelectEating() }),
-            ExtraMenuEntry({ "💤 지금 낮잠자기 (Sleep)" }, { [weak app] in app?.didSelectSleep() }, keyEquivalent: "z"),
-            ExtraMenuEntry({ "🪜 사다리 타고 창문 내려가기 (Ladder Descent)" }, { [weak app] in app?.didSelectLadderDescent() }, keyEquivalent: "l", isEnabled: { [weak app] in app?.canStartLadderDescent() ?? false }),
-
-
-            ExtraMenuEntry({ "🪑 상단 메뉴바에 걸터앉기" }, { [weak app] in app?.didSelectSitOnMenuBar() }, keyEquivalent: "m"),
             ExtraMenuEntry({ "💥 크리퍼 소환 (Spawn Creeper)" }, { [weak app] in app?.didSelectSpawnCreeper() }, keyEquivalent: "k"),
-
-
             ExtraMenuEntry({ "👁️ 엔더맨 소환 (Spawn Enderman)" }, { [weak app] in app?.didSelectSpawnEnderman() }, keyEquivalent: "e"),
-            ExtraMenuEntry({ "🎉 코딩 신나게 응원하기 (Cheer)" }, { [weak app] in app?.didSelectCheer() }, keyEquivalent: "c"),
-            ExtraMenuEntry({ "💢 알림 안 읽는다고 구박하기 (Nag)" }, { [weak app] in app?.didSelectNag() }, keyEquivalent: "n"),
-            ExtraMenuEntry({ "🎣 모서리 낚시하기 (Go Fishing)" }, { [weak app] in app?.didSelectFishing() }, keyEquivalent: "f"),
-
-            ExtraMenuEntry({ "🔱 삼지창 던지기 (Throw Trident)" }, { [weak app] in app?.didSelectThrowTrident() }),
-            ExtraMenuEntry({ "🎶 주크박스 틀기 (Jukebox)" }, { [weak app] in app?.didSelectJukebox() }),
-            ExtraMenuEntry({ "📦 보물상자 소환 (Chest)" }, { [weak app] in app?.didSelectChest() }),
-            ExtraMenuEntry({ "✨ 불사의 토템 들기 (Totem)" }, { [weak app] in app?.didToggleTotemFromMenu() }),
             ExtraMenuEntry({ "🟢 슬라임 소환 (Spawn Slime)" }, { [weak app] in app?.didSelectSpawnSlime() }),
-            ExtraMenuEntry({ "🌾 밀 들기 (Hold Wheat)" }, { [weak app] in app?.didSelectWheat() }),
-            ExtraMenuEntry({ "🥛 우유 마시기 (Drink Milk)" }, { [weak app] in app?.didSelectDrinkMilk() }),
-            ExtraMenuEntry({ "🟣 지옥문 열기 (Nether Portal)" }, { [weak app] in app?.didSelectPortal() }),
-            ExtraMenuEntry({ "🌱 밀 심기 (Plant Wheat)" }, { [weak app] in app?.didSelectPlantCrop() }),
             ExtraMenuEntry({ "🐺 야생 늑대 부르기 (Wild Wolf)" }, { [weak app] in app?.didSelectSpawnWildWolf() }),
-            ExtraMenuEntry({ "🐝 벌집 설치 (Beehive)" }, { [weak app] in app?.didSelectBeehive() }),
             ExtraMenuEntry({ "🐴 야생마 부르기 (Wild Horse)" }, { [weak app] in app?.didSelectSpawnWildHorse() }),
-            ExtraMenuEntry({ "🐎 말 타기/내리기 (Ride)" }, { [weak app] in app?.didToggleHorseRide() }, isEnabled: { [weak app] in app?.currentPetKind == .horse }),
-            ExtraMenuEntry({ [weak app] in "📖 인챈트 테이블 (XP: \(app?.player.playerXP ?? 0))" }, { [weak app] in app?.didSelectEnchantTable() }),
-            ExtraMenuEntry({ [weak app] in (app?.isDefenseMode == true) ? "🏹 디펜스전 모드 (웨이브 \(app?.defenseWave ?? 1))" : "🏹 디펜스전 모드" }, { [weak app] in app?.didToggleDefenseModeFromMenu() }),
-            ExtraMenuEntry({ "👥 친구 소환 (Summon Buddy)" }, { [weak app] in app?.didSelectSummonBuddy() }, isEnabled: { [weak app] in (app?.buddyWindows.count ?? 0) < 2 }),
-            ExtraMenuEntry({ "👋 친구 보내기 (Dismiss Buddies)" }, { [weak app] in app?.didSelectDismissBuddies() }, isEnabled: { [weak app] in !(app?.buddyWindows.isEmpty ?? true) }),
-            ExtraMenuEntry({ "🧪 양조기 설치 (Brewing)" }, { [weak app] in app?.didSelectBrewStand() }),
-            ExtraMenuEntry({ [weak app] in "🧑‍🌾 주민 거래 (에메랄드: \(app?.player.playerEmeralds ?? 0))" }, { [weak app] in app?.didSelectTrade() }),
             ExtraMenuEntry({ "🦊 여우 소환 (Spawn Fox)" }, { [weak app] in app?.didSelectSpawnFox() }),
-            ExtraMenuEntry({ "🛒 광산 수레 타기 (Minecart)" }, { [weak app] in app?.didSelectMinecart() }),
             ExtraMenuEntry({ "🐐 염소 소환 (Spawn Goat)" }, { [weak app] in app?.didSelectSpawnGoat() }),
-            ExtraMenuEntry({ "🏆 발전 과제 (\(AdvancementManager.shared.unlockedCount)/\(AdvancementID.allCases.count))" }, { [weak app] in app?.didSelectAdvancements() }),
-
             ExtraMenuEntry({ "👻 팬텀 소환 (Spawn Phantom)" }, { [weak app] in app?.didSelectSpawnPhantom() }),
             ExtraMenuEntry({ "🕷️ 거미 소환 (Spawn Spider)" }, { [weak app] in app?.didSelectSpawnSpider() }),
             ExtraMenuEntry({ "🔥 가스트 소환 (Spawn Ghast)" }, { [weak app] in app?.didSelectSpawnGhast() }),
             ExtraMenuEntry({ "🧟 좀비 공성전 (Siege)" }, { [weak app] in app?.didSelectSpawnSiege() }),
-            ExtraMenuEntry({ "🦎 아홀로틀 데려오기 (Axolotl)" }, { [weak app] in app?.didSelectAxolotl() }),
-            ExtraMenuEntry({ "🐑 양 소환 (Spawn Sheep)" }, { [weak app] in app?.didSelectSpawnSheep() }),
-            ExtraMenuEntry({ "⛄ 눈 골렘 조립 (Snow Golem)" }, { [weak app] in app?.didSelectBuildGolem() }),
-            ExtraMenuEntry({ [weak app] in "🎺 뿔피리 불기 (뿔: \(app?.player.playerHorns ?? 0))" }, { [weak app] in app?.didSelectBlowHorn() }),
-            ExtraMenuEntry({ "🔔 종 울리기 (Bell)" }, { [weak app] in app?.didSelectRingBell() }),
-            ExtraMenuEntry({ "🎂 케이크 놓기 (Cake)" }, { [weak app] in app?.didSelectCake() }),
-            ExtraMenuEntry({ "🐲 드래곤 플라이바이 (Dragon)" }, { [weak app] in app?.didSelectDragonFlyby() }),
             ExtraMenuEntry({ "🧙‍♀️ 마녀 소환 (Spawn Witch)" }, { [weak app] in app?.didSelectSpawnWitch() }),
+        ]
+        let farmEntries: [ExtraMenuEntry] = [
+            ExtraMenuEntry({ "🍎 사과 냠냠 먹기" }, { [weak app] in app?.didSelectEating() }),
+            ExtraMenuEntry({ "🎣 모서리 낚시하기 (Go Fishing)" }, { [weak app] in app?.didSelectFishing() }, keyEquivalent: "f"),
+            ExtraMenuEntry({ "🌾 밀 들기 (Hold Wheat)" }, { [weak app] in app?.didSelectWheat() }),
+            ExtraMenuEntry({ "🥛 우유 마시기 (Drink Milk)" }, { [weak app] in app?.didSelectDrinkMilk() }),
+            ExtraMenuEntry({ "🌱 밀 심기 (Plant Wheat)" }, { [weak app] in app?.didSelectPlantCrop() }),
+            ExtraMenuEntry({ "🐝 벌집 설치 (Beehive)" }, { [weak app] in app?.didSelectBeehive() }),
+            ExtraMenuEntry({ "🧪 양조기 설치 (Brewing)" }, { [weak app] in app?.didSelectBrewStand() }),
+            ExtraMenuEntry({ [weak app] in "🧑‍🌾 주민 거래 (에메랄드: \(app?.player.playerEmeralds ?? 0))" }, { [weak app] in app?.didSelectTrade() }),
+            ExtraMenuEntry({ "🎂 케이크 놓기 (Cake)" }, { [weak app] in app?.didSelectCake() }),
             ExtraMenuEntry({ "🔥 캠프파이어 (Campfire)" }, { [weak app] in app?.didSelectCampfire() }),
-            ExtraMenuEntry({ "🎯 과녁 설치 (Target)" }, { [weak app] in app?.didSelectPlaceTarget() }),
-            ExtraMenuEntry({ [weak app] in "🏹 과녁 쏘기 (점수: \(app?.archeryScore ?? 0))" }, { [weak app] in app?.didSelectShootTarget() }, isEnabled: { [weak app] in app?.targetWindow != nil }),
-            ExtraMenuEntry({ "🦇 박쥐 부르기 (Bat)" }, { [weak app] in app?.didSelectBat() }),
-            ExtraMenuEntry({ "🐔 닭 소환 (Chicken)" }, { [weak app] in app?.didSelectSpawnChicken() }),
-            ExtraMenuEntry({ "🍄 무쉬룸 소환 (Mooshroom)" }, { [weak app] in app?.didSelectSpawnMooshroom() }),
-            ExtraMenuEntry({ "🧶 리드줄 묶기/풀기 (Lead)" }, { [weak app] in app?.didSelectToggleLead() }),
-            ExtraMenuEntry({ "🐼 판다 소환 (Panda)" }, { [weak app] in app?.didSelectSpawnPanda() }),
-            ExtraMenuEntry({ "🧭 스폰 나침반 (Compass)" }, { [weak app] in app?.didSelectCompass() }),
             ExtraMenuEntry({ "🥔 감자 심기 (Potato)" }, { [weak app] in app?.didSelectPlantPotato() }),
             ExtraMenuEntry({ "🍉 수박 심기 (Melon)" }, { [weak app] in app?.didSelectPlantMelon() }),
             ExtraMenuEntry({ "🎃 호박 (심기/쓰기)" }, { [weak app] in app?.didSelectPumpkin() }),
             ExtraMenuEntry({ "🌳 사과나무 심기 (Tree)" }, { [weak app] in app?.didSelectPlantTree() }),
             ExtraMenuEntry({ [weak app] in "🍞 빵 굽기 (밀: \(app?.player.playerWheat ?? 0)/3)" }, { [weak app] in app?.didSelectBakeBread() }),
         ]
-        let actSubmenuItem = makeSearchableMenu(title: "✨ 재미있는 모션 실행", groups: [("실행", actEntries)])
+        let petActionEntries: [ExtraMenuEntry] = [
+            ExtraMenuEntry({ "🐎 말 타기/내리기 (Ride)" }, { [weak app] in app?.didToggleHorseRide() }, isEnabled: { [weak app] in app?.currentPetKind == .horse }),
+            ExtraMenuEntry({ "👥 친구 소환 (Summon Buddy)" }, { [weak app] in app?.didSelectSummonBuddy() }, isEnabled: { [weak app] in (app?.buddyWindows.count ?? 0) < 2 }),
+            ExtraMenuEntry({ "👋 친구 보내기 (Dismiss Buddies)" }, { [weak app] in app?.didSelectDismissBuddies() }, isEnabled: { [weak app] in !(app?.buddyWindows.isEmpty ?? true) }),
+            ExtraMenuEntry({ "🦎 아홀로틀 데려오기 (Axolotl)" }, { [weak app] in app?.didSelectAxolotl() }),
+            ExtraMenuEntry({ "🐑 양 소환 (Spawn Sheep)" }, { [weak app] in app?.didSelectSpawnSheep() }),
+            ExtraMenuEntry({ "🔔 종 울리기 (Bell)" }, { [weak app] in app?.didSelectRingBell() }),
+            ExtraMenuEntry({ "🦇 박쥐 부르기 (Bat)" }, { [weak app] in app?.didSelectBat() }),
+            ExtraMenuEntry({ "🐔 닭 소환 (Chicken)" }, { [weak app] in app?.didSelectSpawnChicken() }),
+            ExtraMenuEntry({ "🍄 무쉬룸 소환 (Mooshroom)" }, { [weak app] in app?.didSelectSpawnMooshroom() }),
+            ExtraMenuEntry({ "🧶 리드줄 묶기/풀기 (Lead)" }, { [weak app] in app?.didSelectToggleLead() }),
+            ExtraMenuEntry({ "🐼 판다 소환 (Panda)" }, { [weak app] in app?.didSelectSpawnPanda() }),
+            ExtraMenuEntry({ "🧭 스폰 나침반 (Compass)" }, { [weak app] in app?.didSelectCompass() }),
+        ]
+        let moveEntries: [ExtraMenuEntry] = [
+            ExtraMenuEntry({ "🤸‍♂️ 공중제비 (Backflip)" }, { [weak app] in app?.didSelectBackflip() }, keyEquivalent: "b"),
+            ExtraMenuEntry({ "🕺 쉬프트 댄스 (Sneak Dance)" }, { [weak app] in app?.didSelectSneakDance() }, keyEquivalent: "t"),
+            ExtraMenuEntry({ "👋 손 흔들기 (Wave)" }, { [weak app] in app?.didSelectWave() }, keyEquivalent: "w"),
+            ExtraMenuEntry({ "⛏️ 블록 설치하고 캐기" }, { [weak app] in app?.didSelectPlaceAndMine() }),
+            ExtraMenuEntry({ "💤 지금 낮잠자기 (Sleep)" }, { [weak app] in app?.didSelectSleep() }, keyEquivalent: "z"),
+            ExtraMenuEntry({ "🪜 사다리 타고 창문 내려가기 (Ladder Descent)" }, { [weak app] in app?.didSelectLadderDescent() }, keyEquivalent: "l", isEnabled: { [weak app] in app?.canStartLadderDescent() ?? false }),
+            ExtraMenuEntry({ "🪑 상단 메뉴바에 걸터앉기" }, { [weak app] in app?.didSelectSitOnMenuBar() }, keyEquivalent: "m"),
+            ExtraMenuEntry({ "🎉 코딩 신나게 응원하기 (Cheer)" }, { [weak app] in app?.didSelectCheer() }, keyEquivalent: "c"),
+            ExtraMenuEntry({ "💢 알림 안 읽는다고 구박하기 (Nag)" }, { [weak app] in app?.didSelectNag() }, keyEquivalent: "n"),
+            ExtraMenuEntry({ "🎶 주크박스 틀기 (Jukebox)" }, { [weak app] in app?.didSelectJukebox() }),
+            ExtraMenuEntry({ "📦 보물상자 소환 (Chest)" }, { [weak app] in app?.didSelectChest() }),
+            ExtraMenuEntry({ "🟣 지옥문 열기 (Nether Portal)" }, { [weak app] in app?.didSelectPortal() }),
+            ExtraMenuEntry({ "🛒 광산 수레 타기 (Minecart)" }, { [weak app] in app?.didSelectMinecart() }),
+            ExtraMenuEntry({ "🏆 발전 과제 (\(AdvancementManager.shared.unlockedCount)/\(AdvancementID.allCases.count))" }, { [weak app] in app?.didSelectAdvancements() }),
+            ExtraMenuEntry({ "🐲 드래곤 플라이바이 (Dragon)" }, { [weak app] in app?.didSelectDragonFlyby() }),
+        ]
+        let combatEntries: [ExtraMenuEntry] = [
+            ExtraMenuEntry({ "🔱 삼지창 던지기 (Throw Trident)" }, { [weak app] in app?.didSelectThrowTrident() }),
+            ExtraMenuEntry({ "✨ 불사의 토템 들기 (Totem)" }, { [weak app] in app?.didToggleTotemFromMenu() }),
+            ExtraMenuEntry({ [weak app] in "📖 인챈트 테이블 (XP: \(app?.player.playerXP ?? 0))" }, { [weak app] in app?.didSelectEnchantTable() }),
+            ExtraMenuEntry({ [weak app] in (app?.isDefenseMode == true) ? "🏹 디펜스전 모드 (웨이브 \(app?.defenseWave ?? 1))" : "🏹 디펜스전 모드" }, { [weak app] in app?.didToggleDefenseModeFromMenu() }),
+            ExtraMenuEntry({ "⛄ 눈 골렘 조립 (Snow Golem)" }, { [weak app] in app?.didSelectBuildGolem() }),
+            ExtraMenuEntry({ [weak app] in "🎺 뿔피리 불기 (뿔: \(app?.player.playerHorns ?? 0))" }, { [weak app] in app?.didSelectBlowHorn() }),
+            ExtraMenuEntry({ "🎯 과녁 설치 (Target)" }, { [weak app] in app?.didSelectPlaceTarget() }),
+            ExtraMenuEntry({ [weak app] in "🏹 과녁 쏘기 (점수: \(app?.archeryScore ?? 0))" }, { [weak app] in app?.didSelectShootTarget() }, isEnabled: { [weak app] in app?.targetWindow != nil }),
+        ]
+        let actSubmenuItem = makeSearchableMenu(title: "✨ 재미있는 모션 실행", groups: [
+            ("👾 몹 소환", mobEntries),
+            ("🌾 농장·음식", farmEntries),
+            ("🐾 펫·동물", petActionEntries),
+            ("🤸 액션·이동", moveEntries),
+            ("⚔️ 전투·도구", combatEntries),
+        ])
         menu.addItem(actSubmenuItem)
-        app.ladderMenuItem = actSubmenuItem.submenu?.items.first(where: { $0.title == "🪜 사다리 타고 창문 내려가기 (Ladder Descent)" })
+        func findActItem(in rootMenu: NSMenu?, matching predicate: (String) -> Bool) -> NSMenuItem? {
+            guard let rootMenu = rootMenu else { return nil }
+            for item in rootMenu.items {
+                if predicate(item.title) { return item }
+                if let found = findActItem(in: item.submenu, matching: predicate) { return found }
+            }
+            return nil
+        }
+        app.ladderMenuItem = findActItem(in: actSubmenuItem.submenu, matching: { $0 == "🪜 사다리 타고 창문 내려가기 (Ladder Descent)" })
         if app.window.characterView.characterNode.isTotemEquipped {
-            actSubmenuItem.submenu?.items.first(where: { $0.title == "✨ 불사의 토템 들기 (Totem)" })?.state = .on
+            findActItem(in: actSubmenuItem.submenu, matching: { $0 == "✨ 불사의 토템 들기 (Totem)" })?.state = .on
         }
         if app.isDefenseMode {
-            actSubmenuItem.submenu?.items.first(where: { $0.title.hasPrefix("🏹 디펜스전 모드") })?.state = .on
+            findActItem(in: actSubmenuItem.submenu, matching: { $0.hasPrefix("🏹 디펜스전 모드") })?.state = .on
         }
 
         let extraSubmenuItem = makeSearchableMenu(title: "🎉 추가 모션 9~17차", groups: app.extraGroups())
@@ -342,9 +372,17 @@ struct MenuBuilder {
         scaleMenu.addItem(customScaleItem)
         let scaleSubmenuItem = NSMenuItem(title: "📏 캐릭터 크기", action: nil, keyEquivalent: "")
         scaleSubmenuItem.submenu = scaleMenu
-        menu.addItem(scaleSubmenuItem)
+        lookMenu.addItem(scaleSubmenuItem)
 
         menu.addItem(NSMenuItem.separator())
+
+        // 🛠️ 고급 부모: 루트에 설정 다음으로 둔다. 내용은 여기서부터 채운다.
+        let advancedMenu = NSMenu()
+        advancedMenu.autoenablesItems = false
+        let advancedSubmenuItem = NSMenuItem(title: "🛠️ 고급", action: nil, keyEquivalent: "")
+        advancedSubmenuItem.submenu = advancedMenu
+        menu.addItem(settingsSubmenuItem)
+        menu.addItem(advancedSubmenuItem)
 
         // 5. Actions
         let jumpItem = NSMenuItem(
@@ -353,7 +391,7 @@ struct MenuBuilder {
             keyEquivalent: "j"
         )
         jumpItem.target = app
-        menu.addItem(jumpItem)
+        advancedMenu.addItem(jumpItem)
 
         let resetItem = NSMenuItem(
             title: "🪟 바닥으로 소환 (Reset to Floor)",
@@ -361,7 +399,7 @@ struct MenuBuilder {
             keyEquivalent: "r"
         )
         resetItem.target = app
-        menu.addItem(resetItem)
+        advancedMenu.addItem(resetItem)
 
         // Sound SFX Toggle
         let soundItem = NSMenuItem(
@@ -371,7 +409,7 @@ struct MenuBuilder {
         )
         soundItem.target = app
         soundItem.state = SoundAndEffectsManager.shared.isSoundEnabled ? .on : .off
-        menu.addItem(soundItem)
+        settingsMenu.addItem(soundItem)
 
         // H4. Day/Night Mode Submenu
         let dayNightMenu = NSMenu()
@@ -390,7 +428,7 @@ struct MenuBuilder {
         }
         let dayNightSubmenuItem = NSMenuItem(title: "☀️/🌙 낮밤 모드 (Day/Night)", action: nil, keyEquivalent: "")
         dayNightSubmenuItem.submenu = dayNightMenu
-        menu.addItem(dayNightSubmenuItem)
+        settingsMenu.addItem(dayNightSubmenuItem)
 
         // Weather Toggle
         let weatherItem = NSMenuItem(
@@ -400,7 +438,7 @@ struct MenuBuilder {
         )
         weatherItem.target = app
         weatherItem.state = WeatherManager.shared.isEnabled ? .on : .off
-        menu.addItem(weatherItem)
+        settingsMenu.addItem(weatherItem)
 
 
         // Skeleton Spawning Toggle
@@ -411,7 +449,7 @@ struct MenuBuilder {
         )
         skelToggleItem.target = app
         skelToggleItem.state = app.isSkeletonSpawnEnabled ? .on : .off
-        menu.addItem(skelToggleItem)
+        advancedMenu.addItem(skelToggleItem)
         // Typing Cheer Toggle
         let typingCheerItem = NSMenuItem(
             title: "⌨️ 타이핑 응원 모드 (WPM 감지)",
@@ -420,7 +458,7 @@ struct MenuBuilder {
         )
         typingCheerItem.target = app
         typingCheerItem.state = TypingActivityMonitor.shared.isEnabled ? .on : .off
-        menu.addItem(typingCheerItem)
+        settingsMenu.addItem(typingCheerItem)
 
         if !TypingActivityMonitor.shared.isAccessibilityTrusted {
             let permItem = NSMenuItem(
@@ -429,7 +467,7 @@ struct MenuBuilder {
                 keyEquivalent: ""
             )
             permItem.target = app
-            menu.addItem(permItem)
+            settingsMenu.addItem(permItem)
         }
 
         // Notification Nag Toggle
@@ -448,7 +486,7 @@ struct MenuBuilder {
         )
         glintItem.target = app
         glintItem.state = app.window.characterView.characterNode.isEnchantedGlintEnabled ? .on : .off
-        menu.addItem(glintItem)
+        settingsMenu.addItem(glintItem)
 
         // L4. Battery Hunger Toggle
         let batteryToggleItem = NSMenuItem(
@@ -458,9 +496,9 @@ struct MenuBuilder {
         )
         batteryToggleItem.target = app
         batteryToggleItem.state = app.isBatteryHungerEnabled ? .on : .off
-        menu.addItem(batteryToggleItem)
+        settingsMenu.addItem(batteryToggleItem)
         nagToggleItem.state = NotificationCenterMonitor.shared.isEnabled ? .on : .off
-        menu.addItem(nagToggleItem)
+        settingsMenu.addItem(nagToggleItem)
 
         // Creeper Spawning Toggle
         let creeperToggleItem = NSMenuItem(
@@ -477,10 +515,10 @@ struct MenuBuilder {
         )
         endermanToggleItem.target = app
         endermanToggleItem.state = app.isEndermanSpawnEnabled ? .on : .off
-        menu.addItem(endermanToggleItem)
+        advancedMenu.addItem(endermanToggleItem)
         creeperToggleItem.target = app
         creeperToggleItem.state = app.isCreeperSpawnEnabled ? .on : .off
-        menu.addItem(creeperToggleItem)
+        advancedMenu.addItem(creeperToggleItem)
 
 
         let squashItem = NSMenuItem(
@@ -490,7 +528,7 @@ struct MenuBuilder {
         )
         squashItem.target = app
         squashItem.isEnabled = app.canStartSquashMinimize()
-        menu.addItem(squashItem)
+        advancedMenu.addItem(squashItem)
         let attackItem = NSMenuItem(
             title: "🧨 TNT로 창 부수기",
             action: #selector(AppController.didSelectTNTBreak),
@@ -499,7 +537,7 @@ struct MenuBuilder {
         attackItem.target = app
         attackItem.isEnabled = app.canStartTNTBreak()
         app.attackMenuItem = attackItem
-        menu.addItem(attackItem)
+        advancedMenu.addItem(attackItem)
         menu.addItem(NSMenuItem.separator())
 
         // 6. Quit
