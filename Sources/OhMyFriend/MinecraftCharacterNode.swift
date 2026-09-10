@@ -75,7 +75,14 @@ public final class MinecraftCharacterNode: SCNNode {
     public var isEating: Bool = false
 
     // Ladder climbing (사다리 등반)
-    public var isClimbing: Bool = false
+    public var isClimbing: Bool = false {
+        didSet {
+            if oldValue && !isClimbing {
+                // 사다리에서 내려오면 몸을 돌려 정면을 본다 (등을 보이던 회전 해제)
+                modelRoot.eulerAngles = SCNVector3(0, 0, 0)
+            }
+        }
+    }
     public var climbProgress: CGFloat = 0
 
     public override init() {
