@@ -132,6 +132,7 @@ public final class CharacterBehaviorController {
 
     public func triggerPlaceAndMine(characterNode: MinecraftCharacterNode) {
         guard !isClimbing else { return }
+        AdvancementManager.shared.unlock(.firstMine)
         characterNode.showOverheadEmoji("⛏️", duration: 2.5)
         characterNode.placedBlockNode.isHidden = false
         SoundAndEffectsManager.shared.play(.pop)
@@ -673,6 +674,7 @@ public final class CharacterBehaviorController {
             if timeLeft <= 0 {
                 characterNode.isFishing = false
                 let loot = FishingLoot.roll()
+                AdvancementManager.shared.unlock(.fishingLoot)
                 characterNode.showOverheadEmoji("\(loot.emoji) \(loot.name)", duration: 2.8)
                 SoundAndEffectsManager.shared.play(.heart)
                 state = .sit(timeLeft: 4.0)

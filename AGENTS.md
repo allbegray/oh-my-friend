@@ -63,7 +63,8 @@ Sources/OhMyFriend/
 ├── BeeEntityWindow.swift               # 벌 3마리 추적 + 30초 꿀 생산 벌집
 ├── BrewStandWindow.swift               # 양조기 + 3색 물약병(신속/투명/힘 양조)
 ├── FoxWindow.swift                     # 밤 여우(급속 지그재그 이동, 아이템 낚아채기·14초 추격전)
-└── GoatWindow.swift                    # 염소(풀뜯기→조준→돌진 3단 AI, 빈 양동이 우유 짜기)
+├── GoatWindow.swift                    # 염소(풀뜯기→조준→돌진 3단 AI, 빈 양동이 우유 짜기)
+└── Advancements.swift                  # 발전 과제 16종·해금 토스트·체크리스트 창(UserDefaults 영속)
 ```
 
 - **렌더링 & 애니메이션 파이프라인**: `CharacterView` 내부의 `SCNScene`에서 `MinecraftCharacterNode`가 관절 피벗(목, 어깨, 골반)을 기반으로 회전 및 위치를 실시간 보간합니다.
@@ -74,6 +75,7 @@ Sources/OhMyFriend/
 ## 실행 기록
 
 ### 2026-09-10
+- **[업적 시스템] 발전 과제 16종 도입**: `Advancements.swift`(과제 정의·해금·토스트 큐·체크리스트 창, UserDefaults 영속). 채굴·몹 4종·길들이기 2종·수확·낚시·양조·인챈트·거래·지옥문·승마·친구·밤스킵 16곳 훅 연결, 달성 시 우상단 토스트 + 차임. 메뉴 "🏆 발전 과제 (n/16)" 추가. 검증: `swift build` 통과, 번들 생성 및 4초 실행 스모크 테스트.
 - **[고증 추가 5종 3차] 양조·거래·여우·수레·염소 구축**: `BrewStandWindow.swift`(신속/투명/힘 물약 양조·시간제 효과), 에메랄드 재화 + NSAlert 주민 거래(검 3/사과 2/토템 5), `FoxWindow.swift`(밤 여우 낚아채기·14초 추격 회수전), Dock 광산 수레 10초 왕복 질주, `GoatWindow.swift`(3단 돌진 AI·빈 양동이 우유 짜기). 메뉴 5종 추가. 검증: `swift build` 통과, 번들 생성 및 4초 실행 스모크 테스트.
 - **[고증 추가 5종 2차] 말·인챈트·디펜스·풍선·멀티캐릭터 구축**: `PetKind.horse` + 3D 복셀 말(`buildHorseModel`) + 야생마 황금사과 길들이기 + 14초 260pt/s 승마 질주, `EnchantTableWindow.swift`(XP 10 날카로움/효율 강화·광택·데미지 반영, 크리퍼+5/스켈레톤+5/엔더맨+8/슬라임+3), 밤 웨이브 디펜스전(격퇴 카운트·클리어 보너스), `HeldItem.balloon` + `PhysicsEngine.isSlowFalling`(-60pt/s·퐁신 착지), **[L1] 멀티 캐릭터**(최대 2기 독립 FSM·물리·델리게이트 라우팅 `triple(for:)`). 메뉴 6종 추가. 검증: `swift build` 통과, 번들 생성 및 4초 실행 스모크 테스트. 백로그 전량 완료.
 - **[고증 추가 5종] 농사·길들이기·날씨·밤스킵·벌꿀 구축**: `CropEntityWindow.swift`(25초/단계 4단계 성장·클릭 수확), 야생 늑대 배회 + 뼈다귀 길들이기 펫 편입, `WeatherManager.swift`(150~300초 비·뇌우 전환) + `RainOverlayWindow.swift`(빗줄기·번개 섬광·볼트) + 뇌우 충전 크리퍼(폭발 1.6배), 밤 전원 6초 수면 시 15분 아침 스킵(`skipToMorning` + `wakeUpIfSleeping`), `BeeEntityWindow.swift`(벌 3마리 꽃 추적 + 30초 꿀 벌집). `HeldItem.flower` 추가, 메뉴 3종(밀 심기/야생 늑대/벌집) + "🌧️ 날씨 모드" 토글 추가. 검증: `swift build` 통과, 번들 생성 및 4초 실행 스모크 테스트.

@@ -405,6 +405,7 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
             if sleepSkipTimer >= 6.0 {
                 sleepSkipTimer = 0
                 DayNightCycleManager.shared.skipToMorning()
+                AdvancementManager.shared.unlock(.nightSkip)
                 behavior.wakeUpIfSleeping(
                     characterNode: window.characterView.characterNode,
                     withEmoji: "☀️ 푹 잤다! 아침이다!"
@@ -560,6 +561,7 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
         buddyPhysics.append(bp)
         buddyBehaviors.append(CharacterBehaviorController())
         buddyWindows.append(bw)
+        AdvancementManager.shared.unlock(.buddySummon)
         bw.setFeetPosition(x: spawn.x, y: spawn.y)
         bw.orderFrontRegardless()
         bw.characterView.characterNode.showOverheadEmoji("👋 같이 놀자!", duration: 2.2)
@@ -969,6 +971,10 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
         let goatItem = NSMenuItem(title: "🐐 염소 소환 (Spawn Goat)", action: #selector(didSelectSpawnGoat), keyEquivalent: "")
         goatItem.target = self
         actMenu.addItem(goatItem)
+
+        let advItem = NSMenuItem(title: "🏆 발전 과제 (\(AdvancementManager.shared.unlockedCount)/\(AdvancementID.allCases.count))", action: #selector(didSelectAdvancements), keyEquivalent: "")
+        advItem.target = self
+        actMenu.addItem(advItem)
         let actSubmenuItem = NSMenuItem(title: "✨ 재미있는 모션 실행", action: nil, keyEquivalent: "")
         actSubmenuItem.submenu = actMenu
         menu.addItem(actSubmenuItem)
@@ -1931,6 +1937,7 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
 
         // 승리의 포즈 및 멋진 대사 출력
         playerXP += 5
+        AdvancementManager.shared.unlock(.creeperKill)
         window.characterView.characterNode.showOverheadEmoji("\(victoryQuote) +5XP!", duration: 3.2)
         SoundAndEffectsManager.shared.play(.heart)
 
@@ -2114,6 +2121,7 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
     private func handleSkeletonDefeated() {
         playerXP += 5
         playerEmeralds += 1
+        AdvancementManager.shared.unlock(.skeletonKill)
         if isDefenseMode {
             defenseKills += 1
             let needed = 2 + defenseWave
@@ -2186,6 +2194,7 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
 
     private func handleEndermanDefeated() {
         playerXP += 8
+        AdvancementManager.shared.unlock(.endermanKill)
         window.characterView.characterNode.showOverheadEmoji("🔮 엔더 진주 +8XP! 대박!", duration: 3.2)
         SoundAndEffectsManager.shared.play(.heart)
         physics.jump(impulse: 340)
@@ -2232,6 +2241,7 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
         var crop: CropEntityWindow?
         crop = CropEntityWindow(plantPos: pos) { [weak self, weak crop] in
             guard let self = self else { return }
+            AdvancementManager.shared.unlock(.firstHarvest)
             if let crop = crop {
                 self.cropWindows.removeAll { $0 === crop }
             }
@@ -2282,6 +2292,7 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
         if window.characterView.characterNode.currentHeldItem == .bone {
             window.characterView.characterNode.currentHeldItem = .none
             view.petNode.showOverheadEmoji("❤️❤️❤️ 길들였다!", duration: 2.5)
+            AdvancementManager.shared.unlock(.wolfTame)
             SoundAndEffectsManager.shared.play(.heart)
             ww.close()
             wildWolfWindow = nil
@@ -2363,6 +2374,7 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
         }
         guard currentPetKind == .horse, petPhysics != nil else { return }
         isRidingHorse = true
+        AdvancementManager.shared.unlock(.horseRide)
         rideTimer = 14.0
         rideDir = window.characterView.characterNode.modelRoot.eulerAngles.y >= 0 ? 1 : -1
         window.characterView.characterNode.isSitting = true
@@ -2399,6 +2411,7 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
         if window.characterView.characterNode.currentHeldItem == .goldenApple {
             window.characterView.characterNode.currentHeldItem = .none
             view.petNode.showOverheadEmoji("❤️❤️❤️ 길들였다!", duration: 2.5)
+            AdvancementManager.shared.unlock(.horseTame)
             SoundAndEffectsManager.shared.play(.heart)
             wh.close()
             wildHorseWindow = nil
@@ -2474,9 +2487,11 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
         playerXP -= 10
         if weapon == .diamondSword {
             swordSharpness += 1
+            AdvancementManager.shared.unlock(.enchanting)
             charNode.showOverheadEmoji("📖 날카로움 \(swordSharpness)! ✨", duration: 2.5)
         } else {
             pickaxeEfficiency += 1
+            AdvancementManager.shared.unlock(.enchanting)
             charNode.showOverheadEmoji("📖 효율 \(pickaxeEfficiency)! ✨", duration: 2.5)
         }
         charNode.isEnchantedGlintEnabled = true
@@ -2531,16 +2546,19 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
         case .goldenApple:
             charNode.currentHeldItem = .none
             swiftTimer = 90.0
+            AdvancementManager.shared.unlock(.brewing)
             charNode.showOverheadEmoji("⚡ 신속 물약! 빨라졌다!", duration: 2.2)
             SoundAndEffectsManager.shared.play(.gulp)
         case .flower:
             charNode.currentHeldItem = .none
             invisTimer = 60.0
+            AdvancementManager.shared.unlock(.brewing)
             charNode.showOverheadEmoji("👻 투명 물약! 안 보여!", duration: 2.2)
             SoundAndEffectsManager.shared.play(.gulp)
         case .bone:
             charNode.currentHeldItem = .none
             strengthTimer = 90.0
+            AdvancementManager.shared.unlock(.brewing)
             charNode.showOverheadEmoji("💪 힘 물약! 세졌다!", duration: 2.2)
             SoundAndEffectsManager.shared.play(.gulp)
         default:
@@ -2604,6 +2622,7 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
             }
             playerEmeralds -= 3
             charNode.currentHeldItem = .diamondSword
+            AdvancementManager.shared.unlock(.trading)
             charNode.showOverheadEmoji("🗡️ 거래 성사! 흡!", duration: 2.2)
             SoundAndEffectsManager.shared.play(.heart)
         case .alertSecondButtonReturn:
@@ -2613,6 +2632,7 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
             }
             playerEmeralds -= 2
             charNode.currentHeldItem = .goldenApple
+            AdvancementManager.shared.unlock(.trading)
             charNode.showOverheadEmoji("🍎 거래 성사! 흡!", duration: 2.2)
             SoundAndEffectsManager.shared.play(.heart)
         case .alertThirdButtonReturn:
@@ -2622,6 +2642,7 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
             }
             playerEmeralds -= 5
             charNode.isTotemEquipped = true
+            AdvancementManager.shared.unlock(.trading)
             charNode.showOverheadEmoji("✨ 토템 거래 성사! 흡!", duration: 2.2)
             SoundAndEffectsManager.shared.play(.chime)
         default:
@@ -2778,6 +2799,20 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
 
     private func updateGoat() {
         goatWindow?.targetX = physics.position.x
+    }
+
+    // MARK: - Advancements (발전 과제)
+    private var advancementListWindow: AdvancementListWindow?
+
+    @objc private func didSelectAdvancements() {
+        if let w = advancementListWindow {
+            w.close()
+            advancementListWindow = nil
+            return
+        }
+        let w = AdvancementListWindow()
+        advancementListWindow = w
+        w.orderFrontRegardless()
     }
 
     // MARK: - Fishing (낚시)
@@ -2954,6 +2989,7 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
         slimeWindows.removeAll { $0 === window }
         playerXP += 3
         playerEmeralds += 1
+        AdvancementManager.shared.unlock(.slimeKill)
         self.window.characterView.characterNode.showOverheadEmoji("🟢 슬라임볼 +3XP +1에메!", duration: 2.0)
         SoundAndEffectsManager.shared.play(.pop)
     }
@@ -3007,6 +3043,7 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
         if dx < 45 && abs(physics.position.y - portal.floorPos.y) < 60 {
             portal.markEntered()
             isInNether.toggle()
+            AdvancementManager.shared.unlock(.portalTrip)
             let charNode = window.characterView.characterNode
             if isInNether {
                 charNode.showOverheadEmoji("🔥 여기가 지옥인가...!", duration: 2.5)
