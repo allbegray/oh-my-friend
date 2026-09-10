@@ -201,6 +201,12 @@ public final class AppController: NSObject, CharacterViewDelegate, NSMenuDelegat
     public func characterViewDidEndDrag(_ view: CharacterView, throwVelocity: CGPoint) {
         physics.releaseDrag(throwVelocity: throwVelocity)
 
+        // 놓는 순간의 위치 기준으로 발판을 즉시 다시 스캔한다.
+        // 게임 루프의 0.5초 주기 스캔은 '직전에 캐릭터가 있던 화면' 기준이라, 다른 모니터의 창문 위로
+        // 빠르게(0.5초 안에) 끌어다 놓으면 이전 화면의 발판 목록이 그대로 남아 있다.
+        // 그 상태로는 창문을 못 찾아 사다리 등반도 착지도 실패하고, 캐릭터가 창문을 뚫고 이전 화면 바닥까지 떨어진다.
+        cachedPlatforms = ScreenEnvironment.shared.scanPlatforms(for: ScreenEnvironment.shared.screen(for: physics.position))
+
         // 약하게 놓았고 그 자리가 창문 안이면, 놓인 자리에서 그 창문 위쪽 끝까지 사다리를 걸고 올라간다.
         // 세게 던진 경우(throwVelocity 큼)는 기존처럼 그대로 날아간다.
         if hypot(throwVelocity.x, throwVelocity.y) <= CharacterBehaviorController.dropSnapSpeedLimit {
@@ -249,6 +255,11 @@ public final class AppController: NSObject, CharacterViewDelegate, NSMenuDelegat
     private func buildContextMenu() -> NSMenu {
         let menu = NSMenu()
         menu.delegate = self
+
+        // 자동 활성화 검증을 끈다. 기본값(true)에서는 AppKit이 항목을 열 때마다 '타깃이 selector에 응답하는가'만
+        // 보고 활성 상태를 덮어써서, `isEnabled = canStartTNTBreak()` 같은 명시적 비활성화가 무시됐다.
+        // (창문 위에 서 있지 않아 TNT를 쓸 수 없어도 항목이 활성으로 보여, 눌러도 아무 반응이 없는 상태가 됐다)
+        menu.autoenablesItems = false
 
         // 1. Status Display
         let status = NSMenuItem(title: "마인크래프트 친구", action: nil, keyEquivalent: "")
@@ -374,6 +385,7 @@ public final class AppController: NSObject, CharacterViewDelegate, NSMenuDelegat
 
         let ladderItem = NSMenuItem(title: "🪜 사다리 타고 창문 내려가기 (Ladder Descent)", action: #selector(didSelectLadderDescent), keyEquivalent: "l")
         ladderItem.target = self
+        ladderItem.isEnabled = canStartLadderDescent()
         actMenu.addItem(ladderItem)
         self.ladderMenuItem = ladderItem
 
