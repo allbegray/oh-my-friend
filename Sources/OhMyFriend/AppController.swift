@@ -20,7 +20,7 @@ public final class AppController: NSObject, CharacterViewDelegate, NSMenuDelegat
 
     // Pickaxe attack (앱 창 부수기)
     private var attackMenuItem: NSMenuItem?
-    private var breakOverlay: BlockBreakOverlayWindow?
+    private var breakOverlays: [BlockBreakOverlayWindow] = []
     private var tntEntityWindow: TNTEntityWindow?
     private var tntPlacementPoint: CGPoint = .zero
     private var isBreakInProgress = false
@@ -575,21 +575,43 @@ public final class AppController: NSObject, CharacterViewDelegate, NSMenuDelegat
     @objc private func didSelectTNTBreak() {
         guard canStartTNTBreak(),
               let platform = physics.currentPlatform,
-              case .window(let windowID, _, let ownerPid) = platform.kind,
-              let frame = ScreenEnvironment.shared.windowCocoaFrame(windowID: windowID) else { return }
+              case .window(let windowID, _, let ownerPid) = platform.kind else { return }
 
-        // 1. 대상 창 위에 폭파 연출 오버레이 생성 (도화선 점멸 → 폭발)
-        let screen = ScreenEnvironment.shared.screen(for: physics.position)
-        let overlay = BlockBreakOverlayWindow(over: frame, on: screen)
-        overlay.onBreakFinished = { [weak self] in
-            self?.breakOverlay = nil
-            self?.isBreakInProgress = false
+        // 1. 대상 앱의 모든 창 수집 (캐릭터가 서 있는 창 포함)
+        var windows = ScreenEnvironment.shared.windowsForApp(pid: ownerPid)
+        guard !windows.isEmpty else { return }
+        if !windows.contains(where: { $0.id == windowID }),
+           let targetFrame = ScreenEnvironment.shared.windowCocoaFrame(windowID: windowID) {
+            windows.insert((windowID, targetFrame), at: 0)
         }
-        overlay.orderFrontRegardless()
-        self.breakOverlay = overlay
-        self.isBreakInProgress = true
+        if windows.count > 12 {
+            // 창이 너무 많으면 12개까지만 (캐릭터가 서 있는 창 우선)
+            windows = Array(windows.prefix(12))
+            if !windows.contains(where: { $0.id == windowID }),
+               let targetFrame = ScreenEnvironment.shared.windowCocoaFrame(windowID: windowID) {
+                windows[windows.count - 1] = (windowID, targetFrame)
+            }
+        }
+        let screen = ScreenEnvironment.shared.screen(for: physics.position)
 
-        // 2. TNT 설치 → 점화 → 도화선 4초(마인크래프트 표준) → 폭발
+        // 2. 모든 창 위에 폭파 연출 오버레이 생성
+        var overlays: [BlockBreakOverlayWindow] = []
+        for info in windows {
+            let overlay = BlockBreakOverlayWindow(over: info.frame, on: screen)
+            overlay.onBreakFinished = { [weak self, weak overlay] in
+                guard let self = self else { return }
+                self.breakOverlays.removeAll { $0 === overlay }
+                if self.breakOverlays.isEmpty {
+                    self.isBreakInProgress = false
+                }
+            }
+            overlay.orderFrontRegardless()
+            overlays.append(overlay)
+        }
+        breakOverlays = overlays
+        isBreakInProgress = true
+
+        // 3. TNT 설치 → 점화 → 도화선 4초(마인크래프트 표준) → 전 창 동시 폭발
         let started = behavior.startTNTPlacement(
             on: platform,
             fuse: 4.0,
@@ -607,30 +629,38 @@ public final class AppController: NSObject, CharacterViewDelegate, NSMenuDelegat
                 self.tntEntityWindow = nil
 
                 if endedOn != nil {
-                    // 3. 폭발! 대상 앱 종료 + 폭발음 + 창이 블록 파편으로 비산
+                    // 4. 폭발! 대상 앱 종료 + 폭발음 + 모든 창이 동시에 블록 파편으로 비산
                     if let app = NSRunningApplication(processIdentifier: ownerPid) {
                         app.terminate()
                     }
                     SoundAndEffectsManager.shared.play(.explode)
-                    overlay.explode(at: self.tntPlacementPoint)
+                    for overlay in self.breakOverlays {
+                        overlay.explode(at: self.tntPlacementPoint)
+                    }
                 } else {
                     // 중단(드래그/낙하) → 연출 취소
-                    overlay.cancel()
-                    self.breakOverlay = nil
+                    for overlay in self.breakOverlays {
+                        overlay.cancel()
+                    }
+                    self.breakOverlays = []
                     self.isBreakInProgress = false
                 }
             }
         )
         if !started {
-            overlay.cancel()
-            self.breakOverlay = nil
-            self.isBreakInProgress = false
+            for overlay in breakOverlays {
+                overlay.cancel()
+            }
+            breakOverlays = []
+            isBreakInProgress = false
         }
     }
 
     private func syncTNT() {
         guard let progress = behavior.tntProgress else { return }
-        breakOverlay?.showFuse(progress: progress)
+        for overlay in breakOverlays {
+            overlay.showFuse(progress: progress)
+        }
         tntEntityWindow?.setFuseProgress(progress)
     }
 

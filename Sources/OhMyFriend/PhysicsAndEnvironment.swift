@@ -151,6 +151,36 @@ public final class ScreenEnvironment {
         return CGRect(x: cgX, y: cocoaY, width: cgW, height: cgH)
     }
 
+    /// 앱(프로세스)의 화면에 보이는 모든 표준 창 (Cocoa 좌표 프레임)
+    public func windowsForApp(pid: pid_t) -> [(id: CGWindowID, frame: CGRect)] {
+        let options: CGWindowListOption = [.optionOnScreenOnly, .excludeDesktopElements]
+        guard let windowInfoList = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[String: Any]] else {
+            return []
+        }
+        let primaryHeight = (NSScreen.screens.first?.frame.height) ?? 0
+        var result: [(id: CGWindowID, frame: CGRect)] = []
+
+        for info in windowInfoList {
+            // 표준 앱 창만 (layer 0), 대상 프로세스의 창
+            guard let layer = info[kCGWindowLayer as String] as? Int, layer == 0 else { continue }
+            guard let owner = info[kCGWindowOwnerPID as String] as? pid_t, owner == pid else { continue }
+            guard let boundsDict = info[kCGWindowBounds as String] as? [String: Any],
+                  let cgX = boundsDict["X"] as? CGFloat,
+                  let cgY = boundsDict["Y"] as? CGFloat,
+                  let cgW = boundsDict["Width"] as? CGFloat,
+                  let cgH = boundsDict["Height"] as? CGFloat else {
+                continue
+            }
+            // 작은 팝업/툴팁성 창 제외
+            guard cgW >= 100, cgH >= 60 else { continue }
+
+            let windowId = (info[kCGWindowNumber as String] as? CGWindowID) ?? 0
+            let cocoaY = primaryHeight - (cgY + cgH)
+            result.append((windowId, CGRect(x: cgX, y: cocoaY, width: cgW, height: cgH)))
+        }
+        return result
+    }
+
     /// Returns Dock rectangle if dock exists on screen
     public func dockRect(for screen: NSScreen) -> CGRect? {
         let full = screen.frame
