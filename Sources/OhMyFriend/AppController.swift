@@ -3,7 +3,7 @@ import CoreGraphics
 import SceneKit
 import UniformTypeIdentifiers
 
-public final class AppController: NSObject, CharacterViewDelegate, PetViewDelegate, CreeperViewDelegate, EndermanViewDelegate, NSMenuDelegate {
+public final class AppController: NSObject, CharacterViewDelegate, PetViewDelegate, CreeperViewDelegate, EndermanViewDelegate, SkeletonViewDelegate, NSMenuDelegate {
     private var window: CharacterWindow!
     private var physics: PhysicsEngine!
     private var behavior = CharacterBehaviorController()
@@ -51,6 +51,15 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
     private var isEndermanSpawnEnabled: Bool = true
     private var endermanSpawnTimer: TimeInterval = 0
     private var endermanSpawnInterval: TimeInterval = 150.0
+
+    // Skeleton Entity (스켈레톤 출현 & 활 쏘기)
+    private var skeletonWindow: SkeletonWindow?
+    private var skeletonPhysics: PhysicsEngine?
+    private var skeletonBehavior: SkeletonBehaviorController?
+    private var isSkeletonSpawnEnabled: Bool = true
+    private var skeletonSpawnTimer: TimeInterval = 0
+    private var skeletonSpawnInterval: TimeInterval = 140.0
+    private var activeArrows: [ArrowEntityWindow] = []
 
     // L2. Skin Filter & L3. Glint & L4. Battery
     private var baseSkinTexture: SkinTexture?
@@ -268,6 +277,42 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
             let dist = hypot(ePhys.position.x - physics.position.x, ePhys.position.y - physics.position.y)
             if dist < 110.0 && !eBehav.isDespawned && eBehav.isEnraged && playerAttackTimer <= 0 {
                 attackEndermanWithCurrentWeapon()
+            }
+        }
+
+        // 4.8. Update Skeleton Entity
+        if let sw = skeletonWindow, let sPhys = skeletonPhysics, let sBehav = skeletonBehavior {
+            sBehav.update(
+                deltaTime: CGFloat(dt),
+                skeletonPhysics: sPhys,
+                skeletonNode: sw.skeletonView.skeletonNode,
+                playerPos: physics.position,
+                platforms: cachedPlatforms,
+                screen: screen,
+                onShootArrow: { [weak self] startPos, targetPos in
+                    self?.launchArrowFromSkeleton(from: startPos, to: targetPos)
+                },
+                onDefeated: { [weak self] in
+                    self?.handleSkeletonDefeated()
+                }
+            )
+            sPhys.update(deltaTime: CGFloat(dt), platforms: cachedPlatforms, screen: screen)
+            sw.skeletonView.skeletonNode.update(deltaTime: CGFloat(dt))
+            sw.setFeetPosition(x: sPhys.position.x, y: sPhys.position.y)
+
+            // Auto-attack if player has weapon and Skeleton is within 100pt
+            let dist = hypot(sPhys.position.x - physics.position.x, sPhys.position.y - physics.position.y)
+            if dist < 100.0 && !sBehav.isDespawned && playerAttackTimer <= 0 {
+                attackSkeletonWithCurrentWeapon()
+            }
+        }
+
+        // Autonomous Skeleton Spawning
+        if isSkeletonSpawnEnabled && skeletonWindow == nil {
+            skeletonSpawnTimer += dt
+            if skeletonSpawnTimer >= skeletonSpawnInterval {
+                skeletonSpawnTimer = 0
+                spawnSkeleton()
             }
         }
 
@@ -619,6 +664,10 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
         waveItem.target = self
         actMenu.addItem(waveItem)
 
+        let skelItem = NSMenuItem(title: "🏹 스켈레톤 소환 (Spawn Skeleton)", action: #selector(didSelectSpawnSkeleton), keyEquivalent: "")
+        skelItem.target = self
+        actMenu.addItem(skelItem)
+
         let mineItem = NSMenuItem(title: "⛏️ 블록 설치하고 캐기", action: #selector(didSelectPlaceAndMine), keyEquivalent: "")
         mineItem.target = self
         actMenu.addItem(mineItem)
@@ -748,6 +797,16 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
         soundItem.state = SoundAndEffectsManager.shared.isSoundEnabled ? .on : .off
         menu.addItem(soundItem)
 
+
+        // Skeleton Spawning Toggle
+        let skelToggleItem = NSMenuItem(
+            title: "👾 가끔 스켈레톤 출현 모드",
+            action: #selector(didToggleSkeletonSpawn(_:)),
+            keyEquivalent: ""
+        )
+        skelToggleItem.target = self
+        skelToggleItem.state = isSkeletonSpawnEnabled ? .on : .off
+        menu.addItem(skelToggleItem)
         // Typing Cheer Toggle
         let typingCheerItem = NSMenuItem(
             title: "⌨️ 타이핑 응원 모드 (WPM 감지)",
@@ -1578,6 +1637,121 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
                 self?.handleEndermanDefeated()
             }
         )
+    }
+
+    // MARK: - Skeleton Archer & Combat (스켈레톤 활 쏘기 & 전투)
+    public func spawnSkeleton() {
+        guard skeletonWindow == nil else { return }
+        let sw = SkeletonWindow()
+        sw.skeletonView.skeletonDelegate = self
+        self.skeletonWindow = sw
+
+        let spawnDir: CGFloat = Bool.random() ? 1.0 : -1.0
+        let spawnX = physics.position.x + (spawnDir * 290.0)
+        let sPhys = PhysicsEngine(initialPosition: CGPoint(x: spawnX, y: physics.position.y))
+        self.skeletonPhysics = sPhys
+        self.skeletonBehavior = SkeletonBehaviorController()
+
+        sw.setFeetPosition(x: spawnX, y: physics.position.y)
+        sw.orderFrontRegardless()
+        sw.skeletonView.skeletonNode.showOverheadEmoji("🏹 딸깍딸깍...", duration: 1.8)
+        SoundAndEffectsManager.shared.play(.alert)
+    }
+
+    public func despawnSkeleton() {
+        skeletonWindow?.orderOut(nil)
+        skeletonWindow = nil
+        skeletonPhysics = nil
+        skeletonBehavior = nil
+    }
+
+    private func launchArrowFromSkeleton(from startPos: CGPoint, to targetPos: CGPoint) {
+        let arrow = ArrowEntityWindow(
+            startPos: startPos,
+            targetPos: targetPos,
+            checkGuarding: { [weak self] in
+                guard let self = self else { return false }
+                let char = self.window.characterView.characterNode
+                return char.isShieldEquipped && (char.isSneaking || char.isGuarding)
+            },
+            onHit: { [weak self] isDeflected in
+                guard let self = self else { return }
+                let char = self.window.characterView.characterNode
+                if isDeflected {
+                    char.showOverheadEmoji("🛡️ 챙-! 화살 방어!", duration: 2.0)
+                    SoundAndEffectsManager.shared.play(.pop)
+                } else {
+                    char.showOverheadEmoji("💥 아야!", duration: 1.5)
+                    self.physics.launch(vx: (self.physics.position.x >= startPos.x ? 120 : -120), vy: 80)
+                }
+            }
+        )
+        activeArrows.append(arrow)
+        arrow.launch()
+    }
+
+    public func attackSkeletonWithCurrentWeapon() {
+        guard let sw = skeletonWindow,
+              let sPhys = skeletonPhysics,
+              let sBehav = skeletonBehavior,
+              !sBehav.isDespawned else { return }
+
+        let dx = sPhys.position.x - physics.position.x
+        window.characterView.characterNode.modelRoot.eulerAngles.y = dx >= 0 ? (CGFloat.pi / 2.0) : (-CGFloat.pi / 2.0)
+
+        window.characterView.characterNode.isAttackingWeapon = true
+        playerAttackTimer = 0.35
+
+        let weapon = window.characterView.characterNode.currentHeldItem
+        let damage = weapon == .diamondSword ? 3 : (weapon == .diamondPickaxe ? 2 : 1)
+        window.characterView.characterNode.showOverheadEmoji("⚔️ 스켈레톤 타격!", duration: 1.2)
+
+        sBehav.applyDamage(
+            damage,
+            fromPlayerAt: physics.position,
+            weapon: weapon,
+            skeletonPhysics: sPhys,
+            skeletonNode: sw.skeletonView.skeletonNode,
+            onDefeated: { [weak self] in
+                self?.handleSkeletonDefeated()
+            }
+        )
+    }
+
+    private func handleSkeletonDefeated() {
+        window.characterView.characterNode.showOverheadEmoji("🏹 스켈레톤 명중 컷! 뼈다귀 득템! 🦴", duration: 3.2)
+        SoundAndEffectsManager.shared.play(.heart)
+        physics.jump(impulse: 340)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
+            self?.despawnSkeleton()
+        }
+    }
+
+    @objc private func didSelectSpawnSkeleton() {
+        spawnSkeleton()
+    }
+
+    @objc private func didToggleSkeletonSpawn(_ sender: NSMenuItem) {
+        isSkeletonSpawnEnabled.toggle()
+        sender.state = isSkeletonSpawnEnabled ? .on : .off
+        statusItem?.menu = buildContextMenu()
+    }
+
+    // MARK: - SkeletonViewDelegate
+    public func skeletonViewDidClick(_ view: SkeletonView) {
+        attackSkeletonWithCurrentWeapon()
+    }
+
+    public func skeletonViewDidStartDrag(_ view: SkeletonView, at screenPoint: CGPoint) {
+        skeletonPhysics?.setDragged(at: screenPoint)
+    }
+
+    public func skeletonViewDidDrag(_ view: SkeletonView, to screenPoint: CGPoint) {
+        skeletonPhysics?.setDragged(at: screenPoint)
+    }
+
+    public func skeletonViewDidEndDrag(_ view: SkeletonView, throwVelocity: CGPoint) {
+        skeletonPhysics?.releaseDrag(throwVelocity: throwVelocity)
     }
 
     private func handleEndermanDefeated() {

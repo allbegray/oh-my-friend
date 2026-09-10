@@ -61,6 +61,7 @@ Sources/OhMyFriend/
 ## 실행 기록
 
 ### 2026-09-10
+- **[H1] 활 쏘는 스켈레톤(Skeleton Archer) 출현 및 방패 화살 튕겨내기 / 낮 햇빛 발화 고증 구축**: `SkeletonNode.swift`, `SkeletonBehaviorController.swift`, `SkeletonView.swift`, `SkeletonWindow.swift`, `ArrowEntityWindow.swift` 신규 구현. 해골 머리와 앙상한 갈비뼈/뼈다귀 팔다리, 3D 나무 활(`bowNode`) 조준/시위 당기기 모션. 포물선 궤적으로 날아가는 화살(`ArrowEntityWindow`) 발사 및 플레이어 방패 가드 시 `챙-!` 튕겨내기(`🛡️ 챙-! 화살 방어!`) 구현. 낮 시간대(06:00~18:00) 햇빛 노출 시 온몸 발화(`🔥 치이익! 햇빛이다!`) 및 창문 그늘 도주 AI 구현. 처치 시 뼈다귀(`🦴`), 화살(`➡️`), 활(`🏹`) 드롭. 메뉴바 "✨ 재미있는 모션 실행"에 "🏹 스켈레톤 소환" 및 "👾 가끔 스켈레톤 출현 모드" 토글 추가.
 - **.idea/ 디렉토리 git ignore 및 저장소 인덱스 추적 제외**: JetBrains/IDEA 설정 파일(`.idea/`)을 `.gitignore`에 등록하고 원격 저장소 추적에서 안전하게 분리.
 - **[M1-M4, L2-L4] 고급 원작 고증 7대 기능(창 압축, 모서리 낚시, 겉날개 활공, 늑대 꼬리, 스킨 필터, 인챈트 광택, 배터리 허기) 구축**:
   - `[M1]` `WindowMinimizer.swift` 및 `WindowSquashOverlayWindow.swift`: 접근성 API/AppleScript 기반 유압 피스톤 창 압축 최소화 구현.
