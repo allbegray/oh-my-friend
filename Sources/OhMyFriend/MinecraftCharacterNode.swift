@@ -48,6 +48,13 @@ public final class MinecraftCharacterNode: SCNNode {
         didSet { updateHeldItemModel() }
     }
 
+
+    // Off-hand Shield (왼손 3D 방패)
+    public let leftHandShieldAnchor = SCNNode()
+    public var isShieldEquipped: Bool = false {
+        didSet { updateShieldModel() }
+    }
+    public var isGuarding: Bool = false
     // Interactive Placed Block Node (in front of player)
     public let placedBlockNode = SCNNode()
 
@@ -177,6 +184,9 @@ public final class MinecraftCharacterNode: SCNNode {
         leftArmOverlayMesh.geometry = leftArmOverlayBox
         leftArmOverlayMesh.position = SCNVector3(0, -0.6, 0)
         leftArmOverlayMesh.isHidden = true
+        // Mount shield anchor on the left forearm
+        leftHandShieldAnchor.position = SCNVector3(0, -0.45, 0.20)
+        leftArmMesh.addChildNode(leftHandShieldAnchor)
         leftArmJoint.addChildNode(leftArmOverlayMesh)
         bodyAnchor.addChildNode(leftArmJoint)
 
@@ -465,8 +475,46 @@ public final class MinecraftCharacterNode: SCNNode {
         let fNode = SCNNode(geometry: flameBox)
         fNode.position = SCNVector3(0, 0.3, 0)
         root.addChildNode(fNode)
-
         return root
+    }
+
+    // MARK: - 3D Minecraft Shield Model
+    private func updateShieldModel() {
+        leftHandShieldAnchor.childNodes.forEach { $0.removeFromParentNode() }
+        guard isShieldEquipped else { return }
+
+        let ironMat = SCNMaterial()
+        ironMat.diffuse.contents = NSColor(red: 0.60, green: 0.62, blue: 0.65, alpha: 1.0)
+        ironMat.lightingModel = .lambert
+
+        let woodMat = SCNMaterial()
+        woodMat.diffuse.contents = NSColor(red: 0.82, green: 0.72, blue: 0.52, alpha: 1.0) // Birch wood
+        woodMat.lightingModel = .lambert
+
+        let darkIronMat = SCNMaterial()
+        darkIronMat.diffuse.contents = NSColor(red: 0.40, green: 0.42, blue: 0.45, alpha: 1.0)
+        darkIronMat.lightingModel = .lambert
+
+        let root = SCNNode()
+        // Iron outer rim: W=0.72, H=1.05, L=0.08
+        let rimBox = SCNBox(width: 0.72, height: 1.05, length: 0.08, chamferRadius: 0.01)
+        rimBox.materials = [ironMat]
+        let rimNode = SCNNode(geometry: rimBox)
+        root.addChildNode(rimNode)
+
+        // Wood face: W=0.62, H=0.95, L=0.09
+        let faceBox = SCNBox(width: 0.62, height: 0.95, length: 0.09, chamferRadius: 0)
+        faceBox.materials = [woodMat]
+        let faceNode = SCNNode(geometry: faceBox)
+        root.addChildNode(faceNode)
+
+        // Center metal stud: W=0.18, H=0.18, L=0.11
+        let bossBox = SCNBox(width: 0.18, height: 0.18, length: 0.11, chamferRadius: 0)
+        bossBox.materials = [darkIronMat]
+        let bossNode = SCNNode(geometry: bossBox)
+        root.addChildNode(bossNode)
+
+        leftHandShieldAnchor.addChildNode(root)
     }
 
     public func applySkin(_ skin: SkinTexture) {
@@ -667,6 +715,11 @@ public final class MinecraftCharacterNode: SCNNode {
             bodyAnchor.position = SCNVector3(0, 0, 0)
             torsoNode.eulerAngles.x = 0
             headJoint.position = SCNVector3(0, 2.4, 0)
+        }
+        let isActivelyGuarding = isShieldEquipped && (isSneaking || isGuarding)
+        if isActivelyGuarding {
+            // 방패를 가슴/얼굴 앞으로 번쩍 들어 올려 완벽 가드 자세!
+            leftArmJoint.eulerAngles = SCNVector3(-CGFloat.pi / 2.2, 0.45, -0.65)
         }
 
         if walkSpeed > 0.05 {

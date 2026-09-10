@@ -3,7 +3,7 @@ import CoreGraphics
 import SceneKit
 import UniformTypeIdentifiers
 
-public final class AppController: NSObject, CharacterViewDelegate, PetViewDelegate, CreeperViewDelegate, NSMenuDelegate {
+public final class AppController: NSObject, CharacterViewDelegate, PetViewDelegate, CreeperViewDelegate, EndermanViewDelegate, NSMenuDelegate {
     private var window: CharacterWindow!
     private var physics: PhysicsEngine!
     private var behavior = CharacterBehaviorController()
@@ -43,6 +43,14 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
     private var creeperSpawnTimer: TimeInterval = 0
     private var creeperSpawnInterval: TimeInterval = 120.0 // Occasional spawn every ~2 min
     private var playerAttackTimer: TimeInterval = 0
+
+    // Enderman Entity (엔더맨 출현 & 시선 마주침)
+    private var endermanWindow: EndermanWindow?
+    private var endermanPhysics: PhysicsEngine?
+    private var endermanBehavior: EndermanBehaviorController?
+    private var isEndermanSpawnEnabled: Bool = true
+    private var endermanSpawnTimer: TimeInterval = 0
+    private var endermanSpawnInterval: TimeInterval = 150.0
 
     public override init() {
         super.init()
@@ -160,11 +168,19 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
 
         // 4.6. Update Creeper Entity
         if let cw = creeperWindow, let cPhys = creeperPhysics, let cBehav = creeperBehavior {
+            let catPos: CGPoint?
+            if currentPetKind == .cat, let pPhys = petPhysics {
+                catPos = pPhys.position
+            } else {
+                catPos = nil
+            }
+
             cBehav.update(
                 deltaTime: CGFloat(dt),
                 creeperPhysics: cPhys,
                 creeperNode: cw.creeperView.creeperNode,
                 playerPos: physics.position,
+                catPos: catPos,
                 onExplode: { [weak self] blastPos in
                     self?.handleCreeperExploded(at: blastPos)
                 },
@@ -198,6 +214,39 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
             if creeperSpawnTimer >= creeperSpawnInterval {
                 creeperSpawnTimer = 0
                 spawnCreeper()
+            }
+        }
+
+        // 4.7. Update Enderman Entity
+        if let ew = endermanWindow, let ePhys = endermanPhysics, let eBehav = endermanBehavior {
+            eBehav.update(
+                deltaTime: CGFloat(dt),
+                endermanPhysics: ePhys,
+                endermanNode: ew.endermanView.endermanNode,
+                playerPos: physics.position,
+                cursorPos: cursorPos,
+                screen: screen,
+                onDefeated: { [weak self] in
+                    self?.handleEndermanDefeated()
+                }
+            )
+            ePhys.update(deltaTime: CGFloat(dt), platforms: cachedPlatforms, screen: screen)
+            ew.endermanView.endermanNode.update(deltaTime: CGFloat(dt))
+            ew.setFeetPosition(x: ePhys.position.x, y: ePhys.position.y)
+
+            // Auto-attack if player has weapon and Enderman charges dangerously close
+            let dist = hypot(ePhys.position.x - physics.position.x, ePhys.position.y - physics.position.y)
+            if dist < 110.0 && !eBehav.isDespawned && eBehav.isEnraged && playerAttackTimer <= 0 {
+                attackEndermanWithCurrentWeapon()
+            }
+        }
+
+        // Autonomous Enderman Spawning
+        if isEndermanSpawnEnabled && endermanWindow == nil {
+            endermanSpawnTimer += dt
+            if endermanSpawnTimer >= endermanSpawnInterval {
+                endermanSpawnTimer = 0
+                spawnEnderman()
             }
         }
         // 5. Update Status Menu Text
@@ -427,6 +476,16 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
         itemSubmenuItem.submenu = itemMenu
         menu.addItem(itemSubmenuItem)
 
+        // Off-hand Shield Toggle
+        let shieldItem = NSMenuItem(
+            title: "🛡️ 왼손에 방패 착용 (Off-hand Shield)",
+            action: #selector(didToggleShield(_:)),
+            keyEquivalent: ""
+        )
+        shieldItem.target = self
+        shieldItem.state = window.characterView.characterNode.isShieldEquipped ? .on : .off
+        menu.addItem(shieldItem)
+
         // Pet Companion Submenu
         let petMenu = NSMenu()
         for kind in PetKind.allCases {
@@ -498,6 +557,10 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
         creeperItem.target = self
         actMenu.addItem(creeperItem)
 
+
+        let endermanItem = NSMenuItem(title: "👁️ 엔더맨 소환 (Spawn Enderman)", action: #selector(didSelectSpawnEnderman), keyEquivalent: "e")
+        endermanItem.target = self
+        actMenu.addItem(endermanItem)
         let cheerItem = NSMenuItem(title: "🎉 코딩 신나게 응원하기 (Cheer)", action: #selector(didSelectCheer), keyEquivalent: "c")
         cheerItem.target = self
         actMenu.addItem(cheerItem)
@@ -629,6 +692,16 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
             action: #selector(didToggleCreeperSpawn(_:)),
             keyEquivalent: ""
         )
+
+        // Enderman Spawning Toggle
+        let endermanToggleItem = NSMenuItem(
+            title: "👾 가끔 엔더맨 출현 모드",
+            action: #selector(didToggleEndermanSpawn(_:)),
+            keyEquivalent: ""
+        )
+        endermanToggleItem.target = self
+        endermanToggleItem.state = isEndermanSpawnEnabled ? .on : .off
+        menu.addItem(endermanToggleItem)
         creeperToggleItem.target = self
         creeperToggleItem.state = isCreeperSpawnEnabled ? .on : .off
         menu.addItem(creeperToggleItem)
@@ -1166,10 +1239,20 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
     }
 
     private func handleCreeperExploded(at blastPos: CGPoint) {
-        let dx = physics.position.x - blastPos.x
-        let blastDir: CGFloat = dx >= 0 ? 1.0 : -1.0
-        physics.launch(vx: blastDir * 550.0, vy: 420.0)
-        window.characterView.characterNode.showOverheadEmoji("💥 으악!", duration: 2.0)
+        let charNode = window.characterView.characterNode
+        let isGuarding = charNode.isShieldEquipped && (charNode.isSneaking || charNode.isGuarding)
+
+        if isGuarding {
+            // 원작 고증: 방패로 가드 시 100% 폭발 피해 및 넉백 완벽 방어!
+            charNode.showOverheadEmoji("🛡️ 챙-! 완벽 방어!", duration: 2.5)
+            SoundAndEffectsManager.shared.play(.pop)
+        } else {
+            let dx = physics.position.x - blastPos.x
+            let blastDir: CGFloat = dx >= 0 ? 1.0 : -1.0
+            physics.launch(vx: blastDir * 550.0, vy: 420.0)
+            charNode.showOverheadEmoji("💥 으악!", duration: 2.0)
+        }
+
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
             self?.despawnCreeper()
         }
@@ -1247,11 +1330,110 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
     public func creeperViewDidEndDrag(_ view: CreeperView, throwVelocity: CGPoint) {
         creeperPhysics?.releaseDrag(throwVelocity: throwVelocity)
     }
+
+    // MARK: - Enderman Combat & Spawning (엔더맨 시선 마주침 & 소환)
+    public func spawnEnderman() {
+        guard endermanWindow == nil else { return }
+        let ew = EndermanWindow()
+        ew.endermanView.endermanDelegate = self
+        self.endermanWindow = ew
+
+        let spawnDir: CGFloat = Bool.random() ? 1.0 : -1.0
+        let spawnX = physics.position.x + (spawnDir * 280.0)
+        let ePhys = PhysicsEngine(initialPosition: CGPoint(x: spawnX, y: physics.position.y))
+        self.endermanPhysics = ePhys
+        self.endermanBehavior = EndermanBehaviorController()
+
+        ew.setFeetPosition(x: spawnX, y: physics.position.y)
+        ew.orderFrontRegardless()
+        ew.endermanView.endermanNode.showOverheadEmoji("👁️ 블록 들고 배회 중...", duration: 2.0)
+        SoundAndEffectsManager.shared.play(.pop)
+    }
+
+    public func despawnEnderman() {
+        endermanWindow?.orderOut(nil)
+        endermanWindow = nil
+        endermanPhysics = nil
+        endermanBehavior = nil
+    }
+
+    public func attackEndermanWithCurrentWeapon() {
+        guard let ew = endermanWindow,
+              let ePhys = endermanPhysics,
+              let eBehav = endermanBehavior,
+              !eBehav.isDespawned else { return }
+
+        let screen = ScreenEnvironment.shared.screen(for: physics.position)
+        let dx = ePhys.position.x - physics.position.x
+        window.characterView.characterNode.modelRoot.eulerAngles.y = dx >= 0 ? (CGFloat.pi / 2.0) : (-CGFloat.pi / 2.0)
+
+        window.characterView.characterNode.isAttackingWeapon = true
+        playerAttackTimer = 0.35
+
+        let weapon = window.characterView.characterNode.currentHeldItem
+        let damage = weapon == .diamondSword ? 3 : (weapon == .diamondPickaxe ? 2 : 1)
+        window.characterView.characterNode.showOverheadEmoji("⚔️ 엔더맨 타격!", duration: 1.2)
+
+        eBehav.applyDamage(
+            damage,
+            fromPlayerAt: physics.position,
+            weapon: weapon,
+            endermanPhysics: ePhys,
+            endermanNode: ew.endermanView.endermanNode,
+            screen: screen,
+            onDefeated: { [weak self] in
+                self?.handleEndermanDefeated()
+            }
+        )
+    }
+
+    private func handleEndermanDefeated() {
+        window.characterView.characterNode.showOverheadEmoji("🔮 엔더 진주를 손에 넣었다! 대박!", duration: 3.2)
+        SoundAndEffectsManager.shared.play(.heart)
+        physics.jump(impulse: 340)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
+            self?.despawnEnderman()
+        }
+    }
+
+    @objc private func didSelectSpawnEnderman() {
+        spawnEnderman()
+    }
+
+    @objc private func didToggleEndermanSpawn(_ sender: NSMenuItem) {
+        isEndermanSpawnEnabled.toggle()
+        sender.state = isEndermanSpawnEnabled ? .on : .off
+        statusItem?.menu = buildContextMenu()
+    }
+
+    // MARK: - EndermanViewDelegate
+    public func endermanViewDidClick(_ view: EndermanView) {
+        attackEndermanWithCurrentWeapon()
+    }
+
+    public func endermanViewDidStartDrag(_ view: EndermanView, at screenPoint: CGPoint) {
+        endermanPhysics?.setDragged(at: screenPoint)
+    }
+
+    public func endermanViewDidDrag(_ view: EndermanView, to screenPoint: CGPoint) {
+        endermanPhysics?.setDragged(at: screenPoint)
+    }
+
+    public func endermanViewDidEndDrag(_ view: EndermanView, throwVelocity: CGPoint) {
+        endermanPhysics?.releaseDrag(throwVelocity: throwVelocity)
+    }
     // MARK: - Ladder Descent (사다리 타고 창문 내려가기)
     private func canStartLadderDescent() -> Bool {
         guard !behavior.isClimbing,
               let platform = physics?.currentPlatform else { return false }
         return CharacterBehaviorController.canDescend(from: platform)
+    }
+
+    @objc private func didToggleShield(_ sender: NSMenuItem) {
+        window.characterView.characterNode.isShieldEquipped.toggle()
+        sender.state = window.characterView.characterNode.isShieldEquipped ? .on : .off
+        statusItem?.menu = buildContextMenu()
+        SoundAndEffectsManager.shared.play(.pop)
     }
 
     @objc private func didSelectLadderDescent() {

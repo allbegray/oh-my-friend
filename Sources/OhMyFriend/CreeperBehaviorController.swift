@@ -6,6 +6,7 @@ public enum CreeperState {
     case stalking
     case hissing(fuseElapsed: TimeInterval)
     case burningPanic(timeLeft: TimeInterval)
+    case fleeingFromCat(timeLeft: TimeInterval)
     case hurt(knockbackVx: CGFloat, timer: TimeInterval)
     case dying(timer: TimeInterval)
     case exploded
@@ -28,6 +29,7 @@ public final class CreeperBehaviorController {
         creeperPhysics: PhysicsEngine,
         creeperNode: CreeperNode,
         playerPos: CGPoint,
+        catPos: CGPoint? = nil,
         onExplode: @escaping (CGPoint) -> Void,
         onDefeated: @escaping () -> Void
     ) {
@@ -39,6 +41,24 @@ public final class CreeperBehaviorController {
         let dist = hypot(dx, dy)
         let dirToPlayer: CGFloat = dx > 0 ? 1.0 : -1.0
 
+
+        // 원작 고증: 크리퍼는 고양이를 극도로 무서워하여 근처에 오면 도화선을 즉시 끄고 도망침!
+        if let cat = catPos {
+            let catDist = hypot(cat.x - creeperPos.x, cat.y - creeperPos.y)
+            if catDist < 220.0 {
+                switch state {
+                case .stalking, .hissing:
+                    creeperNode.isHissing = false
+                    creeperNode.fuseProgress = 0
+                    creeperNode.showOverheadEmoji("🙀 으악 고양이다!", duration: 2.0)
+                    SoundAndEffectsManager.shared.play(.alert)
+                    state = .fleeingFromCat(timeLeft: 3.5)
+                    return
+                default:
+                    break
+                }
+            }
+        }
         switch state {
         case .stalking:
             creeperNode.isHissing = false
@@ -86,6 +106,25 @@ public final class CreeperBehaviorController {
                 state = .hissing(fuseElapsed: elapsed)
             }
 
+
+        case .fleeingFromCat(var timeLeft):
+            timeLeft -= Double(dt)
+            creeperNode.isHissing = false
+            creeperNode.fuseProgress = 0
+            let fleeSpeed = stalkSpeed * 1.85 // 고양이를 피해 전력 질주!
+            creeperNode.walkSpeed = fleeSpeed
+
+            // 고양이(또는 플레이어)의 반대 방향으로 질주
+            let refPos = catPos ?? playerPos
+            let runDir: CGFloat = creeperPos.x >= refPos.x ? 1.0 : -1.0
+            creeperNode.modelRoot.eulerAngles.y = runDir > 0 ? (CGFloat.pi / 2.0) : (-CGFloat.pi / 2.0)
+            creeperPhysics.position.x += runDir * fleeSpeed * dt
+
+            if timeLeft <= 0 {
+                state = .stalking
+            } else {
+                state = .fleeingFromCat(timeLeft: timeLeft)
+            }
         case .burningPanic(var timeLeft):
             timeLeft -= Double(dt)
             creeperNode.isHissing = false
