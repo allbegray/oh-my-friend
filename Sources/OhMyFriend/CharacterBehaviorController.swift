@@ -30,6 +30,9 @@ public final class CharacterBehaviorController {
         case nag(timeLeft: TimeInterval, phraseTimer: TimeInterval, phraseIndex: Int)
         case squash(timeLeft: TimeInterval, windowPlatform: Platform)
         case fishing(timeLeft: TimeInterval, biteTime: TimeInterval, hasBitten: Bool)
+        case throwTrident(timeLeft: TimeInterval)
+        case jukebox(timeLeft: TimeInterval, beatTimer: TimeInterval)
+        case drinkMilk(timeLeft: TimeInterval)
     }
 
     public private(set) var state: State = .idle(timeLeft: 2.0)
@@ -213,7 +216,38 @@ public final class CharacterBehaviorController {
         state = .idle(timeLeft: 1.5)
     }
 
+    public func wakeUpIfSleeping(characterNode: MinecraftCharacterNode, withEmoji emoji: String = "❗") {
+        if case .sleep = state {
+            characterNode.isSleeping = false
+            characterNode.bedNode.isHidden = true
+            characterNode.showOverheadEmoji(emoji, duration: 2.2)
+            SoundAndEffectsManager.shared.play(.alert)
+            state = .idle(timeLeft: 1.5)
+        }
+    }
+
     // MARK: - Window Squash & Minimize (창 압축 최소화)
+    public func triggerThrowTrident(characterNode: MinecraftCharacterNode, isRiptide: Bool) {
+        guard !isClimbing, !isTNTActive else { return }
+        characterNode.currentHeldItem = .trident
+        characterNode.showOverheadEmoji(isRiptide ? "🌊 급류 돌진-!" : "🔱 충성 삼지창! 돌아와-!", duration: 2.0)
+        SoundAndEffectsManager.shared.play(.whoosh)
+        state = .throwTrident(timeLeft: 1.6)
+    }
+
+    public func triggerJukeboxDance(characterNode: MinecraftCharacterNode) {
+        guard !isClimbing, !isTNTActive else { return }
+        characterNode.showOverheadEmoji("🎶 리듬 타는 중~", duration: 2.0)
+        state = .jukebox(timeLeft: 8.0, beatTimer: 0.0)
+    }
+
+    public func triggerDrinkMilk(characterNode: MinecraftCharacterNode) {
+        guard !isClimbing, !isTNTActive else { return }
+        characterNode.currentHeldItem = .milkBucket
+        characterNode.showOverheadEmoji("🥛 꿀꺽꿀꺽...", duration: 1.6)
+        SoundAndEffectsManager.shared.play(.gulp)
+        state = .drinkMilk(timeLeft: 1.8)
+    }
     public func startSquashMinimize(
         on platform: Platform,
         duration: TimeInterval = 2.0,
@@ -644,6 +678,49 @@ public final class CharacterBehaviorController {
                 state = .sit(timeLeft: 4.0)
             } else {
                 state = .fishing(timeLeft: timeLeft, biteTime: biteTime, hasBitten: hasBitten)
+            }
+
+        case .throwTrident(var timeLeft):
+            timeLeft -= dt
+            characterNode.walkSpeed = 0
+            characterNode.isThrowingTrident = true
+            characterNode.isAttackingWeapon = true
+            if timeLeft <= 0 {
+                characterNode.isThrowingTrident = false
+                characterNode.isAttackingWeapon = false
+                chooseNextState(physics: physics, platforms: platforms, screen: screen, cursorPos: cursorPos, characterNode: characterNode)
+            } else {
+                state = .throwTrident(timeLeft: timeLeft)
+            }
+
+        case .jukebox(var timeLeft, var beatTimer):
+            timeLeft -= dt
+            beatTimer -= dt
+            characterNode.walkSpeed = 0
+            characterNode.isJukeboxDancing = true
+            if beatTimer <= 0 {
+                beatTimer = 0.45
+                SoundAndEffectsManager.shared.play(.chime)
+            }
+            if timeLeft <= 0 {
+                characterNode.isJukeboxDancing = false
+                chooseNextState(physics: physics, platforms: platforms, screen: screen, cursorPos: cursorPos, characterNode: characterNode)
+            } else {
+                state = .jukebox(timeLeft: timeLeft, beatTimer: beatTimer)
+            }
+
+        case .drinkMilk(var timeLeft):
+            timeLeft -= dt
+            characterNode.walkSpeed = 0
+            characterNode.isEating = true
+            if timeLeft <= 0 {
+                characterNode.isEating = false
+                characterNode.currentHeldItem = .emptyBucket
+                characterNode.showOverheadEmoji("🥛✨ 깔끔하게 정화!", duration: 2.2)
+                SoundAndEffectsManager.shared.play(.gulp)
+                chooseNextState(physics: physics, platforms: platforms, screen: screen, cursorPos: cursorPos, characterNode: characterNode)
+            } else {
+                state = .drinkMilk(timeLeft: timeLeft)
             }
 
         case .nag(var timeLeft, var phraseTimer, var phraseIndex):

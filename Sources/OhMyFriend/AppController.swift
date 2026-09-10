@@ -3,7 +3,7 @@ import CoreGraphics
 import SceneKit
 import UniformTypeIdentifiers
 
-public final class AppController: NSObject, CharacterViewDelegate, PetViewDelegate, CreeperViewDelegate, EndermanViewDelegate, SkeletonViewDelegate, NSMenuDelegate {
+public final class AppController: NSObject, CharacterViewDelegate, PetViewDelegate, CreeperViewDelegate, EndermanViewDelegate, SkeletonViewDelegate, SlimeWindowDelegate, NSMenuDelegate {
     private var window: CharacterWindow!
     private var physics: PhysicsEngine!
     private var behavior = CharacterBehaviorController()
@@ -60,6 +60,7 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
     private var skeletonSpawnTimer: TimeInterval = 0
     private var skeletonSpawnInterval: TimeInterval = 140.0
     private var activeArrows: [ArrowEntityWindow] = []
+    private var activeTridents: [TridentEntityWindow] = []
 
     // L2. Skin Filter & L3. Glint & L4. Battery
     private var baseSkinTexture: SkinTexture?
@@ -225,17 +226,20 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
             }
         }
 
-        // Autonomous Creeper Spawning
+        // Autonomous Creeper Spawning (야간에는 H4 가중치로 더 자주 출현)
         if isCreeperSpawnEnabled && creeperWindow == nil {
             creeperSpawnTimer += dt
-            if creeperSpawnTimer >= creeperSpawnInterval {
+            if creeperSpawnTimer >= creeperSpawnInterval / DayNightCycleManager.shared.nightSpawnMultiplier {
                 creeperSpawnTimer = 0
                 spawnCreeper()
             }
         }
 
-        // L4. Battery Hunger Check (every ~5.0s)
-        if isBatteryHungerEnabled {
+        // L4. Battery Hunger Check (every ~5.0s, L2 우유 정화 중에는 억제)
+        if milkCleanseTimer > 0 {
+            milkCleanseTimer -= dt
+        }
+        if isBatteryHungerEnabled && milkCleanseTimer <= 0 {
             batteryCheckTimer += dt
             if batteryCheckTimer >= 5.0 {
                 batteryCheckTimer = 0
@@ -307,22 +311,94 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
             }
         }
 
-        // Autonomous Skeleton Spawning
+        // Autonomous Skeleton Spawning (야간 가중치 적용)
         if isSkeletonSpawnEnabled && skeletonWindow == nil {
             skeletonSpawnTimer += dt
-            if skeletonSpawnTimer >= skeletonSpawnInterval {
+            if skeletonSpawnTimer >= skeletonSpawnInterval / DayNightCycleManager.shared.nightSpawnMultiplier {
                 skeletonSpawnTimer = 0
                 spawnSkeleton()
             }
         }
 
-        // Autonomous Enderman Spawning
+        // Autonomous Enderman Spawning (야간 가중치 적용)
         if isEndermanSpawnEnabled && endermanWindow == nil {
             endermanSpawnTimer += dt
-            if endermanSpawnTimer >= endermanSpawnInterval {
+            if endermanSpawnTimer >= endermanSpawnInterval / DayNightCycleManager.shared.nightSpawnMultiplier {
                 endermanSpawnTimer = 0
                 spawnEnderman()
             }
+        }
+
+        // M3. Slime proximity auto-attack + occasional spawn
+        for slime in slimeWindows {
+            let dist = hypot(slime.position.x - physics.position.x, slime.position.y - physics.position.y)
+            if dist < 90.0 && playerAttackTimer <= 0 {
+                attackSlime(slime)
+            }
+        }
+        slimeSpawnTimer += dt
+        if slimeSpawnTimer >= slimeSpawnInterval && slimeWindows.isEmpty {
+            slimeSpawnTimer = 0
+            spawnSlime(size: .big, at: nil)
+        }
+
+        // L3. Nether portal entry check + M4 baby pet follow
+        checkPortalEntry()
+        updateBabyPet(dt: dt)
+        updateWildWolf(dt: dt)
+        updateWeather(dt: dt, screen: screen)
+        updateBees()
+
+        // H4. Day/Night cycle (every ~5s)
+        dayNightTimer += dt
+        if dayNightTimer >= 5.0 {
+            dayNightTimer = 0
+            DayNightCycleManager.shared.refresh()
+            let isNight = DayNightCycleManager.shared.isNight
+            if isNight != wasNight {
+                wasNight = isNight
+                let charNode = window.characterView.characterNode
+                if isNight {
+                    if charNode.currentHeldItem == .none {
+                        charNode.currentHeldItem = .torch
+                        didAutoEquipTorch = true
+                    }
+                    charNode.showOverheadEmoji("🌙 밤이 됐네... 횃불 켜자! 🔥", duration: 2.5)
+                    SoundAndEffectsManager.shared.play(.ignite)
+                } else {
+                    if didAutoEquipTorch && charNode.currentHeldItem == .torch {
+                        charNode.currentHeldItem = .none
+                    }
+                    didAutoEquipTorch = false
+                    charNode.showOverheadEmoji("☀️ 좋은 아침!", duration: 2.0)
+                }
+            }
+        }
+
+        // Night skip: 밤에 전원(플레이어+펫)이 6초 이상 쿨쿨 자면 아침으로 스킵
+        let playerSleeping = window.characterView.characterNode.isSleeping
+        let petSleeping = petBehavior == nil || petBehavior?.isSleeping == true
+        if DayNightCycleManager.shared.isNight && playerSleeping && petSleeping {
+            sleepSkipTimer += dt
+            if sleepSkipTimer >= 6.0 {
+                sleepSkipTimer = 0
+                DayNightCycleManager.shared.skipToMorning()
+                behavior.wakeUpIfSleeping(
+                    characterNode: window.characterView.characterNode,
+                    withEmoji: "☀️ 푹 잤다! 아침이다!"
+                )
+                if petBehavior != nil {
+                    petBehavior?.isSleeping = false
+                    petWindow?.petView.petNode.isSleeping = false
+                }
+                wasNight = false
+                if didAutoEquipTorch && window.characterView.characterNode.currentHeldItem == .torch {
+                    window.characterView.characterNode.currentHeldItem = .none
+                }
+                didAutoEquipTorch = false
+            }
+        } else {
+            sleepSkipTimer = 0
         }
         // 5. Update Status Menu Text
         updateStatusMenuItemText()
@@ -385,6 +461,12 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
             desc = "창을 압축해서 Dock으로 치우는 중! 🗜️"
         case .fishing:
             desc = "물가에 낚싯대 드리우고 낚시 중 🎣"
+        case .throwTrident:
+            desc = "충성 삼지창 투척! 돌아와-! 🔱"
+        case .jukebox:
+            desc = "주크박스 리듬 타며 댄스 중 🎶"
+        case .drinkMilk:
+            desc = "우유 꿀꺽 정화 중 🥛"
         case .climb(_, _, let isUp):
             desc = isUp ? "🪜 사다리 타고 창문 올라가는 중" : "🪜 사다리 타고 창문 내려가는 중"
         case .fall:
@@ -709,6 +791,51 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
         let fishItem = NSMenuItem(title: "🎣 모서리 낚시하기 (Go Fishing)", action: #selector(didSelectFishing), keyEquivalent: "f")
         fishItem.target = self
         actMenu.addItem(fishItem)
+
+        let tridentItem = NSMenuItem(title: "🔱 삼지창 던지기 (Throw Trident)", action: #selector(didSelectThrowTrident), keyEquivalent: "")
+        tridentItem.target = self
+        actMenu.addItem(tridentItem)
+
+        let jukeboxItem = NSMenuItem(title: "🎶 주크박스 틀기 (Jukebox)", action: #selector(didSelectJukebox), keyEquivalent: "")
+        jukeboxItem.target = self
+        actMenu.addItem(jukeboxItem)
+
+        let chestItem = NSMenuItem(title: "📦 보물상자 소환 (Chest)", action: #selector(didSelectChest), keyEquivalent: "")
+        chestItem.target = self
+        actMenu.addItem(chestItem)
+
+        let totemItem = NSMenuItem(title: "✨ 불사의 토템 들기 (Totem)", action: #selector(didToggleTotem(_:)), keyEquivalent: "")
+        totemItem.target = self
+        totemItem.state = window.characterView.characterNode.isTotemEquipped ? .on : .off
+        actMenu.addItem(totemItem)
+
+        let slimeItem = NSMenuItem(title: "🟢 슬라임 소환 (Spawn Slime)", action: #selector(didSelectSpawnSlime), keyEquivalent: "")
+        slimeItem.target = self
+        actMenu.addItem(slimeItem)
+
+        let wheatItem = NSMenuItem(title: "🌾 밀 들기 (Hold Wheat)", action: #selector(didSelectWheat), keyEquivalent: "")
+        wheatItem.target = self
+        actMenu.addItem(wheatItem)
+
+        let milkItem = NSMenuItem(title: "🥛 우유 마시기 (Drink Milk)", action: #selector(didSelectDrinkMilk), keyEquivalent: "")
+        milkItem.target = self
+        actMenu.addItem(milkItem)
+
+        let portalItem = NSMenuItem(title: "🟣 지옥문 열기 (Nether Portal)", action: #selector(didSelectPortal), keyEquivalent: "")
+        portalItem.target = self
+        actMenu.addItem(portalItem)
+
+        let farmItem = NSMenuItem(title: "🌱 밀 심기 (Plant Wheat)", action: #selector(didSelectPlantCrop), keyEquivalent: "")
+        farmItem.target = self
+        actMenu.addItem(farmItem)
+
+        let tameItem = NSMenuItem(title: "🐺 야생 늑대 부르기 (Wild Wolf)", action: #selector(didSelectSpawnWildWolf), keyEquivalent: "")
+        tameItem.target = self
+        actMenu.addItem(tameItem)
+
+        let hiveItem = NSMenuItem(title: "🐝 벌집 설치 (Beehive)", action: #selector(didSelectBeehive), keyEquivalent: "")
+        hiveItem.target = self
+        actMenu.addItem(hiveItem)
         let actSubmenuItem = NSMenuItem(title: "✨ 재미있는 모션 실행", action: nil, keyEquivalent: "")
         actSubmenuItem.submenu = actMenu
         menu.addItem(actSubmenuItem)
@@ -796,6 +923,35 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
         soundItem.target = self
         soundItem.state = SoundAndEffectsManager.shared.isSoundEnabled ? .on : .off
         menu.addItem(soundItem)
+
+        // H4. Day/Night Mode Submenu
+        let dayNightMenu = NSMenu()
+        for mode in DayNightMode.allCases {
+            let item = NSMenuItem(
+                title: mode.rawValue,
+                action: #selector(didSelectDayNightMode(_:)),
+                keyEquivalent: ""
+            )
+            item.target = self
+            item.representedObject = mode
+            if DayNightCycleManager.shared.mode == mode {
+                item.state = .on
+            }
+            dayNightMenu.addItem(item)
+        }
+        let dayNightSubmenuItem = NSMenuItem(title: "☀️/🌙 낮밤 모드 (Day/Night)", action: nil, keyEquivalent: "")
+        dayNightSubmenuItem.submenu = dayNightMenu
+        menu.addItem(dayNightSubmenuItem)
+
+        // Weather Toggle
+        let weatherItem = NSMenuItem(
+            title: "🌧️ 날씨 모드 (비·뇌우)",
+            action: #selector(didToggleWeather(_:)),
+            keyEquivalent: ""
+        )
+        weatherItem.target = self
+        weatherItem.state = WeatherManager.shared.isEnabled ? .on : .off
+        menu.addItem(weatherItem)
 
 
         // Skeleton Spawning Toggle
@@ -1246,8 +1402,14 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
         SoundAndEffectsManager.shared.play(.pop)
     }
 
-    @objc private func didToggleSoundSFX(_ sender: NSMenuItem) {
-        SoundAndEffectsManager.shared.isSoundEnabled.toggle()
+    @objc private func didSelectDayNightMode(_ sender: NSMenuItem) {
+        guard let mode = sender.representedObject as? DayNightMode else { return }
+        DayNightCycleManager.shared.mode = mode
+        DayNightCycleManager.shared.refresh()
+        statusItem?.menu = buildContextMenu()
+    }
+
+    @objc private func didToggleSoundSFX(_ sender: NSMenuItem) {        SoundAndEffectsManager.shared.isSoundEnabled.toggle()
         sender.state = SoundAndEffectsManager.shared.isSoundEnabled ? .on : .off
         statusItem?.menu = buildContextMenu()
     }
@@ -1349,12 +1511,68 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
 
     @objc private func didSelectFeedPet() {
         guard let pw = petWindow else { return }
+        if window.characterView.characterNode.currentHeldItem == .wheat {
+            feedWheatToPet()
+            return
+        }
         pw.petView.petNode.feed()
         window.characterView.characterNode.showOverheadEmoji("🦴 냠냠 맛있게 먹어!", duration: 2.0)
     }
 
+    private var wheatFeedCount: Int = 0
+    private var babyPetWindow: PetWindow?
+    private var babyGrowTimer: TimeInterval = 0
+
+    private func feedWheatToPet() {
+        guard let pw = petWindow, let kind = currentPetKind else { return }
+        wheatFeedCount += 1
+        pw.petView.petNode.showOverheadEmoji("💕🌾", duration: 1.6)
+        SoundAndEffectsManager.shared.play(.heart)
+        if wheatFeedCount >= 2 {
+            wheatFeedCount = 0
+            spawnBabyPet(kind: kind)
+        } else {
+            window.characterView.characterNode.showOverheadEmoji("🌾 한 번 더 먹이자!", duration: 1.8)
+        }
+    }
+
+    private func spawnBabyPet(kind: PetKind) {
+        guard babyPetWindow == nil, let screen = NSScreen.main else { return }
+        let bw = PetWindow(kind: kind)
+        bw.setScale(0.5)
+        bw.setFeetPosition(x: physics.position.x - 40, y: physics.position.y)
+        bw.orderFrontRegardless()
+        babyPetWindow = bw
+        babyGrowTimer = 60.0
+        bw.petView.petNode.showOverheadEmoji("🍼 아기가 태어났다!", duration: 2.5)
+        window.characterView.characterNode.showOverheadEmoji("🍼 아기가 태어났다!", duration: 2.5)
+        SoundAndEffectsManager.shared.play(.heart)
+    }
+
+    private func updateBabyPet(dt: TimeInterval) {
+        guard let bw = babyPetWindow else { return }
+        babyGrowTimer -= dt
+        bw.setFeetPosition(x: physics.position.x - 40, y: physics.position.y)
+        if babyGrowTimer <= 0 {
+            bw.setScale(1.0)
+            bw.petView.petNode.showOverheadEmoji("🎉 쑥쑥 성장!", duration: 2.0)
+            babyGrowTimer = -3.0
+        } else if babyGrowTimer < -3.0 {
+            bw.close()
+            babyPetWindow = nil
+        }
+    }
+
     // MARK: - PetViewDelegate
     public func petViewDidClick(_ view: PetView) {
+        if let ww = wildWolfWindow, view === ww.petView {
+            handleWildWolfClicked(view)
+            return
+        }
+        if window.characterView.characterNode.currentHeldItem == .wheat {
+            feedWheatToPet()
+            return
+        }
         if window.characterView.characterNode.currentHeldItem == .bone || view.petNode.wolfHealth < 0.95 {
             view.petNode.feed()
             window.characterView.characterNode.showOverheadEmoji("🦴 냠냠!", duration: 1.8)
@@ -1463,6 +1681,18 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
         case .bone:
             damage = 1
             playerEmoji = "🦴 뼈다귀 어택!"
+        case .trident:
+            damage = 3
+            playerEmoji = "🔱 삼지창 찌르기!"
+        case .wheat:
+            damage = 1
+            playerEmoji = "🌾 밀 후리기!"
+        case .milkBucket, .emptyBucket:
+            damage = 1
+            playerEmoji = "🪣 양동이 쿵!"
+        case .flower:
+            damage = 1
+            playerEmoji = "🌺 꽃 후리기!"
         case .none:
             damage = 1
             playerEmoji = "👊 펀치!"
@@ -1490,12 +1720,20 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
             // 원작 고증: 방패로 가드 시 100% 폭발 피해 및 넉백 완벽 방어!
             charNode.showOverheadEmoji("🛡️ 챙-! 완벽 방어!", duration: 2.5)
             SoundAndEffectsManager.shared.play(.pop)
+        } else if consumeTotemIfEquipped() {
+            // M2: 불사의 토템이 치명타를 대신 받고 부활 (넉백 취소)
         } else {
             let dx = physics.position.x - blastPos.x
             let blastDir: CGFloat = dx >= 0 ? 1.0 : -1.0
-            physics.launch(vx: blastDir * 550.0, vy: 420.0)
-            charNode.showOverheadEmoji("💥 으악!", duration: 2.0)
+            if creeperCharged {
+                physics.launch(vx: blastDir * 880.0, vy: 590.0)
+                charNode.showOverheadEmoji("⚡💥 충전 폭발!", duration: 2.2)
+            } else {
+                physics.launch(vx: blastDir * 550.0, vy: 420.0)
+                charNode.showOverheadEmoji("💥 으악!", duration: 2.0)
+            }
         }
+        creeperCharged = false
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
             self?.despawnCreeper()
@@ -1790,9 +2028,352 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
         endermanPhysics?.releaseDrag(throwVelocity: throwVelocity)
     }
 
+    // MARK: - Farming (밀 농사)
+    private var cropWindows: [CropEntityWindow] = []
+    @objc private func didSelectPlantCrop() {
+        guard cropWindows.count < 4 else {
+            window.characterView.characterNode.showOverheadEmoji("🌱 밭이 꽉 찼어!", duration: 1.6)
+            return
+        }
+        let pos = CGPoint(x: physics.position.x + 70, y: physics.position.y)
+        var crop: CropEntityWindow?
+        crop = CropEntityWindow(plantPos: pos) { [weak self, weak crop] in
+            guard let self = self else { return }
+            if let crop = crop {
+                self.cropWindows.removeAll { $0 === crop }
+            }
+            self.window.characterView.characterNode.currentHeldItem = .wheat
+            self.window.characterView.characterNode.showOverheadEmoji("🌾 수확! 밀 획득!", duration: 2.2)
+            SoundAndEffectsManager.shared.play(.heart)
+        }
+        cropWindows.append(crop!)
+        crop!.plant()
+        window.characterView.characterNode.showOverheadEmoji("🌱 밀 심기!", duration: 1.6)
+    }
+
+    // MARK: - Taming (야생 늑대 길들이기)
+    private var wildWolfWindow: PetWindow?
+    private var wildWolfDir: CGFloat = 1
+    private var wildWolfFlipTimer: TimeInterval = 0
+    @objc private func didSelectSpawnWildWolf() {
+        if wildWolfWindow != nil { return }
+        let ww = PetWindow(kind: .wolf)
+        ww.setFeetPosition(x: physics.position.x + 220, y: physics.position.y)
+        ww.orderFrontRegardless()
+        ww.petView.petDelegate = self
+        wildWolfWindow = ww
+        wildWolfFlipTimer = 2.0
+        ww.petView.petNode.showOverheadEmoji("❓ 야생 늑대다...!", duration: 2.2)
+        SoundAndEffectsManager.shared.play(.alert)
+    }
+
+    private func updateWildWolf(dt: TimeInterval) {
+        guard let ww = wildWolfWindow else { return }
+        wildWolfFlipTimer -= dt
+        if wildWolfFlipTimer <= 0 {
+            wildWolfFlipTimer = Double.random(in: 2.0...4.0)
+            wildWolfDir = Bool.random() ? 1 : -1
+        }
+        let node = ww.petView.petNode
+        node.modelRoot.eulerAngles.y = wildWolfDir > 0 ? (CGFloat.pi / 2.0) : (-CGFloat.pi / 2.0)
+        node.walkSpeed = 45
+        node.isRunning = false
+        node.update(deltaTime: CGFloat(dt))
+        var frame = ww.frame
+        frame.origin.x += wildWolfDir * 45.0 * CGFloat(dt)
+        ww.setFrameOrigin(frame.origin)
+    }
+
+    private func handleWildWolfClicked(_ view: PetView) {
+        guard let ww = wildWolfWindow, view === ww.petView else { return }
+        if window.characterView.characterNode.currentHeldItem == .bone {
+            window.characterView.characterNode.currentHeldItem = .none
+            view.petNode.showOverheadEmoji("❤️❤️❤️ 길들였다!", duration: 2.5)
+            SoundAndEffectsManager.shared.play(.heart)
+            ww.close()
+            wildWolfWindow = nil
+            summonPet(kind: .wolf)
+            petWindow?.petView.petNode.wolfHealth = 1.0
+            window.characterView.characterNode.showOverheadEmoji("🐺 새 가족이다!", duration: 2.2)
+            statusItem?.menu = buildContextMenu()
+        } else {
+            view.petNode.showOverheadEmoji("으르렁! 🐺 (뼈다귀를 들어봐)", duration: 2.0)
+            SoundAndEffectsManager.shared.play(.alert)
+            wildWolfDir *= -1
+        }
+    }
+
+    // MARK: - Bees (벌·꿀)
+    private var beehiveWindow: BeehiveEntityWindow?
+    private var beeWindows: [BeeEntityWindow] = []
+    @objc private func didSelectBeehive() {
+        if let hive = beehiveWindow {
+            hive.close()
+            beehiveWindow = nil
+            for bee in beeWindows { bee.close() }
+            beeWindows = []
+            return
+        }
+        let pos = CGPoint(x: physics.position.x - 110, y: physics.position.y)
+        let hive = BeehiveEntityWindow(floorPos: pos) { [weak self] in
+            guard let self = self else { return }
+            self.window.characterView.characterNode.showOverheadEmoji("🍯 달콤해!", duration: 2.2)
+            SoundAndEffectsManager.shared.play(.gulp)
+        }
+        beehiveWindow = hive
+        hive.place()
+        let offsets = [CGPoint(x: -50, y: 60), CGPoint(x: 10, y: 80), CGPoint(x: 60, y: 55)]
+        for offset in offsets {
+            let bee = BeeEntityWindow(startPos: CGPoint(x: pos.x + offset.x, y: pos.y + offset.y))
+            bee.followOffset = offset
+            bee.orderFrontRegardless()
+            beeWindows.append(bee)
+        }
+        window.characterView.characterNode.currentHeldItem = .flower
+        window.characterView.characterNode.showOverheadEmoji("🐝 꽃 향기에 벌이 모여든다!", duration: 2.2)
+        SoundAndEffectsManager.shared.play(.heart)
+    }
+
+    private func updateBees() {
+        guard !beeWindows.isEmpty else { return }
+        let excited = window.characterView.characterNode.currentHeldItem == .flower
+        for bee in beeWindows {
+            bee.follow(target: physics.position, excited: excited)
+        }
+    }
+
     // MARK: - Fishing (낚시)
     @objc private func didSelectFishing() {
         behavior.triggerFishing(characterNode: window.characterView.characterNode)
+    }
+
+    // MARK: - H2 Trident (삼지창 충성 & 급류)
+    @objc private func didSelectThrowTrident() {
+        let charNode = window.characterView.characterNode
+        let isRiptide = charNode.isSneaking
+        behavior.triggerThrowTrident(characterNode: charNode, isRiptide: isRiptide)
+        let startPos = physics.position
+        let facing: CGFloat = charNode.modelRoot.eulerAngles.y >= 0 ? 1 : -1
+        let targetPos = CGPoint(x: startPos.x + facing * 320, y: startPos.y + 70)
+        if isRiptide {
+            physics.launch(vx: facing * 420, vy: 160)
+            charNode.showOverheadEmoji("🌊 급류 돌진-!", duration: 2.0)
+        }
+        charNode.currentHeldItem = .none
+        let trident = TridentEntityWindow(startPos: startPos, targetPos: targetPos) { [weak self] in
+            guard let self = self else { return }
+            self.window.characterView.characterNode.currentHeldItem = .trident
+            self.window.characterView.characterNode.showOverheadEmoji("🔱 촥-! 복귀!", duration: 1.6)
+            SoundAndEffectsManager.shared.play(.pop)
+        }
+        activeTridents.append(trident)
+        trident.launch()
+    }
+
+    // MARK: - H3 Jukebox (주크박스 & 리듬 댄스)
+    private var jukeboxWindow: JukeboxEntityWindow?
+    @objc private func didSelectJukebox() {
+        if jukeboxWindow != nil {
+            jukeboxWindow?.close()
+            jukeboxWindow = nil
+            return
+        }
+        let pos = CGPoint(x: physics.position.x + 90, y: physics.position.y)
+        let jukebox = JukeboxEntityWindow(floorPos: pos) { [weak self] in
+            self?.jukeboxWindow = nil
+        }
+        jukeboxWindow = jukebox
+        jukebox.place()
+        behavior.triggerJukeboxDance(characterNode: window.characterView.characterNode)
+        petBehavior?.startDancing()
+    }
+
+    // MARK: - M1 Chest (보물 상자)
+    private var chestWindow: ChestEntityWindow?
+    @objc private func didSelectChest() {
+        if chestWindow != nil { return }
+        let pos = CGPoint(x: physics.position.x + 110, y: physics.position.y)
+        let chest = ChestEntityWindow(floorPos: pos) { [weak self] in
+            guard let self = self else { return }
+            self.chestWindow = nil
+            self.window.characterView.characterNode.showOverheadEmoji("💎 대박! 다이아다!", duration: 2.5)
+            SoundAndEffectsManager.shared.play(.heart)
+        }
+        chestWindow = chest
+        chest.spawn()
+        window.characterView.characterNode.showOverheadEmoji("📦 오! 상자다!", duration: 1.8)
+    }
+
+    // MARK: - M2 Totem (불사의 토템)
+    @objc private func didToggleTotem(_ sender: NSMenuItem) {
+        let charNode = window.characterView.characterNode
+        charNode.isTotemEquipped.toggle()
+        sender.state = charNode.isTotemEquipped ? .on : .off
+        if charNode.isTotemEquipped {
+            charNode.showOverheadEmoji("✨ 불사의 토템 장착!", duration: 2.0)
+            SoundAndEffectsManager.shared.play(.chime)
+        }
+        statusItem?.menu = buildContextMenu()
+    }
+
+    public func consumeTotemIfEquipped() -> Bool {
+        let charNode = window.characterView.characterNode
+        guard charNode.isTotemEquipped else { return false }
+        charNode.isTotemEquipped = false
+        charNode.isReviving = true
+        charNode.showOverheadEmoji("✨ 죽음은 아직이다!", duration: 2.5)
+        SoundAndEffectsManager.shared.play(.chime)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            charNode.isReviving = false
+        }
+        statusItem?.menu = buildContextMenu()
+        return true
+    }
+
+    // MARK: - M3 Slime (슬라임 분열 몹)
+    private var slimeWindows: [SlimeWindow] = []
+    private var slimeSpawnTimer: TimeInterval = 0
+    private var slimeSpawnInterval: TimeInterval = 180.0
+
+    // MARK: - H4 Day/Night (낮밤 사이클)
+    private var dayNightTimer: TimeInterval = 0
+    private var wasNight: Bool = false
+    private var didAutoEquipTorch: Bool = false
+    private var sleepSkipTimer: TimeInterval = 0
+
+    // MARK: - Weather (비·뇌우·번개)
+    private var rainOverlay: RainOverlayWindow?
+    private var weatherWasRaining: Bool = false
+    private var creeperCharged: Bool = false
+
+    @objc private func didToggleWeather(_ sender: NSMenuItem) {
+        WeatherManager.shared.isEnabled.toggle()
+        sender.state = WeatherManager.shared.isEnabled ? .on : .off
+        if !WeatherManager.shared.isEnabled {
+            rainOverlay?.hide()
+            rainOverlay = nil
+            weatherWasRaining = false
+        }
+        statusItem?.menu = buildContextMenu()
+    }
+
+    private func updateWeather(dt: TimeInterval, screen: NSScreen) {
+        WeatherManager.shared.update(dt: dt)
+        let raining = WeatherManager.shared.isEnabled && WeatherManager.shared.isRaining
+        if raining != weatherWasRaining {
+            weatherWasRaining = raining
+            if raining {
+                let overlay = RainOverlayWindow(screen: screen)
+                rainOverlay = overlay
+                overlay.show()
+                window.characterView.characterNode.showOverheadEmoji(
+                    WeatherManager.shared.isThunder ? "⛈️ 우르릉! 뇌우다!" : "🌧️ 비가 오네...",
+                    duration: 2.5
+                )
+            } else {
+                rainOverlay?.hide()
+                rainOverlay = nil
+            }
+        }
+        if WeatherManager.shared.consumeStrike() {
+            rainOverlay?.flashLightning()
+            let strikeX = physics.position.x + CGFloat.random(in: -260...260)
+            if abs(strikeX - physics.position.x) < 200 {
+                window.characterView.characterNode.showOverheadEmoji("⚡ 꽈광! 깜짝이야!", duration: 2.0)
+            }
+        }
+        if WeatherManager.shared.isThunder && creeperWindow != nil && !creeperCharged {
+            creeperCharged = true
+            creeperWindow?.creeperView.creeperNode.showOverheadEmoji("⚡ 충전 크리퍼!!", duration: 2.5)
+            SoundAndEffectsManager.shared.play(.alert)
+        }
+    }
+    @objc private func didSelectSpawnSlime() {
+        spawnSlime(size: .big, at: nil)
+    }
+
+    public func spawnSlime(size: SlimeSize, at pos: CGPoint?) {
+        guard slimeWindows.count < 8 else { return }
+        let spawnPos = pos ?? CGPoint(x: physics.position.x - 160, y: physics.position.y + 40)
+        let slime = SlimeWindow(size: size, startPos: spawnPos, delegate: self)
+        slimeWindows.append(slime)
+        slime.spawn()
+        if size == .big {
+            window.characterView.characterNode.showOverheadEmoji("🟢 끈적한 손님이다!", duration: 2.0)
+        }
+    }
+
+    public func slimeWindowDidSplit(_ window: SlimeWindow, size: SlimeSize, at pos: CGPoint) {
+        slimeWindows.removeAll { $0 === window }
+        guard size.smaller() != nil else { return }
+        spawnSlime(size: size.smaller()!, at: CGPoint(x: pos.x - 30, y: pos.y))
+        spawnSlime(size: size.smaller()!, at: CGPoint(x: pos.x + 30, y: pos.y))
+        SoundAndEffectsManager.shared.play(.splash)
+    }
+
+    public func slimeWindowDidDespawn(_ window: SlimeWindow) {
+        slimeWindows.removeAll { $0 === window }
+        self.window.characterView.characterNode.showOverheadEmoji("🟢 슬라임볼 획득!", duration: 2.0)
+        SoundAndEffectsManager.shared.play(.pop)
+    }
+
+    public func attackSlime(_ slime: SlimeWindow) {
+        let charNode = window.characterView.characterNode
+        charNode.isAttackingWeapon = true
+        playerAttackTimer = 0.35
+        charNode.showOverheadEmoji("🗡️ 퐁!", duration: 1.2)
+        SoundAndEffectsManager.shared.play(.splash)
+        slime.takeHit()
+    }
+
+    // MARK: - M4 Wheat (밀 유혹 & 번식)
+    @objc private func didSelectWheat() {
+        let charNode = window.characterView.characterNode
+        charNode.currentHeldItem = .wheat
+        charNode.showOverheadEmoji("🌾 밀 있다! 모여라~", duration: 2.2)
+        SoundAndEffectsManager.shared.play(.pop)
+        petBehavior?.enticeWithWheat()
+    }
+
+    // MARK: - L2 Milk (우유 정화)
+    private var milkCleanseTimer: TimeInterval = 0
+    @objc private func didSelectDrinkMilk() {
+        behavior.triggerDrinkMilk(characterNode: window.characterView.characterNode)
+        isBatteryAlertFired = false
+        milkCleanseTimer = 60.0
+    }
+
+    // MARK: - L3 Nether Portal (지옥문)
+    private var portalOverlay: NetherPortalOverlayWindow?
+    private var isInNether: Bool = false
+    @objc private func didSelectPortal() {
+        if portalOverlay != nil {
+            portalOverlay?.close()
+            portalOverlay = nil
+            return
+        }
+        let pos = CGPoint(x: physics.position.x + 130, y: physics.position.y)
+        let portal = NetherPortalOverlayWindow(floorPos: pos)
+        portalOverlay = portal
+        portal.open()
+        window.characterView.characterNode.showOverheadEmoji("🟣 지옥문이다...!", duration: 2.0)
+        SoundAndEffectsManager.shared.play(.portal)
+    }
+
+    public func checkPortalEntry() {
+        guard let portal = portalOverlay, !portal.hasEntered else { return }
+        let dx = abs(physics.position.x - portal.floorPos.x)
+        if dx < 45 && abs(physics.position.y - portal.floorPos.y) < 60 {
+            portal.markEntered()
+            isInNether.toggle()
+            let charNode = window.characterView.characterNode
+            if isInNether {
+                charNode.showOverheadEmoji("🔥 여기가 지옥인가...!", duration: 2.5)
+            } else {
+                charNode.showOverheadEmoji("🌿 집으로 복귀!", duration: 2.0)
+            }
+            SoundAndEffectsManager.shared.play(.portal)
+        }
     }
 
     // MARK: - Window Squash & Minimize (창 압축 최소화)

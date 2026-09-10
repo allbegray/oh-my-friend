@@ -9,6 +9,11 @@ public enum SoundEffect {
     case alert     // Wake up / surprise
     case ignite    // TNT ignition (flint & steel spark)
     case explode   // TNT explosion boom
+    case whoosh    // Trident throw / Riptide launch
+    case splash    // Fishing splash / slime squish
+    case chime     // Jukebox note / chest open / totem revive
+    case gulp      // Milk drink
+    case portal    // Nether portal travel
 }
 
 public final class SoundAndEffectsManager {
@@ -62,6 +67,21 @@ public final class SoundAndEffectsManager {
         case .explode:
             bassoSound?.stop()
             bassoSound?.play()
+        case .whoosh:
+            tinkSound?.stop()
+            tinkSound?.play()
+        case .splash:
+            bottleSound?.stop()
+            bottleSound?.play()
+        case .chime:
+            heroSound?.stop()
+            heroSound?.play()
+        case .gulp:
+            purrSound?.stop()
+            purrSound?.play()
+        case .portal:
+            pingSound?.stop()
+            pingSound?.play()
         }
     }
 }

@@ -9,6 +9,11 @@ public enum HeldItem: String, CaseIterable {
     case torch = "레드스톤 횃불 🕯️"
     case fishingRod = "낚싯대 🎣"
     case bone = "뼈다귀 🦴"
+    case trident = "삼지창 🔱"
+    case wheat = "밀 🌾"
+    case milkBucket = "우유 양동이 🥛"
+    case emptyBucket = "빈 양동이 🪣"
+    case flower = "빨간 꽃 🌺"
 }
 
 public final class MinecraftCharacterNode: SCNNode {
@@ -57,6 +62,11 @@ public final class MinecraftCharacterNode: SCNNode {
         didSet { updateShieldModel() }
     }
     public var isGuarding: Bool = false
+
+    public let leftHandTotemAnchor = SCNNode()
+    public var isTotemEquipped: Bool = false {
+        didSet { updateTotemModel() }
+    }
 
     // 🪽 겉날개 (Elytra)
     public let elytraNode = SCNNode()
@@ -115,6 +125,9 @@ public final class MinecraftCharacterNode: SCNNode {
     public var isAttackingWeapon: Bool = false
     public var isFishing: Bool = false
     public var isPressingDown: Bool = false
+    public var isJukeboxDancing: Bool = false
+    public var isThrowingTrident: Bool = false
+    public var isReviving: Bool = false
 
     // Ladder climbing (사다리 등반)
     public var isClimbing: Bool = false {
@@ -213,6 +226,8 @@ public final class MinecraftCharacterNode: SCNNode {
         // Mount shield anchor on the left forearm
         leftHandShieldAnchor.position = SCNVector3(0, -0.45, 0.20)
         leftArmMesh.addChildNode(leftHandShieldAnchor)
+        leftHandTotemAnchor.position = SCNVector3(0, -0.45, -0.20)
+        leftArmMesh.addChildNode(leftHandTotemAnchor)
         leftArmJoint.addChildNode(leftArmOverlayMesh)
         bodyAnchor.addChildNode(leftArmJoint)
 
@@ -420,6 +435,26 @@ public final class MinecraftCharacterNode: SCNNode {
         case .bone:
             let bone = createBoneModel()
             rightHandItemAnchor.addChildNode(bone)
+
+        case .trident:
+            let trident = createTridentModel()
+            rightHandItemAnchor.addChildNode(trident)
+
+        case .wheat:
+            let wheat = createWheatModel()
+            rightHandItemAnchor.addChildNode(wheat)
+
+        case .milkBucket:
+            let milk = createBucketModel(fillColor: NSColor.white)
+            rightHandItemAnchor.addChildNode(milk)
+
+        case .emptyBucket:
+            let empty = createBucketModel(fillColor: NSColor(red: 0.55, green: 0.55, blue: 0.58, alpha: 1.0))
+            rightHandItemAnchor.addChildNode(empty)
+
+        case .flower:
+            let flower = createFlowerModel()
+            rightHandItemAnchor.addChildNode(flower)
         }
         EnchantmentGlintShader.apply(to: rightHandItemAnchor, enabled: isEnchantedGlintEnabled)
     }
@@ -583,6 +618,96 @@ public final class MinecraftCharacterNode: SCNNode {
         return root
     }
 
+    /// 🔱 삼지창: 나무 손잡이 + 3갈래 다이아 촉 (H2 Trident)
+    private func createTridentModel() -> SCNNode {
+        let root = SCNNode()
+        root.eulerAngles = SCNVector3(CGFloat.pi / 2.0, 0, 0)
+        let woodMat = SCNMaterial()
+        woodMat.diffuse.contents = NSColor(red: 0.45, green: 0.30, blue: 0.14, alpha: 1.0)
+        let diaMat = SCNMaterial()
+        diaMat.diffuse.contents = NSColor(red: 0.2, green: 0.85, blue: 0.85, alpha: 1.0)
+
+        let shaftBox = SCNBox(width: 0.08, height: 1.1, length: 0.08, chamferRadius: 0)
+        shaftBox.materials = [woodMat]
+        let shaft = SCNNode(geometry: shaftBox)
+        shaft.position = SCNVector3(0, 0.45, 0)
+        root.addChildNode(shaft)
+
+        let crossBox = SCNBox(width: 0.5, height: 0.08, length: 0.08, chamferRadius: 0)
+        crossBox.materials = [diaMat]
+        let cross = SCNNode(geometry: crossBox)
+        cross.position = SCNVector3(0, 1.0, 0)
+        root.addChildNode(cross)
+
+        for x in [-0.21, 0.0, 0.21] as [CGFloat] {
+            let prongBox = SCNBox(width: 0.07, height: 0.35, length: 0.07, chamferRadius: 0)
+            prongBox.materials = [diaMat]
+            let prong = SCNNode(geometry: prongBox)
+            prong.position = SCNVector3(x, 1.2, 0)
+            root.addChildNode(prong)
+        }
+        return root
+    }
+
+    /// 🌾 밀: 노란 줄기 + 이삭 (M4 Wheat)
+    private func createWheatModel() -> SCNNode {
+        let root = SCNNode()
+        let stemMat = SCNMaterial()
+        stemMat.diffuse.contents = NSColor(red: 0.55, green: 0.42, blue: 0.18, alpha: 1.0)
+        let grainMat = SCNMaterial()
+        grainMat.diffuse.contents = NSColor(red: 0.95, green: 0.82, blue: 0.30, alpha: 1.0)
+        let stemBox = SCNBox(width: 0.06, height: 0.7, length: 0.06, chamferRadius: 0)
+        stemBox.materials = [stemMat]
+        let stem = SCNNode(geometry: stemBox)
+        stem.position = SCNVector3(0, 0.3, 0)
+        root.addChildNode(stem)
+        for i in 0..<3 {
+            let grainBox = SCNBox(width: 0.14, height: 0.12, length: 0.10, chamferRadius: 0)
+            grainBox.materials = [grainMat]
+            let grain = SCNNode(geometry: grainBox)
+            grain.position = SCNVector3(0, 0.68 + CGFloat(i) * 0.13, 0)
+            root.addChildNode(grain)
+        }
+        return root
+    }
+
+    private func createFlowerModel() -> SCNNode {
+        let root = SCNNode()
+        let stemMat = SCNMaterial()
+        stemMat.diffuse.contents = NSColor(red: 0.2, green: 0.6, blue: 0.2, alpha: 1.0)
+        let petalMat = SCNMaterial()
+        petalMat.diffuse.contents = NSColor(red: 0.9, green: 0.12, blue: 0.12, alpha: 1.0)
+        let stemBox = SCNBox(width: 0.05, height: 0.5, length: 0.05, chamferRadius: 0)
+        stemBox.materials = [stemMat]
+        let stem = SCNNode(geometry: stemBox)
+        stem.position = SCNVector3(0, 0.2, 0)
+        root.addChildNode(stem)
+        let headBox = SCNBox(width: 0.22, height: 0.22, length: 0.22, chamferRadius: 0.02)
+        headBox.materials = [petalMat]
+        let head = SCNNode(geometry: headBox)
+        head.position = SCNVector3(0, 0.5, 0)
+        root.addChildNode(head)
+        return root
+    }
+
+    /// 🥛 양동이: 철 양동이 + 내용물 색상 (L2 Milk, 빈 양동이 겸용)
+    private func createBucketModel(fillColor: NSColor) -> SCNNode {
+        let root = SCNNode()
+        let ironMat = SCNMaterial()
+        ironMat.diffuse.contents = NSColor(red: 0.62, green: 0.63, blue: 0.66, alpha: 1.0)
+        let fillMat = SCNMaterial()
+        fillMat.diffuse.contents = fillColor
+        let bodyBox = SCNBox(width: 0.3, height: 0.35, length: 0.3, chamferRadius: 0.02)
+        bodyBox.materials = [ironMat]
+        root.addChildNode(SCNNode(geometry: bodyBox))
+        let fillBox = SCNBox(width: 0.26, height: 0.08, length: 0.26, chamferRadius: 0)
+        fillBox.materials = [fillMat]
+        let fill = SCNNode(geometry: fillBox)
+        fill.position = SCNVector3(0, 0.16, 0)
+        root.addChildNode(fill)
+        return root
+    }
+
     // MARK: - 3D Minecraft Shield Model
     private func updateShieldModel() {
         leftHandShieldAnchor.childNodes.forEach { $0.removeFromParentNode() }
@@ -621,6 +746,32 @@ public final class MinecraftCharacterNode: SCNNode {
 
         leftHandShieldAnchor.addChildNode(root)
         EnchantmentGlintShader.apply(to: leftHandShieldAnchor, enabled: isEnchantedGlintEnabled)
+    }
+
+    private func updateTotemModel() {
+        leftHandTotemAnchor.childNodes.forEach { $0.removeFromParentNode() }
+        guard isTotemEquipped else { return }
+        let goldMat = SCNMaterial()
+        goldMat.diffuse.contents = NSColor(red: 0.95, green: 0.75, blue: 0.20, alpha: 1.0)
+        goldMat.lightingModel = .lambert
+        let gemMat = SCNMaterial()
+        gemMat.diffuse.contents = NSColor(red: 0.30, green: 0.85, blue: 0.95, alpha: 1.0)
+        gemMat.lightingModel = .lambert
+        let root = SCNNode()
+        let bodyBox = SCNBox(width: 0.22, height: 0.55, length: 0.12, chamferRadius: 0.01)
+        bodyBox.materials = [goldMat]
+        root.addChildNode(SCNNode(geometry: bodyBox))
+        let headBox = SCNBox(width: 0.18, height: 0.18, length: 0.12, chamferRadius: 0.01)
+        headBox.materials = [goldMat]
+        let head = SCNNode(geometry: headBox)
+        head.position = SCNVector3(0, 0.36, 0)
+        root.addChildNode(head)
+        let gemBox = SCNBox(width: 0.10, height: 0.10, length: 0.13, chamferRadius: 0)
+        gemBox.materials = [gemMat]
+        let gem = SCNNode(geometry: gemBox)
+        gem.position = SCNVector3(0, 0.05, 0)
+        root.addChildNode(gem)
+        leftHandTotemAnchor.addChildNode(root)
     }
 
     // MARK: - 3D Minecraft Elytra (겉날개)
@@ -822,6 +973,31 @@ public final class MinecraftCharacterNode: SCNNode {
                 rightArmJoint.eulerAngles = SCNVector3(-0.3, 0, 0.1)
                 leftArmJoint.eulerAngles = SCNVector3(-0.3, 0, -0.1)
             }
+            return
+        }
+
+        if isJukeboxDancing {
+            let sway = sin(animTime * 7.0) * 0.35
+            headJoint.eulerAngles = SCNVector3(0, sway, sin(animTime * 3.5) * 0.1)
+            let bob = abs(sin(animTime * 7.0)) * 0.12
+            bodyAnchor.position = SCNVector3(sway * 0.2, bob, 0)
+            rightArmJoint.eulerAngles = SCNVector3(-0.5 + sway * 0.4, 0, 0.35)
+            leftArmJoint.eulerAngles = SCNVector3(-0.5 - sway * 0.4, 0, -0.35)
+            return
+        }
+
+        if isThrowingTrident {
+            let windup = sin(animTime * 9.0) * 0.5
+            rightArmJoint.eulerAngles = SCNVector3(-2.4 + windup, 0, 0.2)
+            leftArmJoint.eulerAngles = SCNVector3(-0.3, 0, -0.1)
+            return
+        }
+
+        if isReviving {
+            let glow = abs(sin(animTime * 10.0)) * 0.2
+            bodyAnchor.position = SCNVector3(0, 0.25 + glow, 0)
+            rightArmJoint.eulerAngles = SCNVector3(-2.8, 0, 0.4)
+            leftArmJoint.eulerAngles = SCNVector3(-2.8, 0, -0.4)
             return
         }
 

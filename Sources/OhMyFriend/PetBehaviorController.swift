@@ -18,8 +18,20 @@ public final class PetBehaviorController {
 
     private var walkSpeed: CGFloat = 85.0
     private var idleBlinkTimer: TimeInterval = 0
+    private var danceTimer: TimeInterval = 0
+    private var danceBeatTimer: TimeInterval = 0
+    private var wheatLureTimer: TimeInterval = 0
 
     public init() {}
+
+    public func startDancing(duration: TimeInterval = 8.0) {
+        danceTimer = duration
+        danceBeatTimer = 0
+    }
+
+    public func enticeWithWheat(duration: TimeInterval = 12.0) {
+        wheatLureTimer = duration
+    }
 
     public func update(
         deltaTime dt: CGFloat,
@@ -44,6 +56,23 @@ public final class PetBehaviorController {
         }
 
         // 2. Sync with Player Sleeping
+        if danceTimer > 0 {
+            danceTimer -= dt
+            danceBeatTimer -= dt
+            if danceBeatTimer <= 0 {
+                danceBeatTimer = 0.45
+                petPhysics.jump(impulse: 130)
+                petNode.showOverheadEmoji("🎶", duration: 0.8)
+            }
+            if danceTimer <= 0 {
+                petNode.walkSpeed = 0
+                state = .idle(timeLeft: 1.0)
+                return
+            }
+        }
+        if wheatLureTimer > 0 {
+            wheatLureTimer -= dt
+        }
         if playerIsSleeping {
             petNode.isSleeping = true
             petNode.isSitting = false
@@ -86,7 +115,13 @@ public final class PetBehaviorController {
         if distance > stopDistance {
             let dir: CGFloat = dx > 0 ? 1.0 : -1.0
             let isRunning = distance > runThreshold
-            let speed: CGFloat = isRunning ? 150.0 : 85.0
+            var speed: CGFloat = isRunning ? 150.0 : 85.0
+            if wheatLureTimer > 0 {
+                speed *= 1.4
+                if Int(wheatLureTimer * 2.0) % 4 == 0 {
+                    petNode.showOverheadEmoji("👀✨", duration: 0.7)
+                }
+            }
 
             petNode.isRunning = isRunning
             petNode.walkSpeed = speed

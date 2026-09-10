@@ -50,7 +50,17 @@ Sources/OhMyFriend/
 ├── SkinCatalogManager.swift            # 추천 스킨 카탈로그 데이터 및 로컬 보관함(~/Library/.../Skins) 관리자
 ├── SkinDownloaderService.swift         # Mojang/Minotar/Crafatar API 비동기 다운로더 및 URL 검증기
 ├── SkinGalleryView.swift               # SwiftUI 기반 4개 탭 스킨 갤러리 UI
-└── SkinGalleryWindowController.swift   # 스킨 갤러리 전용 NSWindow 컨트롤러
+├── SkinGalleryWindowController.swift   # 스킨 갤러리 전용 NSWindow 컨트롤러
+├── TridentEntityWindow.swift           # 삼지창 투척체: 포물선 비행→회전하며 손으로 복귀하는 충성 연출
+├── JukeboxEntityWindow.swift           # 바닥 설치형 픽셀아트 주크박스(8초 재생 후 자동 정리)
+├── ChestEntityWindow.swift             # 클릭 시 뚜껑 열림 + 전리품 텍스트 방출하는 1회용 보물 상자
+├── SlimeWindow.swift                   # 대/중/소 3단계 분열 슬라임(스쿼시 점프 이동, 클릭 타격 분열)
+├── NetherPortalOverlayWindow.swift     # 흑요석 틀 + 보라 소용돌이 지옥문 오버레이
+├── DayNightCycleManager.swift          # 실제 시간 기반 낮밤 판정(자동/낮고정/밤고정) 및 야간 스폰 가중치
+├── CropEntityWindow.swift              # 밀 농사: 4단계 성장 작물(25초/단계), 성숙 클릭 수확
+├── WeatherManager.swift                # 비·뇌우 랜덤 전환(150~300초) 및 번개 타이머
+├── RainOverlayWindow.swift             # 빗줄기 + 번개 섬광·볼트 오버레이
+└── BeeEntityWindow.swift               # 벌 3마리 추적 + 30초 꿀 생산 벌집
 ```
 
 - **렌더링 & 애니메이션 파이프라인**: `CharacterView` 내부의 `SCNScene`에서 `MinecraftCharacterNode`가 관절 피벗(목, 어깨, 골반)을 기반으로 회전 및 위치를 실시간 보간합니다.
@@ -61,6 +71,8 @@ Sources/OhMyFriend/
 ## 실행 기록
 
 ### 2026-09-10
+- **[고증 추가 5종] 농사·길들이기·날씨·밤스킵·벌꿀 구축**: `CropEntityWindow.swift`(25초/단계 4단계 성장·클릭 수확), 야생 늑대 배회 + 뼈다귀 길들이기 펫 편입, `WeatherManager.swift`(150~300초 비·뇌우 전환) + `RainOverlayWindow.swift`(빗줄기·번개 섬광·볼트) + 뇌우 충전 크리퍼(폭발 1.6배), 밤 전원 6초 수면 시 15분 아침 스킵(`skipToMorning` + `wakeUpIfSleeping`), `BeeEntityWindow.swift`(벌 3마리 꽃 추적 + 30초 꿀 벌집). `HeldItem.flower` 추가, 메뉴 3종(밀 심기/야생 늑대/벌집) + "🌧️ 날씨 모드" 토글 추가. 검증: `swift build` 통과, 번들 생성 및 4초 실행 스모크 테스트.
+- **[H2/H3/H4/M1/M2/M3/M4/L2/L3] 백로그 9종(L1 제외) 일괄 구축**: `TridentEntityWindow.swift`, `JukeboxEntityWindow.swift`, `ChestEntityWindow.swift`, `SlimeWindow.swift`, `NetherPortalOverlayWindow.swift`, `DayNightCycleManager.swift` 신규 구현. 삼지창 충성 복귀 투척 + 웅크리기 급류 추진, 주크박스 8초 재생 + 캐릭터/펫 리듬 댄스, 실제 시간 낮밤(18시~06시 야간 횃불 자동 점등 + 몬스터 1.5배 출현), 클릭 오픈 보물 상자, 왼손 토템 폭발 부활, 3단계 분열 슬라임(최대 8마리), 밀 유혹 + 2회 먹이 아기 펫 탄생·60초 성장, 우유 60초 디버프 정화, 지옥문 왕복 연출 구현. `HeldItem` 4종(삼지창/밀/우유/빈양동이) 및 효과음 5종(`whoosh`/`splash`/`chime`/`gulp`/`portal`) 추가, 메뉴바 "✨ 재미있는 모션 실행"에 8종 액션 + "☀️/🌙 낮밤 모드" 서브메뉴 추가. 검증: `swift build` 통과, `scripts/build_app.sh` 번들 생성 및 4초 실행 스모크 테스트.
 - **[H1] 활 쏘는 스켈레톤(Skeleton Archer) 출현 및 방패 화살 튕겨내기 / 낮 햇빛 발화 고증 구축**: `SkeletonNode.swift`, `SkeletonBehaviorController.swift`, `SkeletonView.swift`, `SkeletonWindow.swift`, `ArrowEntityWindow.swift` 신규 구현. 해골 머리와 앙상한 갈비뼈/뼈다귀 팔다리, 3D 나무 활(`bowNode`) 조준/시위 당기기 모션. 포물선 궤적으로 날아가는 화살(`ArrowEntityWindow`) 발사 및 플레이어 방패 가드 시 `챙-!` 튕겨내기(`🛡️ 챙-! 화살 방어!`) 구현. 낮 시간대(06:00~18:00) 햇빛 노출 시 온몸 발화(`🔥 치이익! 햇빛이다!`) 및 창문 그늘 도주 AI 구현. 처치 시 뼈다귀(`🦴`), 화살(`➡️`), 활(`🏹`) 드롭. 메뉴바 "✨ 재미있는 모션 실행"에 "🏹 스켈레톤 소환" 및 "👾 가끔 스켈레톤 출현 모드" 토글 추가.
 - **.idea/ 디렉토리 git ignore 및 저장소 인덱스 추적 제외**: JetBrains/IDEA 설정 파일(`.idea/`)을 `.gitignore`에 등록하고 원격 저장소 추적에서 안전하게 분리.
 - **[M1-M4, L2-L4] 고급 원작 고증 7대 기능(창 압축, 모서리 낚시, 겉날개 활공, 늑대 꼬리, 스킨 필터, 인챈트 광택, 배터리 허기) 구축**:
