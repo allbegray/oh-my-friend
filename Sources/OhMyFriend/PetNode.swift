@@ -110,16 +110,32 @@ public final class PetNode: SCNNode {
     }
     // MARK: - 3D Voxel Model Builders
     private func setupModel() {
-        // Clear previous meshes
-        let allJoints = [headJoint, bodyAnchor, legFL, legFR, legBL, legBR, tailJoint, wingLeft, wingRight]
-        for joint in allJoints {
+        // 관절은 씬에 붙인 채로 내용물만 비운다 (예전에 bodyAnchor 자식 전체를 지워서
+        // 머리·다리·꼬리가 씬에서 떨어져나가는 버그가 있었음).
+        let joints = [headJoint, legFL, legFR, legBL, legBR, tailJoint, wingLeft, wingRight]
+        for joint in joints {
             joint.geometry = nil
             joint.childNodes.forEach { $0.removeFromParentNode() }
             joint.eulerAngles = SCNVector3Zero
             joint.position = SCNVector3Zero
             joint.isHidden = false
+            if joint.parent !== bodyAnchor {
+                bodyAnchor.addChildNode(joint)
+            }
         }
-        bodyAnchor.addChildNode(overheadEmojiNode) // re-attach emoji
+        bodyAnchor.geometry = nil
+        for child in bodyAnchor.childNodes {
+            var isJoint = false
+            for joint in joints where child === joint {
+                isJoint = true
+            }
+            if !isJoint && child !== overheadEmojiNode {
+                child.removeFromParentNode()
+            }
+        }
+        if overheadEmojiNode.parent == nil {
+            bodyAnchor.addChildNode(overheadEmojiNode)
+        }
 
         switch kind {
         case .wolf:
@@ -133,6 +149,11 @@ public final class PetNode: SCNNode {
         case .horse:
             buildHorseModel()
         }
+
+        // 말은 키가 커서 펫 카메라 프레임(120pt)을 초과하므로 전체 0.8로 축소.
+        // modelRoot 원점(발바닥) 기준이라 착지 위치는 그대로다.
+        let s: CGFloat = (kind == .horse) ? 0.8 : 1.0
+        modelRoot.scale = SCNVector3(s, s, s)
     }
 
     // 1. 🐺 마인크래프트 길들인 늑대/강아지 (Tamed Wolf)
@@ -183,6 +204,16 @@ public final class PetNode: SCNNode {
         let noseNode = SCNNode(geometry: noseGeom)
         noseNode.position = SCNVector3(0, 0.04, 0.14)
         snoutNode.addChildNode(noseNode)
+
+        // Eyes (dark, front-facing for readability)
+        let wolfEyeGeom = SCNBox(width: 0.09, height: 0.10, length: 0.02, chamferRadius: 0)
+        wolfEyeGeom.materials = [noseMat]
+        let wolfEyeL = SCNNode(geometry: wolfEyeGeom)
+        wolfEyeL.position = SCNVector3(-0.13, 0.08, 0.25)
+        let wolfEyeR = SCNNode(geometry: wolfEyeGeom)
+        wolfEyeR.position = SCNVector3(0.13, 0.08, 0.25)
+        headMesh.addChildNode(wolfEyeL)
+        headMesh.addChildNode(wolfEyeR)
 
         // Ears (Pointed)
         let earGeom = SCNBox(width: 0.12, height: 0.16, length: 0.08, chamferRadius: 0)
@@ -335,6 +366,22 @@ public final class PetNode: SCNNode {
         beakNode.position = SCNVector3(0, -0.04, 0.18)
         headMesh.addChildNode(beakNode)
 
+        // Eyes (white + black pupil, front-facing)
+        let whiteMat = makeLambert(color: NSColor.white)
+        let pupilMat = makeLambert(color: NSColor(red: 0.08, green: 0.08, blue: 0.08, alpha: 1.0))
+        let pWhiteGeom = SCNBox(width: 0.09, height: 0.10, length: 0.02, chamferRadius: 0)
+        pWhiteGeom.materials = [whiteMat]
+        let pPupilGeom = SCNBox(width: 0.045, height: 0.05, length: 0.02, chamferRadius: 0)
+        pPupilGeom.materials = [pupilMat]
+        for x in [-0.08, 0.08] as [CGFloat] {
+            let white = SCNNode(geometry: pWhiteGeom)
+            white.position = SCNVector3(x, 0.06, 0.15)
+            headMesh.addChildNode(white)
+            let pupil = SCNNode(geometry: pPupilGeom)
+            pupil.position = SCNVector3(x, 0.06, 0.16)
+            headMesh.addChildNode(pupil)
+        }
+
         // 2 Wings (Red with Yellow/Blue tips)
         let wingGeom = SCNBox(width: 0.06, height: 0.42, length: 0.24, chamferRadius: 0)
         wingGeom.materials = [blueMat]
@@ -388,6 +435,15 @@ public final class PetNode: SCNNode {
         let snoutNode = SCNNode(geometry: snoutGeom)
         snoutNode.position = SCNVector3(0, -0.06, 0.26)
         headMesh.addChildNode(snoutNode)
+
+        // Nostrils
+        let nostrilGeom = SCNBox(width: 0.05, height: 0.06, length: 0.02, chamferRadius: 0)
+        nostrilGeom.materials = [eyeMat]
+        for x in [-0.07, 0.07] as [CGFloat] {
+            let nostril = SCNNode(geometry: nostrilGeom)
+            nostril.position = SCNVector3(x, -0.06, 0.34)
+            headMesh.addChildNode(nostril)
+        }
 
         // Eyes
         let eyeGeom = SCNBox(width: 0.08, height: 0.08, length: 0.02, chamferRadius: 0)
