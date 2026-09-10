@@ -46,6 +46,7 @@ Sources/OhMyFriend/
 ├── CharacterBehaviorController.swift   # 자율 행동 FSM (배회, 시선 추적, 창문 걸터앉기, Dock 노크)
 ├── BlockBreakOverlayWindow.swift       # TNT 폭파: 도화선 점멸→폭발 섬광·연기·블록 파편 오버레이
 ├── TNTEntityWindow.swift               # 창 표면에 놓인 TNT 블록 엔티티(픽셀아트 + 도화선 점멸)
+├── LadderOverlayWindow.swift           # 사다리 등반: 창문 높이만큼만 생성되는 레일 2개 + 가로대 오버레이
 ├── SkinCatalogManager.swift            # 추천 스킨 카탈로그 데이터 및 로컬 보관함(~/Library/.../Skins) 관리자
 ├── SkinDownloaderService.swift         # Mojang/Minotar/Crafatar API 비동기 다운로더 및 URL 검증기
 ├── SkinGalleryView.swift               # SwiftUI 기반 4개 탭 스킨 갤러리 UI
@@ -54,6 +55,7 @@ Sources/OhMyFriend/
 
 - **렌더링 & 애니메이션 파이프라인**: `CharacterView` 내부의 `SCNScene`에서 `MinecraftCharacterNode`가 관절 피벗(목, 어깨, 골반)을 기반으로 회전 및 위치를 실시간 보간합니다.
 - **물리 & 윈도우 추적**: `ScreenEnvironment`가 0.5초 주기로 활성 앱 윈도우 타이틀바의 Cocoa 좌표계 상단을 스캔하여 발판(`Platform`) 목록을 갱신하고, `PhysicsEngine`이 중력 가속도와 착지 판정을 처리합니다.
+- **등반 연출 파이프라인**: `CharacterBehaviorController`가 매 프레임 등반 스냅샷(사다리 사각형 + 진행률)을 만들고, `AppController.syncLadderOverlay()`가 `LadderOverlayWindow`를 생성·갱신·정리합니다. 사다리는 창문 높이만큼만 생성되어 화면 좌표계에 고정되고(창이 움직이면 따라 이동), 캐릭터 창보다 한 단계 아래 레벨(`floating - 1`)에 그려집니다.
 - **스킨 파이프라인**: 로컬 파일, 기본 내장 픽셀아트 생성기, 온라인 다운로더(Mojang/Minotar)를 통해 64x64 PNG 데이터를 확보하고, 각 면(Front, Right, Back, Left, Top, Bottom)을 슬라이스하여 Nearest-neighbor 재질로 큐브에 매핑합니다.
 
 ## 실행 기록
@@ -65,6 +67,9 @@ Sources/OhMyFriend/
 - **파편 격자 창 크기 정합**: `Int(width/cell)` 내림으로 오른쪽·위 가장자리에 남던 빈 틈을 제거하고 창 폭/높이를 셀 수로 나눠 정확히 타일링. 대기 중인 파편도 제자리에 렌더링하도록 수정해, 부서지기 전 0.06초 동안 창이 블록 격자로 바뀐 모습이 창 영역과 일치(가장자리 커버리지 0.93~0.94, 창 밖 유출 0.00 측정).
 - **파편 비산 범위·힘 강화**: 오버레이 패널 여백이 곧 드로잉 클리핑 경계임을 반영해 좌우 340 / 상단 420 / 하단 640pt까지 확장하고 초기 속도·회전을 상향(측정: t=0.6초 시점 창 밖 좌 284 / 우 308 / 상 271pt 비산, 좌우 총 폭 1452pt ≈ 창 폭의 1.7배).
 - **곡괭이 채굴 → TNT 폭파 연출 전환**: 마인크래프트 TNT 실제 동작(도화선 80틱=4초, 점화 중 하얗게 점멸)을 조사해 반영. 캐릭터가 TNT를 치켜들고(0.45초) 앉아서 창 표면에 내려놓은 뒤(0.95초) 점화음과 함께 도화선 4초 동안 창이 사각 펄스로 점멸하고, 도화선 종료 순간 대상 앱 종료 + 폭발음 + 흰 코어·주황 링 섬광·연기·불똥·창 블록 파편 비산이 동시에 일어난다. 캐릭터는 폭풍에 튕겨 날아가 착지(`PhysicsEngine.launch`). 기존 크랙 단계 이펙트·곡괭이 모델은 제거하고 화면 공간 TNT 엔티티(`TNTEntityWindow.swift`, 픽셀아트)와 사운드 `.ignite`/`.explode` 추가.
+
+- **사다리 타고 창문 내려가기 (Ladder Descent)**: 창문 발판 위에서 사다리를 걸고 **창문 높이만큼만** 타고 내려가는 기능 추가. `Platform.yBottom`(창문 아래 끝 좌표)과 `CharacterBehaviorController.canDescend(from:)`(창문이며 높이 180pt 이상)으로 자격을 판정하고, `PhysicsState.climbing` + `beginClimb()/releaseClimb()`로 등반 중 중력·착지 판정을 멈추고 y를 행동 컨트롤러가 구동한다. FSM `climbDown`(0.55초 사다리 설치 → 220pt/s 하강)은 매 프레임 창문을 재조회해 창이 움직이면 사다리가 따라가고, 창이 닫히거나 사다리 끝(창 아래 끝)에 닿으면 사다리를 지우고 낙하시킨다(남은 높이는 기존 물리로 아래 창문/바닥/Dock에 착지). `MinecraftCharacterNode.isClimbing`은 몸을 π만큼 돌려 창문을 마주본 채(등을 보이며) 양팔 교차 리치·다리 교차 디딤 모션을 재생하고 고개 시선 추적을 멈춘다. `LadderOverlayWindow`(레벨 `floating - 1`, 폭 44pt, 레일 2개 + 16pt 간격 가로대 전체를 설치 시점에 한 번에 생성, 완료 시 0.35초 페이드아웃) 신규. 진입점: 메뉴 '🪜 사다리 타고 창문 내려가기'(Cmd+L) + 자율 모드 확률 밴드 9%(12초 쿨다운). 검증: 헤드리스 드라이버(자격 판정 / 사다리 사각형 200~604 정확·등반 중 변동 없음 / 220pt/s·총 143프레임 / 창 하단 이탈 후 바닥 낙하 / 창 소멸 폴백 / 드래그·클릭 중단 / 트리거 6종 차단 / 쿨다운), 창 서버 통합 하네스 15개 체크(오버레이 실제 표시, 폭 44pt, 레이어 2 < 캐릭터 3, 사다리 상단 = 창 상단+4pt·하단 = 창 하단·길이 = 창 높이+4pt 정확, 등반 중 위치 변동 0.0pt, 창 하단까지 하강 후 바닥 착지, 이탈 2.17초·오버레이 소멸 2.78초, 등반 중 yaw = π), `LadderEffectView` 오프스크린 렌더 픽셀 검증(가로대 39개가 상·중·하 전 구간 균일, 레일 640/640행).
+- **등반 중 인터랙션 안전장치**: 등반 중에는 공중제비/쉬프트 댄스/손 흔들기/낮잠/먹기/블록 캐기/곡괭이 공격 트리거를 무시하고, 캐릭터를 드래그하거나 클릭하면 사다리에서 손을 놓고 낙하한다(`cancelClimbIfActive`, `releaseClimb`). 등반 중 커서 근접 인사(Wave)도 스킵한다.
 
 ### 2026-09-09
 - **초기 프로젝트 생성**: Swift Package Manager 프로젝트 구조 생성 및 `Package.swift` 구성.
