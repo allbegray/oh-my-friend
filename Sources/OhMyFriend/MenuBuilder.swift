@@ -488,6 +488,16 @@ struct MenuBuilder {
         glintItem.state = app.window.characterView.characterNode.isEnchantedGlintEnabled ? .on : .off
         settingsMenu.addItem(glintItem)
 
+        // CPU Power Mode Toggle
+        let powerModeItem = NSMenuItem(
+            title: "⚡ CPU 파워 모드",
+            action: #selector(AppController.didTogglePowerMode(_:)),
+            keyEquivalent: ""
+        )
+        powerModeItem.target = app
+        powerModeItem.state = app.isPowerModeEnabled ? .on : .off
+        settingsMenu.addItem(powerModeItem)
+
         // L4. Battery Hunger Toggle
         let batteryToggleItem = NSMenuItem(
             title: "🍗 맥북 배터리 연동 허기 모드",

@@ -66,6 +66,8 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
     var isBatteryHungerEnabled: Bool = true
     private var isBatteryAlertFired: Bool = false
     private var batteryCheckTimer: TimeInterval = 0
+    var isPowerModeEnabled: Bool = true
+    private var powerStagePollTimer: TimeInterval = 0
 
     public override init() {
         super.init()
@@ -272,6 +274,15 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
                         SoundAndEffectsManager.shared.play(.heart)
                     }
                 }
+            }
+        }
+
+        // CPU Power Mode Poll (every 3.0s, accumulated dt — no extra threads)
+        if isPowerModeEnabled {
+            powerStagePollTimer += dt
+            if powerStagePollTimer >= 3.0 {
+                powerStagePollTimer = 0
+                PowerStageManager.shared.update(characterNode: window.characterView.characterNode)
             }
         }
 
@@ -725,6 +736,16 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
     @objc func didToggleBatteryHunger(_ sender: NSMenuItem) {
         isBatteryHungerEnabled.toggle()
         sender.state = isBatteryHungerEnabled ? .on : .off
+        statusItem?.menu = buildContextMenu()
+        SoundAndEffectsManager.shared.play(.pop)
+    }
+
+    @objc func didTogglePowerMode(_ sender: NSMenuItem) {
+        isPowerModeEnabled.toggle()
+        sender.state = isPowerModeEnabled ? .on : .off
+        if !isPowerModeEnabled {
+            window.characterView.characterNode.applyPowerStage(0)
+        }
         statusItem?.menu = buildContextMenu()
         SoundAndEffectsManager.shared.play(.pop)
     }

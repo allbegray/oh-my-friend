@@ -117,6 +117,7 @@ public final class MinecraftCharacterNode: SCNNode {
     // Floating Overhead Emoji Billboard
     public let overheadEmojiNode = SCNNode()
     private var emojiTimer: TimeInterval = 0
+    public var lastAppliedStage: Int = 0
 
     // Current skin
     private var currentSkin: SkinTexture?
@@ -415,6 +416,57 @@ public final class MinecraftCharacterNode: SCNNode {
         overheadEmojiNode.position.y = 3.9
         overheadEmojiNode.opacity = 0.0
         SCNTransaction.commit()
+    }
+
+    public func applyPowerStage(_ stage: Int) {
+        let clamped = min(max(stage, 0), 3)
+        let previous = lastAppliedStage
+        lastAppliedStage = clamped
+        guard clamped != previous else { return }
+        let bodyMeshes: [SCNNode] = [
+            torsoNode, headMesh,
+            rightArmMesh, leftArmMesh,
+            rightLegMesh, leftLegMesh,
+            headOverlayMesh, torsoOverlayMesh,
+            rightArmOverlayMesh, leftArmOverlayMesh,
+            rightLegOverlayMesh, leftLegOverlayMesh,
+        ]
+        if clamped == 0 {
+            for node in bodyMeshes {
+                node.geometry?.materials.forEach { mat in
+                    mat.emission.contents = NSColor.black
+                    mat.emission.intensity = 0.0
+                    mat.shaderModifiers = nil
+                }
+            }
+            return
+        }
+        let color: NSColor
+        let intensity: CGFloat
+        let emoji: String
+        switch clamped {
+        case 1:
+            color = NSColor(srgbRed: 1.0, green: 0.85, blue: 0.2, alpha: 1.0)
+            intensity = 0.35
+            emoji = "⚡"
+        case 2:
+            color = NSColor(srgbRed: 1.0, green: 0.55, blue: 0.1, alpha: 1.0)
+            intensity = 0.6
+            emoji = "🔥"
+        default:
+            color = NSColor(srgbRed: 1.0, green: 0.2, blue: 0.1, alpha: 1.0)
+            intensity = 0.9
+            emoji = "💥"
+        }
+        for node in bodyMeshes {
+            node.geometry?.materials.forEach { mat in
+                mat.emission.contents = color
+                mat.emission.intensity = intensity
+            }
+        }
+        if clamped > previous && !isSleeping {
+            showOverheadEmoji(emoji)
+        }
     }
 
     // MARK: - Held Item 3D Models

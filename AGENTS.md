@@ -126,6 +126,7 @@ Sources/OhMyFriend/
 ## 실행 기록
 
 ### 2026-09-10
+- **[파워 모드] CPU 초사이어인 단계 강화(v0.32.0)**: `CPULoadMonitor`(Mach·5초 캐시) + `PowerStageManager`(50/75/90% 0~3단계 emission·⚡🔥💥) + 메뉴 토글·3초 폴링(기본 ON). 검증: 수정 5파일 에러 0건(`SkinGalleryView` CLT SwiftUIMacros 기존 이슈만 잔존).
 - **[그래픽] 고품질화 ABD 일괄(v0.31.0)**: `StageKit` IBL(절차적 스튜디오 환경·0.6)+HDR·그림자 2048, `SkinTexture`·`MobTexture` 32픽셀·밉맵·PBR 기본값, 6개 모델 파일 Lambert→PBR 23곳(갑옷·금속 금속감, 눈·발광·그림자 유지). 검증: 수정 9파일 에러 0건(`SkinGalleryView` CLT SwiftUIMacros 기존 이슈만 잔존).
 - **[몹 고도화] 절차적 픽셀 텍스처(v0.30.0)**: `MobTexture.swift` 신규(결정적 시드·Nearest 16×16) + 크리퍼 위장·엔더맨 결·스켈레톤 뼈 질감 적용(얼굴·눈 발광·피격 플래시 유지). 검증: 수정 4파일 에러 0건(`SkinGalleryView` CLT SwiftUIMacros 기존 이슈만 잔존).
 - **[말풍선] 상단 잘림 수정(B안)**: `CharacterWindow` 160×160 → 160×200 세로형 확장(발 기준 유지·스케일 대응) + `CharacterView` 카메라 후퇴·상승(`Y 2.0→2.15`, `Z 6.2→7.1`)으로 버블 상단 여유 확보. 검증: 수정 2파일 에러 0건(`SkinGalleryView` CLT SwiftUIMacros 기존 이슈만 잔존).
