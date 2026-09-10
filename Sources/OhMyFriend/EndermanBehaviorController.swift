@@ -22,6 +22,7 @@ public final class EndermanBehaviorController {
 
     private let roamSpeed: CGFloat = 45.0
     private let chargeSpeed: CGFloat = 175.0
+    private var pumpkinConfusedCooldown: TimeInterval = 0
 
     public init() {}
 
@@ -53,9 +54,15 @@ public final class EndermanBehaviorController {
             endermanNode.modelRoot.eulerAngles.y = dir > 0 ? (CGFloat.pi / 2.0) : (-CGFloat.pi / 2.0)
 
             endermanPhysics.position.x += dir * roamSpeed * dt
+            pumpkinConfusedCooldown -= Double(dt)
 
             // Check eye contact with cursor!
-            if isCursorHoveringHead {
+            if isCursorHoveringHead && PumpkinWard.shared.isWorn {
+                if pumpkinConfusedCooldown <= 0 {
+                    pumpkinConfusedCooldown = 3.0
+                    endermanNode.showOverheadEmoji("🎃 ...?", duration: 1.5)
+                }
+            } else if isCursorHoveringHead {
                 endermanNode.walkSpeed = 0
                 endermanNode.isStaring = true
                 endermanNode.showOverheadEmoji("👁️ 쉬이익...!", duration: 1.8)

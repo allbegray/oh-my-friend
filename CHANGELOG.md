@@ -2,6 +2,50 @@
 
 # 변경 이력
 
+## [v0.19.0] - 2026-09-10
+
+### 추가
+- 🌿 **9차 야생 동물**: `Extra9Wildlife.swift` + `WildlifeManager`(토끼 깡충·당근 유혹·토끼발 / 북극곰 중립·분노·연어 진정 / 개구리 혀 사냥 / 거북 인갑 / 발자국 8트레일 전리품).
+- 🌑 **10차 어둠·네더 몹**: `Extra10DarkNether.swift` + `DarkNetherManager`(위더 검은하트 20초·석탄 / 블레이즈 화염탄 쳐내기·막대 / 익사자 미니 삼지창·파편 / 브리즈 바람탄 테니스 / 실버피시 출몰 퇴치).
+- 🌊 **11차 물과 비**: `Extra11Water.swift` + `WaterManager`(발광오징어 잉크 / 복어 부풀음·포획 / 기포 기둥 상승 200pt / 스펀지 비 흡수 갬·60초 건조 / 무지개 황금단지).
+- 👥 **12차 소셜·메타**: `Extra12Social.swift` + `SocialManager`(포옹 하트·8초 쿨 / 악수 호감도 / 보물지도 X 발굴 / 기념사진 ~/Pictures 저장). 발전 과제는 v0.13.0 구현済み로 제외.
+- 🧱 **13차 레드스톤·꾸미기**: `Extra13Redstone.swift` + `RedstoneManager`(레버 램프 회로 / 음표블록 음계 / 명화 3종 액자 / 배너 염료 4지선다 / 트립와이어 경보).
+- ❄️ **14차 겨울**: `Extra14Winter.swift` + `WinterManager`(눈보라·눈싸움 대전 / 얼음 미끄럼 150pt / 별똥별 밤 한정 / 대나무 발판 상승 / 캠프 요리).
+- 🏜️ **15차 사막 캐러밴**: `Extra15Caravan.swift` + `CaravanManager`(낙타 2배속·동승 / 라마 3색 카펫·침 / 행상인 50% 방문·3지선다 / 선인장 방어선 / 사원 압력판 깜짝·황금).
+- 🌌 **16차 엔드**: `Extra16End.swift` + `EndManager`(후렴과 랜덤 텔레포트·10초 쿨 / 셜커 XP 뱅크 / 드래곤 알 장난 / 화염 저항 90초 / 공허 심야 안개).
+- 🎪 **17차 이벤트**: `Extra17Events.swift` + `EventManager`(습격 웨이브 3·영웅 / 피리 자장가 / 활공 링 타임어택 / 멍때리기 칠 모드 / 몹 머리 변장 + MobHeadWard).
+- 🗡️ **손 아이템 3종 추가**: 당근(`createCarrotModel`)·연어(`createSalmonModel`)·스펀지(`createSpongeModel`) 3D 모델, 크리퍼전 대미지 1 반영.
+- 🏗️ **아키텍처**: `ExtraBacklog.swift` 공용 허브(`RewardCenter` 보상·위치 브리지 + `ExtraMenuEntry` + `ClosureMenuItem`) + `ExtraMenus.swift` 중앙 서브메뉴("🎉 추가 모션 9~17차" 9개 하위 메뉴 44종). 배치 파일은 기존 코드 무수정·단일 파일·매니저 소유 수명주기로 병렬 안전.
+- 메뉴 "🎉 추가 모션 9~17차"에 44종 추가. 백로그 전량 완료.
+
+## [v0.18.0] - 2026-09-10
+
+### 추가
+- 🥔 **감자(Potato)**: `PotatoWindow.swift`(두 번째 밭작물, 25초/단계 4단계 성장). 수확 시 20% 썩은감자 꽝 개그(`🤢`), 캠프파이어가 있으면 구운감자 +3XP·없으면 +1XP. 메뉴 "🥔 감자 심기" 토글.
+- 🍉 **수박(Melon)**: `MelonWindow.swift`(덩굴 작물, 20초/단계). 성숙 클릭 시 3~5 슬라이스 파티(XP), 25% 반짝이는 수박(`hasGlisteringMelon`) → 다음 양조 1.5배 증폭(신속/투명 135초·90초). 메뉴 "🍉 수박 심기" 토글.
+- 🎃 **호박(Pumpkin)**: `PumpkinWindow.swift`(15초/단계 빠른 성장) + `PumpkinWard` 싱글톤(보유·착용 상태). "🎃 호박 (심기/쓰기)" 단일 메뉴: 심기→수확(보유)→쓰기(엔더맨 눈싸움 면역, 응시 시 `🎃 ...?` 혼란)→벗기. 호박 보유 중 골렘 조립 시 잭오랜턴 대사, 호박 보유 중 빵 굽기 시 호박 파이 체인. `EndermanBehaviorController` 응시 가드 추가.
+- 🌳 **사과나무(Tree)**: `TreeWindow.swift`(묘목 30초/단계 4단계 성장) + `AppleWindow`(15초마다 낙과, 최대 3개, 클릭 시 +2XP). `HeldItem.axe` + 3D 도끼 모델(`createAxeModel`) 추가, 도끼를 들고 메뉴 실행 시 벌목(원목 2+사과 수 +3XP). 메뉴 "🌳 사과나무 심기".
+- 🍞 **빵 굽기(Bread)**: `BreadWindow.swift`(5초 굽기, 반죽→황금빵 색 보간). 밀 수확 시 `playerWheat` 카운트, 메뉴 "🍞 빵 굽기 (밀: n/3)"에서 밀 3개 + 캠프파이어 필수 확인 후 완성 시 +4XP, 호박 보유 시 파이 +6XP. 메뉴 5종 추가.
+
+## [v0.17.0] - 2026-09-10
+
+### 추가
+- 🐔 **닭·달걀(Chicken & Eggs)**: `ChickenWindow.swift`(흰 닭 배회 + 20초 간격 산란, 최대 3개) + `EggWindow`(알 클릭 시 30% 병아리 부화·70% 효과음). 닭 클릭 시 강제 산란, 부화 병아리는 0.5배율. 메뉴 "🐔 닭 소환" 토글.
+- 🍄 **무쉬룸 스튜(Mooshroom)**: `MooshroomWindow.swift`(빨간 소 + 흰 반점 + 등에 버섯 2송이, 느릿 배회 + 음메 플래시). 빈 양동이를 들고 클릭 시 `collectStew()` 꿀꺽 + 하트 파티클 +2XP. 메뉴 "🍄 무쉬룸 소환" 토글.
+- 🧶 **리드줄(Lead)**: `LeadWindow.swift`(`LeadLineWindow` 갈색 줄 오버레이 + `LeadManager` 묶기/풀기 싱글톤). 펫이 있을 때 묶으면 손에 리드줄 3D 모델(`HeldItem.lead`) 자동 장착. 메뉴 "🧶 리드줄 묶기/풀기" 토글.
+- 🐼 **판다 뒹굴(Panda)**: `PandaWindow.swift`(눈패치 판다, 배회 + 대나무 근처 뒹굴 구르기 + 25~40초 재채기 쿵). 대나무(`HeldItem.bamboo`)를 들고 클릭 시 먹이 반응 +1XP. 메뉴 "🐼 판다 소환" 토글.
+- 🧭 **스폰 나침반(Compass)**: `CompassWindow.swift`(`SpawnCompass` 스폰 저장·UserDefaults 영속 + `CompassToastWindow` 2.5초 토스트). 첫 실행은 스폰 저장, 이후 실행은 펫 순간이동 + 친구 집결 + 귀환 메시지. 메뉴 "🧭 스폰 나침반".
+- 🗡️ **손 아이템 2종 추가**: 리드줄(`createLeadModel`)·대나무(`createBambooModel`, 3마디 + 마디 고리) 3D 모델. 크리퍼전 대미지 1 반영.
+- 메뉴 "✨ 재미있는 모션 실행"에 5종 추가.
+
+### 추가
+- 🐲 **엔더드래곤 플라이바이(Dragon Flyby)**: `DragonShadowWindow.swift`(메뉴바 상공 거대 그림자 + 포효). 300초 주기 확률 출현 + 메뉴 소환, 캐릭터·펫·친구 전원 경계 반응.
+- 🧙 **마녀 투척(Witch)**: `WitchWindow.swift`(보라 로브 + 초록 물약병). 6~9초 간격 둔화 물약 투척(이동 40·20초), 우유 마시기로 즉시 정화, 2타 격퇴 +6XP.
+- 🔥 **캠프파이어(Campfire)**: `CampfireWindow.swift`(장작 + 깜빡이는 불꽃). 근처에 앉아 휴식 시 5초마다 +1XP, 앉은 펫 호감(체력) 회복.
+- 🎯 **양궁 과녁(Archery)**: `HeldItem.bow`(3D 활) + `TargetWindow.swift`(동심원 과녁). 과녁 쏘기 시 화살 발사 → 거리별 1/3/5/7/10점 + 누적 점수 메뉴 표시, XP 소량 획득.
+- 🦇 **동굴 박쥐(Bat)**: `TargetAndBatWindow.swift` 내 `BatWindow`(날갯짓 선회). 플레이어 주변 타원 비행 관상펫 + 랜덤 찍찍 효과음.
+- 메뉴 "✨ 재미있는 모션 실행"에 6종(드래곤·마녀·캠프파이어·과녁·쏘기·박쥐) 추가.
+
 ## [v0.15.0] - 2026-09-10
 
 ### 추가

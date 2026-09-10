@@ -72,7 +72,32 @@ Sources/OhMyFriend/
 ├── AxolotlWindow.swift                 # 어깨 아홀로틀(전투 +1 엄호)
 ├── SheepWindow.swift                   # 양(배회·가위 털깎기·60초 재생)
 ├── GolemWindow.swift                   # 눈 골렘(3초 간격 근접몹 눈덩이 엄호)
-└── CakeWindow.swift                    # 7조각 케이크(클릭 나눔·펫 확률 나눔)
+├── CakeWindow.swift                    # 7조각 케이크(클릭 나눔·펫 확률 나눔)
+├── DragonShadowWindow.swift            # 상공 드래곤 그림자 플라이바이(전원 경계)
+├── WitchWindow.swift                   # 마녀(둔화 투척·우유 정화·2타 격퇴)
+├── CampfireWindow.swift                # 모닥불(휴식 오라·펫 호감 회복)
+├── TargetAndBatWindow.swift            # 양궁 과녁(점수제) + 선회 박쥐 관상펫
+├── ChickenWindow.swift                 # 닭(배회·20초 산란·알 30% 병아리 부화) + EggWindow
+├── MooshroomWindow.swift               # 빨간 무쉬룸 소(빈양동이 스튜 짜기·+2XP)
+├── LeadWindow.swift                    # 리드줄(펫 묶기·풀기 갈색 줄 오버레이 + LeadManager)
+├── PandaWindow.swift                   # 판다(대나무 뒹굴·25~40초 재채기 쿵)
+├── CompassWindow.swift                 # 스폰 나침반(스폰 저장·펫/친구 귀환 토스트 + SpawnCompass)
+├── PotatoWindow.swift                  # 감자(25초/단계·구운감자 보너스·20% 썩은감자 꽝)
+├── MelonWindow.swift                   # 수박(덩굴·슬라이스 파티·25% 반짝임 양조 증폭)
+├── PumpkinWindow.swift                 # 호박(15초/단계·호박 쓰기 면역 + PumpkinWard)
+├── TreeWindow.swift                    # 사과나무(묘목 성장·15초 낙과·도끼 벌목) + AppleWindow
+├── BreadWindow.swift                   # 빵 굽기(밀 3개·5초 굽기·호박파이 체인)
+├── ExtraBacklog.swift                  # 9~17차 공용 허브(RewardCenter·ExtraMenuEntry·ClosureMenuItem)
+├── ExtraMenus.swift                    # 중앙 서브메뉴("🎉 추가 모션 9~17차" 9종)
+├── Extra9Wildlife.swift                # 9차 야생동물 5종 + WildlifeManager
+├── Extra10DarkNether.swift             # 10차 어둠네더 5종 + DarkNetherManager
+├── Extra11Water.swift                  # 11차 물과비 5종 + WaterManager
+├── Extra12Social.swift                 # 12차 소셜 4종 + SocialManager
+├── Extra13Redstone.swift               # 13차 레드스톤 5종 + RedstoneManager
+├── Extra14Winter.swift                 # 14차 겨울 5종 + WinterManager
+├── Extra15Caravan.swift                # 15차 사막 5종 + CaravanManager
+├── Extra16End.swift                    # 16차 엔드 5종 + EndManager
+└── Extra17Events.swift                 # 17차 이벤트 5종 + EventManager(+MobHeadWard)
 ```
 
 - **렌더링 & 애니메이션 파이프라인**: `CharacterView` 내부의 `SCNScene`에서 `MinecraftCharacterNode`가 관절 피벗(목, 어깨, 골반)을 기반으로 회전 및 위치를 실시간 보간합니다.
@@ -83,6 +108,10 @@ Sources/OhMyFriend/
 ## 실행 기록
 
 ### 2026-09-10
+- **[고증 9~17차] 잔여 백로그 44종 일괄 구축(v0.19.0)**: `ExtraBacklog.swift` 공용 허브 + `ExtraMenus.swift` 중앙 서브메뉴("🎉 추가 모션 9~17차") + 배치 단일 파일 9개(Extra9~Extra17, 각 Manager 소유 수명주기·`entries()` 메뉴 기술자·`RewardCenter` 브리지로 기존 코드 무수정 병렬 안전). 9차 야생동물·10차 어둠네더·11차 물과비·12차 소셜(발전과제 v0.13.0 제외)·13차 레드스톤·14차 겨울·15차 사막·16차 엔드·17차 이벤트. `HeldItem.carrot/salmon/sponge` 3D 모델 추가. 검증: `swift build` 에러 0건, 번들 생성 및 4초 실행 스모크 테스트. 백로그 전량 완료.
+- **[고증 8차] 감자·수박·호박·사과나무·빵 구축**: `PotatoWindow.swift`(25초/단계·캠프파이어 구운감자 +3XP·20% 썩은감자 꽝), `MelonWindow.swift`(덩굴·3~5 슬라이스·25% 반짝임 다음 양조 1.5배), `PumpkinWindow.swift` + `PumpkinWard`(심기/쓰기 단일 메뉴·엔더맨 응시 면역 가드·잭오랜턴 골렘·호박파이 체인), `TreeWindow.swift` + `AppleWindow`(30초/단계 성장·15초 낙과·`HeldItem.axe` 도끼 벌목), `BreadWindow.swift`(`playerWheat` 3개 + 캠프파이어 5초 굽기·+4XP/파이 +6XP). 양조 반짝임 증폭(`hasGlisteringMelon`) 추가, 메뉴 5종 추가. 검증: `swift build` 통과.
+- **[고증 7차] 닭·무쉬룸·리드줄·판다·나침반 구축**: `ChickenWindow.swift`(배회·20초 산란·알 30% 병아리 부화 + EggWindow), `MooshroomWindow.swift`(빈양동이 스튜 짜기·+2XP), `LeadWindow.swift`(리드줄 묶기·풀기 + LeadManager 갈색 줄 오버레이), `PandaWindow.swift`(대나무 뒹굴·25~40초 재채기 쿵), `CompassWindow.swift`(스폰 저장·펫/친구 귀환 토스트 + SpawnCompass UserDefaults 영속). `HeldItem.lead`/`bamboo` 3D 모델 추가, 메뉴 5종 추가. 검증: `swift build` 통과.
+- **[고증 6차] 드래곤·마녀·캠프파이어·양궁·박쥐 구축**: `DragonShadowWindow.swift`(상공 그림자 플라이바이·300초 확률·전원 경계), `WitchWindow.swift`(6~9초 둔화 투척·우유 정화·2타 격퇴), `CampfireWindow.swift`(휴식 오라·펫 호감 회복), `TargetAndBatWindow.swift`(활+과녁 점수제·선회 박쥐). 메뉴 6종 추가. 검증: `swift build` 통과, 번들 생성 및 4초 실행 스모크 테스트.
 - **[고증 5차] 양·골렘·뿔피리·종·케이크 구축**: `SheepWindow.swift`(배회·가위 털깎기·60초 재생), `GolemWindow.swift`(3초 간격 근접몹 눈덩이 엄호), 염소 돌진 40% 뿔 드롭 + 전체몹 퇴각 피리, 종(펫 순간이동·친구 집결), `CakeWindow.swift`(7조각 나눔·펫 확률 나눔). 메뉴 5종 추가. 검증: `swift build` 통과, 번들 생성 및 4초 실행 스모크 테스트.
 - **[고증 4차] 팬텀·거미·가스트·좀비·아홀로틀 구축**: `PhantomWindow.swift`(자정 급강하·방패가드·막), `SpiderWindow.swift`(창문 수직 크롤링·낮중립), `GhastWindow.swift`(지옥문 부유·화염탄 클릭 테니스·눈물), `ZombieWindow.swift`(자정 3마리·횃불 2배·승리 보너스), `AxolotlWindow.swift`(빈양동이 어깨펫·전투 +1). 메뉴 5종 추가. 검증: `swift build` 통과, 번들 생성 및 4초 실행 스모크 테스트.
 - **[업적 시스템] 발전 과제 16종 도입**: `Advancements.swift`(과제 정의·해금·토스트 큐·체크리스트 창, UserDefaults 영속). 채굴·몹 4종·길들이기 2종·수확·낚시·양조·인챈트·거래·지옥문·승마·친구·밤스킵 16곳 훅 연결, 달성 시 우상단 토스트 + 차임. 메뉴 "🏆 발전 과제 (n/16)" 추가. 검증: `swift build` 통과, 번들 생성 및 4초 실행 스모크 테스트.

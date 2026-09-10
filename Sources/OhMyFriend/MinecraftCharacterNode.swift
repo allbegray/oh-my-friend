@@ -16,6 +16,13 @@ public enum HeldItem: String, CaseIterable {
     case flower = "빨간 꽃 🌺"
     case balloon = "풍선 🎈"
     case shears = "가위 ✂️"
+    case bow = "활 🏹"
+    case lead = "리드줄 🧶"
+    case bamboo = "대나무 🎍"
+    case axe = "도끼 🪓"
+    case carrot = "당근 🥕"
+    case salmon = "연어 🍣"
+    case sponge = "스펀지 🧽"
 }
 
 public final class MinecraftCharacterNode: SCNNode {
@@ -465,6 +472,34 @@ public final class MinecraftCharacterNode: SCNNode {
         case .shears:
             let shears = createShearsModel()
             rightHandItemAnchor.addChildNode(shears)
+
+        case .bow:
+            let bow = createBowModel()
+            rightHandItemAnchor.addChildNode(bow)
+
+        case .lead:
+            let lead = createLeadModel()
+            rightHandItemAnchor.addChildNode(lead)
+
+        case .bamboo:
+            let bamboo = createBambooModel()
+            rightHandItemAnchor.addChildNode(bamboo)
+
+        case .axe:
+            let axe = createAxeModel()
+            rightHandItemAnchor.addChildNode(axe)
+
+        case .carrot:
+            let carrot = createCarrotModel()
+            rightHandItemAnchor.addChildNode(carrot)
+
+        case .salmon:
+            let salmon = createSalmonModel()
+            rightHandItemAnchor.addChildNode(salmon)
+
+        case .sponge:
+            let sponge = createSpongeModel()
+            rightHandItemAnchor.addChildNode(sponge)
         }
         EnchantmentGlintShader.apply(to: rightHandItemAnchor, enabled: isEnchantedGlintEnabled)
     }
@@ -697,6 +732,144 @@ public final class MinecraftCharacterNode: SCNNode {
         let pivot = SCNNode(geometry: pivotBox)
         pivot.position = SCNVector3(0, 0.08, 0)
         root.addChildNode(pivot)
+        return root
+    }
+
+    private func createBowModel() -> SCNNode {
+        let root = SCNNode()
+        let woodMat = SCNMaterial()
+        woodMat.diffuse.contents = NSColor(red: 0.55, green: 0.36, blue: 0.18, alpha: 1.0)
+        let stringMat = SCNMaterial()
+        stringMat.diffuse.contents = NSColor(white: 0.9, alpha: 0.9)
+        for y in [-0.3, -0.1, 0.1, 0.3] as [CGFloat] {
+            let segBox = SCNBox(width: 0.07, height: 0.24, length: 0.07, chamferRadius: 0)
+            segBox.materials = [woodMat]
+            let seg = SCNNode(geometry: segBox)
+            seg.position = SCNVector3(abs(y) * -0.35, y + 0.35, 0)
+            seg.eulerAngles.z = y > 0 ? -0.35 : 0.35
+            root.addChildNode(seg)
+        }
+        let stringBox = SCNBox(width: 0.02, height: 1.1, length: 0.02, chamferRadius: 0)
+        stringBox.materials = [stringMat]
+        let string = SCNNode(geometry: stringBox)
+        string.position = SCNVector3(0.12, 0.35, 0)
+        root.addChildNode(string)
+        return root
+    }
+
+    private func createLeadModel() -> SCNNode {
+        let root = SCNNode()
+        let ropeMat = SCNMaterial()
+        ropeMat.diffuse.contents = NSColor(red: 0.55, green: 0.38, blue: 0.20, alpha: 1.0)
+        let handleBox = SCNBox(width: 0.08, height: 0.9, length: 0.08, chamferRadius: 0)
+        handleBox.materials = [ropeMat]
+        let handle = SCNNode(geometry: handleBox)
+        handle.position = SCNVector3(0, 0.45, 0)
+        root.addChildNode(handle)
+        let knotBox = SCNBox(width: 0.20, height: 0.14, length: 0.14, chamferRadius: 0)
+        knotBox.materials = [ropeMat]
+        let knot = SCNNode(geometry: knotBox)
+        knot.position = SCNVector3(0, 0.95, 0)
+        root.addChildNode(knot)
+        return root
+    }
+
+    private func createBambooModel() -> SCNNode {
+        let root = SCNNode()
+        let greenMat = SCNMaterial()
+        greenMat.diffuse.contents = NSColor(red: 0.35, green: 0.72, blue: 0.25, alpha: 1.0)
+        let jointMat = SCNMaterial()
+        jointMat.diffuse.contents = NSColor(red: 0.55, green: 0.82, blue: 0.40, alpha: 1.0)
+        for i in 0..<3 {
+            let segBox = SCNBox(width: 0.10, height: 0.34, length: 0.10, chamferRadius: 0)
+            segBox.materials = [greenMat]
+            let seg = SCNNode(geometry: segBox)
+            seg.position = SCNVector3(0, 0.2 + CGFloat(i) * 0.38, 0)
+            root.addChildNode(seg)
+            let ringBox = SCNBox(width: 0.13, height: 0.05, length: 0.13, chamferRadius: 0)
+            ringBox.materials = [jointMat]
+            let ring = SCNNode(geometry: ringBox)
+            ring.position = SCNVector3(0, 0.39 + CGFloat(i) * 0.38, 0)
+            root.addChildNode(ring)
+        }
+        return root
+    }
+
+    private func createAxeModel() -> SCNNode {
+        let root = SCNNode()
+        root.eulerAngles = SCNVector3(CGFloat.pi / 2.0, 0, 0)
+        let woodMat = SCNMaterial()
+        woodMat.diffuse.contents = NSColor(red: 0.52, green: 0.35, blue: 0.18, alpha: 1.0)
+        let handleBox = SCNBox(width: 0.08, height: 1.0, length: 0.08, chamferRadius: 0)
+        handleBox.materials = [woodMat]
+        let handle = SCNNode(geometry: handleBox)
+        handle.position = SCNVector3(0, 0.4, 0)
+        root.addChildNode(handle)
+        let ironMat = SCNMaterial()
+        ironMat.diffuse.contents = NSColor(red: 0.75, green: 0.78, blue: 0.82, alpha: 1.0)
+        let headBox = SCNBox(width: 0.34, height: 0.26, length: 0.08, chamferRadius: 0)
+        headBox.materials = [ironMat]
+        let head = SCNNode(geometry: headBox)
+        head.position = SCNVector3(0.14, 0.85, 0)
+        root.addChildNode(head)
+        return root
+    }
+
+    private func createCarrotModel() -> SCNNode {
+        let root = SCNNode()
+        let orangeMat = SCNMaterial()
+        orangeMat.diffuse.contents = NSColor(red: 0.95, green: 0.55, blue: 0.15, alpha: 1.0)
+        let bodyBox = SCNBox(width: 0.14, height: 0.5, length: 0.14, chamferRadius: 0.03)
+        bodyBox.materials = [orangeMat]
+        let body = SCNNode(geometry: bodyBox)
+        body.position = SCNVector3(0, 0.25, 0)
+        root.addChildNode(body)
+        let leafMat = SCNMaterial()
+        leafMat.diffuse.contents = NSColor(red: 0.25, green: 0.65, blue: 0.25, alpha: 1.0)
+        let leafBox = SCNBox(width: 0.16, height: 0.2, length: 0.06, chamferRadius: 0)
+        leafBox.materials = [leafMat]
+        let leaf = SCNNode(geometry: leafBox)
+        leaf.position = SCNVector3(0, 0.58, 0)
+        root.addChildNode(leaf)
+        return root
+    }
+
+    private func createSalmonModel() -> SCNNode {
+        let root = SCNNode()
+        root.eulerAngles = SCNVector3(0, 0, CGFloat.pi / 2.0)
+        let pinkMat = SCNMaterial()
+        pinkMat.diffuse.contents = NSColor(red: 0.95, green: 0.55, blue: 0.55, alpha: 1.0)
+        let bodyBox = SCNBox(width: 0.5, height: 0.16, length: 0.12, chamferRadius: 0.02)
+        bodyBox.materials = [pinkMat]
+        let body = SCNNode(geometry: bodyBox)
+        body.position = SCNVector3(0, 0.35, 0)
+        root.addChildNode(body)
+        let tailBox = SCNBox(width: 0.14, height: 0.22, length: 0.06, chamferRadius: 0)
+        tailBox.materials = [pinkMat]
+        let tail = SCNNode(geometry: tailBox)
+        tail.position = SCNVector3(-0.3, 0.35, 0)
+        root.addChildNode(tail)
+        return root
+    }
+
+    private func createSpongeModel() -> SCNNode {
+        let root = SCNNode()
+        let yellowMat = SCNMaterial()
+        yellowMat.diffuse.contents = NSColor(red: 0.95, green: 0.85, blue: 0.35, alpha: 1.0)
+        let holeMat = SCNMaterial()
+        holeMat.diffuse.contents = NSColor(red: 0.75, green: 0.62, blue: 0.20, alpha: 1.0)
+        let bodyBox = SCNBox(width: 0.34, height: 0.34, length: 0.34, chamferRadius: 0.02)
+        bodyBox.materials = [yellowMat]
+        let body = SCNNode(geometry: bodyBox)
+        body.position = SCNVector3(0, 0.35, 0)
+        root.addChildNode(body)
+        for (dx, dy) in [(0.08, 0.42), (-0.07, 0.30), (0.0, 0.44)] as [(CGFloat, CGFloat)] {
+            let holeBox = SCNBox(width: 0.08, height: 0.08, length: 0.36, chamferRadius: 0)
+            holeBox.materials = [holeMat]
+            let hole = SCNNode(geometry: holeBox)
+            hole.position = SCNVector3(dx, dy, 0)
+            root.addChildNode(hole)
+        }
         return root
     }
 
