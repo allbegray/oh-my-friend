@@ -5,6 +5,7 @@ public enum PetKind: String, CaseIterable {
     case cat = "cat"
     case parrot = "parrot"
     case pig = "pig"
+    case horse = "horse"
 
     public var displayName: String {
         switch self {
@@ -12,6 +13,7 @@ public enum PetKind: String, CaseIterable {
         case .cat: return "🐱 턱시도 고양이 (Cat)"
         case .parrot: return "🦜 붉은 앵무새 (Parrot)"
         case .pig: return "🐷 아기 돼지 (Pig)"
+        case .horse: return "🐴 길들인 말 (Horse)"
         }
     }
 
@@ -21,6 +23,7 @@ public enum PetKind: String, CaseIterable {
         case .cat: return "🐟"
         case .parrot: return "🌾"
         case .pig: return "🥕"
+        case .horse: return "🍎"
         }
     }
 
@@ -30,6 +33,7 @@ public enum PetKind: String, CaseIterable {
         case .cat: return "💤"
         case .parrot: return "🦜"
         case .pig: return "🐷"
+        case .horse: return "🐴"
         }
     }
 

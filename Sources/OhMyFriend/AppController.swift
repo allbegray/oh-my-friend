@@ -311,10 +311,14 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
             }
         }
 
-        // Autonomous Skeleton Spawning (야간 가중치 적용)
+        // Autonomous Skeleton Spawning (야간 가중치 + 디펜스전 웨이브 가속 적용)
         if isSkeletonSpawnEnabled && skeletonWindow == nil {
             skeletonSpawnTimer += dt
-            if skeletonSpawnTimer >= skeletonSpawnInterval / DayNightCycleManager.shared.nightSpawnMultiplier {
+            var effectiveInterval = skeletonSpawnInterval / DayNightCycleManager.shared.nightSpawnMultiplier
+            if isDefenseMode && DayNightCycleManager.shared.isNight {
+                effectiveInterval = max(12.0, 30.0 - Double(defenseWave) * 3.0)
+            }
+            if skeletonSpawnTimer >= effectiveInterval {
                 skeletonSpawnTimer = 0
                 spawnSkeleton()
             }
@@ -346,8 +350,12 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
         checkPortalEntry()
         updateBabyPet(dt: dt)
         updateWildWolf(dt: dt)
+        updateWildHorse(dt: dt)
+        updateHorseRide(dt: dt)
         updateWeather(dt: dt, screen: screen)
         updateBees()
+        updateBalloonFall()
+        updateBuddies(dt: dt, screen: screen, cursorPos: cursorPos)
 
         // H4. Day/Night cycle (every ~5s)
         dayNightTimer += dt
@@ -481,23 +489,31 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
     }
 
     // MARK: - CharacterViewDelegate
+    private func triple(for view: CharacterView) -> (PhysicsEngine, CharacterBehaviorController, MinecraftCharacterNode) {
+        for i in buddyWindows.indices where view === buddyWindows[i].characterView {
+            return (buddyPhysics[i], buddyBehaviors[i], buddyWindows[i].characterView.characterNode)
+        }
+        return (physics, behavior, window.characterView.characterNode)
+    }
+
     public func characterViewDidStartDrag(_ view: CharacterView, at screenPoint: CGPoint) {
-        physics.setDragged(at: screenPoint)
+        triple(for: view).0.setDragged(at: screenPoint)
     }
 
     public func characterViewDidDrag(_ view: CharacterView, to screenPoint: CGPoint) {
-        physics.setDragged(at: screenPoint)
+        triple(for: view).0.setDragged(at: screenPoint)
     }
 
     public func characterViewDidEndDrag(_ view: CharacterView, throwVelocity: CGPoint) {
-        physics.releaseDrag(throwVelocity: throwVelocity)
+        let t = triple(for: view)
+        t.0.releaseDrag(throwVelocity: throwVelocity)
 
         // 약하게 놓았고 그 자리가 창문 안이면, 놓인 자리에서 그 창문 위쪽 끝까지 사다리를 걸고 올라간다.
         // 세게 던진 경우(throwVelocity 큼)는 기존처럼 그대로 날아간다.
         if hypot(throwVelocity.x, throwVelocity.y) <= CharacterBehaviorController.dropSnapSpeedLimit {
             behavior.climbUpFromDrop(
-                physics: physics,
-                characterNode: window.characterView.characterNode,
+                physics: t.0,
+                characterNode: t.2,
                 platforms: cachedPlatforms
             )
         }
@@ -511,19 +527,74 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
         loadCustomSkin(from: url)
     }
 
+    // MARK: - L1 Multi-Character (친구 소환)
+    private var buddyWindows: [CharacterWindow] = []
+    private var buddyPhysics: [PhysicsEngine] = []
+    private var buddyBehaviors: [CharacterBehaviorController] = []
+
+    @objc private func didSelectSummonBuddy() {
+        guard buddyWindows.count < 2 else {
+            window.characterView.characterNode.showOverheadEmoji("👥 꽉 찼어! (최대 3명)", duration: 1.8)
+            return
+        }
+        let type: BuiltinSkinType = buddyWindows.isEmpty ? .alex : .zombie
+        guard let skin = SkinTexture(image: BuiltinSkinGenerator.makeSkin(type: type)) else { return }
+        let bw = CharacterWindow(skin: skin)
+        bw.characterView.characterDelegate = self
+        let spawn = CGPoint(x: physics.position.x + (buddyWindows.isEmpty ? -90 : 90), y: physics.position.y + 30)
+        let bp = PhysicsEngine(initialPosition: spawn)
+        buddyPhysics.append(bp)
+        buddyBehaviors.append(CharacterBehaviorController())
+        buddyWindows.append(bw)
+        bw.setFeetPosition(x: spawn.x, y: spawn.y)
+        bw.orderFrontRegardless()
+        bw.characterView.characterNode.showOverheadEmoji("👋 같이 놀자!", duration: 2.2)
+        SoundAndEffectsManager.shared.play(.heart)
+        statusItem?.menu = buildContextMenu()
+    }
+
+    @objc private func didSelectDismissBuddies() {
+        for bw in buddyWindows { bw.close() }
+        buddyWindows = []
+        buddyPhysics = []
+        buddyBehaviors = []
+        statusItem?.menu = buildContextMenu()
+    }
+
+    private func updateBuddies(dt: TimeInterval, screen: NSScreen, cursorPos: CGPoint) {
+        for i in buddyWindows.indices {
+            let bw = buddyWindows[i]
+            let bp = buddyPhysics[i]
+            let bb = buddyBehaviors[i]
+            bb.update(
+                deltaTime: dt,
+                physics: bp,
+                characterNode: bw.characterView.characterNode,
+                platforms: cachedPlatforms,
+                screen: screen,
+                cursorPos: cursorPos
+            )
+            bp.update(deltaTime: CGFloat(dt), platforms: cachedPlatforms, screen: screen)
+            bw.characterView.characterNode.update(deltaTime: CGFloat(dt))
+            bw.setFeetPosition(x: bp.position.x, y: bp.position.y)
+        }
+    }
+
     public func characterViewDidClick(_ view: CharacterView) {
-        if window.characterView.characterNode.isGliding {
-            let facingDir = window.characterView.characterNode.modelRoot.eulerAngles.y
-            physics.fireworkRocketBoost(facingDir: facingDir)
-            window.characterView.characterNode.showOverheadEmoji("🚀 슈우웅!", duration: 1.5)
+        let t = triple(for: view)
+        if t.2.isGliding {
+            let facingDir = t.2.modelRoot.eulerAngles.y
+            t.0.fireworkRocketBoost(facingDir: facingDir)
+            t.2.showOverheadEmoji("🚀 슈우웅!", duration: 1.5)
             SoundAndEffectsManager.shared.play(.ignite)
             return
         }
-        behavior.handleCharacterClicked(physics: physics, characterNode: window.characterView.characterNode)
+        t.1.handleCharacterClicked(physics: t.0, characterNode: t.2)
     }
 
     public func characterViewDidDoubleClick(_ view: CharacterView) {
-        behavior.triggerBackflip(physics: physics, characterNode: window.characterView.characterNode)
+        let t = triple(for: view)
+        t.1.triggerBackflip(physics: t.0, characterNode: t.2)
     }
 
     // MARK: - NSMenuDelegate
@@ -836,6 +907,34 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
         let hiveItem = NSMenuItem(title: "🐝 벌집 설치 (Beehive)", action: #selector(didSelectBeehive), keyEquivalent: "")
         hiveItem.target = self
         actMenu.addItem(hiveItem)
+
+        let wildHorseItem = NSMenuItem(title: "🐴 야생마 부르기 (Wild Horse)", action: #selector(didSelectSpawnWildHorse), keyEquivalent: "")
+        wildHorseItem.target = self
+        actMenu.addItem(wildHorseItem)
+
+        let rideItem = NSMenuItem(title: "🐎 말 타기/내리기 (Ride)", action: #selector(didToggleHorseRide), keyEquivalent: "")
+        rideItem.target = self
+        rideItem.isEnabled = (currentPetKind == .horse)
+        actMenu.addItem(rideItem)
+
+        let enchantItem = NSMenuItem(title: "📖 인챈트 테이블 (XP: \(playerXP))", action: #selector(didSelectEnchantTable), keyEquivalent: "")
+        enchantItem.target = self
+        actMenu.addItem(enchantItem)
+
+        let defenseItem = NSMenuItem(title: isDefenseMode ? "🏹 디펜스전 모드 (웨이브 \(defenseWave))" : "🏹 디펜스전 모드", action: #selector(didToggleDefenseMode(_:)), keyEquivalent: "")
+        defenseItem.target = self
+        defenseItem.state = isDefenseMode ? .on : .off
+        actMenu.addItem(defenseItem)
+
+        let buddyItem = NSMenuItem(title: "👥 친구 소환 (Summon Buddy)", action: #selector(didSelectSummonBuddy), keyEquivalent: "")
+        buddyItem.target = self
+        buddyItem.isEnabled = buddyWindows.count < 2
+        actMenu.addItem(buddyItem)
+
+        let dismissBuddyItem = NSMenuItem(title: "👋 친구 보내기 (Dismiss Buddies)", action: #selector(didSelectDismissBuddies), keyEquivalent: "")
+        dismissBuddyItem.target = self
+        dismissBuddyItem.isEnabled = !buddyWindows.isEmpty
+        actMenu.addItem(dismissBuddyItem)
         let actSubmenuItem = NSMenuItem(title: "✨ 재미있는 모션 실행", action: nil, keyEquivalent: "")
         actSubmenuItem.submenu = actMenu
         menu.addItem(actSubmenuItem)
@@ -1569,6 +1668,10 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
             handleWildWolfClicked(view)
             return
         }
+        if let wh = wildHorseWindow, view === wh.petView {
+            handleWildHorseClicked(view)
+            return
+        }
         if window.characterView.characterNode.currentHeldItem == .wheat {
             feedWheatToPet()
             return
@@ -1632,6 +1735,7 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
             case .cat: petReaction = "하악질! 😾"
             case .parrot: petReaction = "비상! 비상! 🦜"
             case .pig: petReaction = "꿀꿀?! 🐷"
+            case .horse: petReaction = "푸르릉! 🐴"
             }
             petNode.showOverheadEmoji(petReaction, duration: 2.5)
         }
@@ -1659,8 +1763,8 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
         playerAttackTimer = 0.35
 
         let weapon = window.characterView.characterNode.currentHeldItem
-        let damage: Int
-        let playerEmoji: String
+        var damage: Int
+        var playerEmoji: String
 
         switch weapon {
         case .diamondSword:
@@ -1693,9 +1797,21 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
         case .flower:
             damage = 1
             playerEmoji = "🌺 꽃 후리기!"
+        case .balloon:
+            damage = 1
+            playerEmoji = "🎈 풍선 쿵!"
         case .none:
             damage = 1
             playerEmoji = "👊 펀치!"
+        }
+
+        if weapon == .diamondSword && swordSharpness > 0 {
+            damage += min(swordSharpness, 3)
+            playerEmoji += " ✨날카로움!"
+        }
+        if weapon == .diamondPickaxe && pickaxeEfficiency > 0 {
+            damage += min(pickaxeEfficiency, 2)
+            playerEmoji += " ✨효율!"
         }
 
         window.characterView.characterNode.showOverheadEmoji(playerEmoji, duration: 1.2)
@@ -1776,7 +1892,8 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
         }
 
         // 승리의 포즈 및 멋진 대사 출력
-        window.characterView.characterNode.showOverheadEmoji(victoryQuote, duration: 3.2)
+        playerXP += 5
+        window.characterView.characterNode.showOverheadEmoji("\(victoryQuote) +5XP!", duration: 3.2)
         SoundAndEffectsManager.shared.play(.heart)
 
         // 승리의 기쁨 점프
@@ -1957,12 +2074,48 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
     }
 
     private func handleSkeletonDefeated() {
-        window.characterView.characterNode.showOverheadEmoji("🏹 스켈레톤 명중 컷! 뼈다귀 득템! 🦴", duration: 3.2)
-        SoundAndEffectsManager.shared.play(.heart)
-        physics.jump(impulse: 340)
+        playerXP += 5
+        if isDefenseMode {
+            defenseKills += 1
+            let needed = 2 + defenseWave
+            if defenseKills >= needed {
+                defenseKills = 0
+                defenseWave += 1
+                let bonus = 10 * defenseWave
+                playerXP += bonus
+                window.characterView.characterNode.showOverheadEmoji("🏆 웨이브 \(defenseWave - 1) 격퇴! +\(bonus)XP!", duration: 3.2)
+                SoundAndEffectsManager.shared.play(.chime)
+                physics.jump(impulse: 420)
+            } else {
+                window.characterView.characterNode.showOverheadEmoji("🏹 격퇴! (웨이브 \(defenseWave): \(defenseKills)/\(needed)) +5XP!", duration: 3.0)
+                SoundAndEffectsManager.shared.play(.heart)
+                physics.jump(impulse: 340)
+            }
+        } else {
+            window.characterView.characterNode.showOverheadEmoji("🏹 스켈레톤 컷! +5XP! 🦴", duration: 3.2)
+            SoundAndEffectsManager.shared.play(.heart)
+            physics.jump(impulse: 340)
+        }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
             self?.despawnSkeleton()
         }
+    }
+
+    // MARK: - Defense (밤 웨이브 디펜스전)
+    private var isDefenseMode: Bool = false
+    private var defenseWave: Int = 1
+    private var defenseKills: Int = 0
+
+    @objc private func didToggleDefenseMode(_ sender: NSMenuItem) {
+        isDefenseMode.toggle()
+        if isDefenseMode {
+            defenseWave = 1
+            defenseKills = 0
+            window.characterView.characterNode.showOverheadEmoji("🏹 밤을 사수하라! 웨이브 1!", duration: 2.5)
+            SoundAndEffectsManager.shared.play(.alert)
+        }
+        sender.state = isDefenseMode ? .on : .off
+        statusItem?.menu = buildContextMenu()
     }
 
     @objc private func didSelectSpawnSkeleton() {
@@ -1993,7 +2146,8 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
     }
 
     private func handleEndermanDefeated() {
-        window.characterView.characterNode.showOverheadEmoji("🔮 엔더 진주를 손에 넣었다! 대박!", duration: 3.2)
+        playerXP += 8
+        window.characterView.characterNode.showOverheadEmoji("🔮 엔더 진주 +8XP! 대박!", duration: 3.2)
         SoundAndEffectsManager.shared.play(.heart)
         physics.jump(impulse: 340)
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
@@ -2140,6 +2294,175 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
         for bee in beeWindows {
             bee.follow(target: physics.position, excited: excited)
         }
+    }
+
+    // MARK: - Horse (야생마 길들이기 & 승마)
+    private var wildHorseWindow: PetWindow?
+    private var wildHorseDir: CGFloat = 1
+    private var wildHorseFlipTimer: TimeInterval = 0
+    private var isRidingHorse: Bool = false
+    private var rideTimer: TimeInterval = 0
+    private var rideDir: CGFloat = 1
+
+    @objc private func didSelectSpawnWildHorse() {
+        if wildHorseWindow != nil { return }
+        let wh = PetWindow(kind: .horse)
+        wh.setFeetPosition(x: physics.position.x - 240, y: physics.position.y)
+        wh.orderFrontRegardless()
+        wh.petView.petDelegate = self
+        wildHorseWindow = wh
+        wildHorseFlipTimer = 2.5
+        wh.petView.petNode.showOverheadEmoji("❓ 야생마다...!", duration: 2.2)
+        SoundAndEffectsManager.shared.play(.alert)
+    }
+
+    @objc private func didToggleHorseRide() {
+        if isRidingHorse {
+            dismountHorse()
+            statusItem?.menu = buildContextMenu()
+            return
+        }
+        guard currentPetKind == .horse, petPhysics != nil else { return }
+        isRidingHorse = true
+        rideTimer = 14.0
+        rideDir = window.characterView.characterNode.modelRoot.eulerAngles.y >= 0 ? 1 : -1
+        window.characterView.characterNode.isSitting = true
+        window.characterView.characterNode.showOverheadEmoji("🐎 히히힝! 달려-!", duration: 2.2)
+        SoundAndEffectsManager.shared.play(.jump)
+    }
+
+    private func dismountHorse() {
+        isRidingHorse = false
+        window.characterView.characterNode.isSitting = false
+        petBehavior?.speedMultiplier = 1.0
+        window.characterView.characterNode.showOverheadEmoji("🐴 잘 달렸다!", duration: 1.8)
+    }
+
+    private func updateWildHorse(dt: TimeInterval) {
+        guard let wh = wildHorseWindow else { return }
+        wildHorseFlipTimer -= dt
+        if wildHorseFlipTimer <= 0 {
+            wildHorseFlipTimer = Double.random(in: 2.5...5.0)
+            wildHorseDir = Bool.random() ? 1 : -1
+        }
+        let node = wh.petView.petNode
+        node.modelRoot.eulerAngles.y = wildHorseDir > 0 ? (CGFloat.pi / 2.0) : (-CGFloat.pi / 2.0)
+        node.walkSpeed = 55
+        node.isRunning = false
+        node.update(deltaTime: CGFloat(dt))
+        var frame = wh.frame
+        frame.origin.x += wildHorseDir * 55.0 * CGFloat(dt)
+        wh.setFrameOrigin(frame.origin)
+    }
+
+    private func handleWildHorseClicked(_ view: PetView) {
+        guard let wh = wildHorseWindow, view === wh.petView else { return }
+        if window.characterView.characterNode.currentHeldItem == .goldenApple {
+            window.characterView.characterNode.currentHeldItem = .none
+            view.petNode.showOverheadEmoji("❤️❤️❤️ 길들였다!", duration: 2.5)
+            SoundAndEffectsManager.shared.play(.heart)
+            wh.close()
+            wildHorseWindow = nil
+            summonPet(kind: .horse)
+            window.characterView.characterNode.showOverheadEmoji("🐴 새 가족이다!", duration: 2.2)
+            statusItem?.menu = buildContextMenu()
+        } else {
+            view.petNode.showOverheadEmoji("푸르릉! 🐴 (황금사과를 들어봐)", duration: 2.0)
+            SoundAndEffectsManager.shared.play(.alert)
+            wildHorseDir *= -1
+        }
+    }
+
+    private func updateHorseRide(dt: TimeInterval) {
+        guard isRidingHorse, let pPhys = petPhysics else { return }
+        rideTimer -= dt
+        if rideTimer <= 0 {
+            dismountHorse()
+            statusItem?.menu = buildContextMenu()
+            return
+        }
+        let screen = ScreenEnvironment.shared.screen(for: pPhys.position)
+        let margin: CGFloat = 60
+        if pPhys.position.x > screen.frame.maxX - margin {
+            rideDir = -1
+        } else if pPhys.position.x < screen.frame.minX + margin {
+            rideDir = 1
+        }
+        pPhys.position.x += rideDir * 260.0 * CGFloat(dt)
+        pPhys.velocity = .zero
+        let horseNode = petWindow?.petView.petNode
+        horseNode?.modelRoot.eulerAngles.y = rideDir > 0 ? (CGFloat.pi / 2.0) : (-CGFloat.pi / 2.0)
+        horseNode?.walkSpeed = 260
+        horseNode?.isRunning = true
+        physics.position = CGPoint(x: pPhys.position.x, y: pPhys.position.y + 34)
+        physics.velocity = .zero
+        window.characterView.characterNode.walkSpeed = 0
+    }
+
+    // MARK: - Enchanting (경험치 & 인챈트 테이블)
+    public var playerXP: Int = 0
+    private var swordSharpness: Int = 0
+    private var pickaxeEfficiency: Int = 0
+    private var enchantTableWindow: EnchantTableWindow?
+
+    @objc private func didSelectEnchantTable() {
+        if let table = enchantTableWindow {
+            table.close()
+            enchantTableWindow = nil
+            return
+        }
+        let pos = CGPoint(x: physics.position.x - 110, y: physics.position.y)
+        let table = EnchantTableWindow(floorPos: pos) { [weak self] in
+            self?.tryEnchantHeldWeapon()
+        }
+        enchantTableWindow = table
+        table.place()
+        window.characterView.characterNode.showOverheadEmoji("📖 인챈트 테이블! (XP: \(playerXP))", duration: 2.2)
+    }
+
+    private func tryEnchantHeldWeapon() {
+        let charNode = window.characterView.characterNode
+        let weapon = charNode.currentHeldItem
+        guard weapon == .diamondSword || weapon == .diamondPickaxe else {
+            charNode.showOverheadEmoji("📖 검/곡괭이를 들어봐! (XP: \(playerXP))", duration: 2.0)
+            return
+        }
+        guard playerXP >= 10 else {
+            charNode.showOverheadEmoji("📖 XP 부족! (필요 10, 보유 \(playerXP))", duration: 2.0)
+            SoundAndEffectsManager.shared.play(.pop)
+            return
+        }
+        playerXP -= 10
+        if weapon == .diamondSword {
+            swordSharpness += 1
+            charNode.showOverheadEmoji("📖 날카로움 \(swordSharpness)! ✨", duration: 2.5)
+        } else {
+            pickaxeEfficiency += 1
+            charNode.showOverheadEmoji("📖 효율 \(pickaxeEfficiency)! ✨", duration: 2.5)
+        }
+        charNode.isEnchantedGlintEnabled = true
+        SoundAndEffectsManager.shared.play(.chime)
+    }
+
+    private func gainXP(_ amount: Int, reason: String) {
+        playerXP += amount
+        window.characterView.characterNode.showOverheadEmoji("🟢 +\(amount)XP! (\(reason) 총 \(playerXP))", duration: 2.0)
+        SoundAndEffectsManager.shared.play(.heart)
+    }
+
+    // MARK: - Balloon (풍선 저속낙하)
+    private var wasAirborneLastTick: Bool = false
+
+    private func updateBalloonFall() {
+        let charNode = window.characterView.characterNode
+        let holdingBalloon = charNode.currentHeldItem == .balloon
+        physics.isSlowFalling = holdingBalloon
+        let onGround = physics.currentPlatform != nil
+        if holdingBalloon && wasAirborneLastTick && onGround {
+            charNode.showOverheadEmoji("💨 퐁신 착지! 🎈", duration: 1.8)
+            SoundAndEffectsManager.shared.play(.pop)
+        }
+        wasAirborneLastTick = !onGround
     }
 
     // MARK: - Fishing (낚시)
@@ -2313,7 +2636,8 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
 
     public func slimeWindowDidDespawn(_ window: SlimeWindow) {
         slimeWindows.removeAll { $0 === window }
-        self.window.characterView.characterNode.showOverheadEmoji("🟢 슬라임볼 획득!", duration: 2.0)
+        playerXP += 3
+        self.window.characterView.characterNode.showOverheadEmoji("🟢 슬라임볼 +3XP!", duration: 2.0)
         SoundAndEffectsManager.shared.play(.pop)
     }
 

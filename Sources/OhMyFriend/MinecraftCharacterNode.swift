@@ -14,6 +14,7 @@ public enum HeldItem: String, CaseIterable {
     case milkBucket = "우유 양동이 🥛"
     case emptyBucket = "빈 양동이 🪣"
     case flower = "빨간 꽃 🌺"
+    case balloon = "풍선 🎈"
 }
 
 public final class MinecraftCharacterNode: SCNNode {
@@ -455,6 +456,10 @@ public final class MinecraftCharacterNode: SCNNode {
         case .flower:
             let flower = createFlowerModel()
             rightHandItemAnchor.addChildNode(flower)
+
+        case .balloon:
+            let balloon = createBalloonModel()
+            rightHandItemAnchor.addChildNode(balloon)
         }
         EnchantmentGlintShader.apply(to: rightHandItemAnchor, enabled: isEnchantedGlintEnabled)
     }
@@ -671,8 +676,26 @@ public final class MinecraftCharacterNode: SCNNode {
         return root
     }
 
-    private func createFlowerModel() -> SCNNode {
+    private func createBalloonModel() -> SCNNode {
         let root = SCNNode()
+        let stringMat = SCNMaterial()
+        stringMat.diffuse.contents = NSColor(white: 0.9, alpha: 0.9)
+        let balloonMat = SCNMaterial()
+        balloonMat.diffuse.contents = NSColor(red: 0.95, green: 0.30, blue: 0.40, alpha: 1.0)
+        let stringBox = SCNBox(width: 0.03, height: 0.6, length: 0.03, chamferRadius: 0)
+        stringBox.materials = [stringMat]
+        let string = SCNNode(geometry: stringBox)
+        string.position = SCNVector3(0, 0.3, 0)
+        root.addChildNode(string)
+        let balloonBox = SCNBox(width: 0.42, height: 0.5, length: 0.42, chamferRadius: 0.12)
+        balloonBox.materials = [balloonMat]
+        let balloon = SCNNode(geometry: balloonBox)
+        balloon.position = SCNVector3(0, 0.85, 0)
+        root.addChildNode(balloon)
+        return root
+    }
+
+    private func createFlowerModel() -> SCNNode {        let root = SCNNode()
         let stemMat = SCNMaterial()
         stemMat.diffuse.contents = NSColor(red: 0.2, green: 0.6, blue: 0.2, alpha: 1.0)
         let petalMat = SCNMaterial()

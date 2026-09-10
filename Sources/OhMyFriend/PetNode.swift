@@ -130,6 +130,8 @@ public final class PetNode: SCNNode {
             buildParrotModel()
         case .pig:
             buildPigModel()
+        case .horse:
+            buildHorseModel()
         }
     }
 
@@ -411,6 +413,90 @@ public final class PetNode: SCNNode {
         let tailMesh = SCNNode(geometry: tailGeom)
         tailMesh.position = SCNVector3(0, 0.08, -0.06)
         tailJoint.position = SCNVector3(0, 0.10, -0.44)
+        tailJoint.addChildNode(tailMesh)
+
+        wingLeft.isHidden = true
+        wingRight.isHidden = true
+    }
+
+    private func buildHorseModel() {
+        let coatMat = makeLambert(color: NSColor(red: 0.55, green: 0.36, blue: 0.20, alpha: 1.0))
+        let maneMat = makeLambert(color: NSColor(red: 0.25, green: 0.15, blue: 0.08, alpha: 1.0))
+        let saddleMat = makeLambert(color: NSColor(red: 0.70, green: 0.25, blue: 0.15, alpha: 1.0))
+        let hoofMat = makeLambert(color: NSColor(red: 0.20, green: 0.18, blue: 0.16, alpha: 1.0))
+        let eyeMat = makeLambert(color: NSColor(red: 0.10, green: 0.10, blue: 0.10, alpha: 1.0))
+
+        let bodyGeom = SCNBox(width: 0.60, height: 0.65, length: 1.15, chamferRadius: 0)
+        bodyGeom.materials = [coatMat]
+        bodyAnchor.geometry = bodyGeom
+        bodyAnchor.position = SCNVector3(0, 0.95, 0)
+
+        let blanketGeom = SCNBox(width: 0.66, height: 0.14, length: 0.70, chamferRadius: 0)
+        blanketGeom.materials = [saddleMat]
+        let blanket = SCNNode(geometry: blanketGeom)
+        blanket.position = SCNVector3(0, 0.34, -0.05)
+        bodyAnchor.addChildNode(blanket)
+        let seatGeom = SCNBox(width: 0.34, height: 0.12, length: 0.40, chamferRadius: 0)
+        seatGeom.materials = [maneMat]
+        let seat = SCNNode(geometry: seatGeom)
+        seat.position = SCNVector3(0, 0.44, -0.05)
+        bodyAnchor.addChildNode(seat)
+
+        let neckGeom = SCNBox(width: 0.34, height: 0.62, length: 0.34, chamferRadius: 0)
+        neckGeom.materials = [coatMat]
+        let neck = SCNNode(geometry: neckGeom)
+        neck.position = SCNVector3(0, 0.42, 0.62)
+        neck.eulerAngles.x = -0.35
+        bodyAnchor.addChildNode(neck)
+        let maneGeom = SCNBox(width: 0.12, height: 0.60, length: 0.14, chamferRadius: 0)
+        maneGeom.materials = [maneMat]
+        let mane = SCNNode(geometry: maneGeom)
+        mane.position = SCNVector3(0, 0.48, 0.44)
+        mane.eulerAngles.x = -0.35
+        bodyAnchor.addChildNode(mane)
+
+        headJoint.position = SCNVector3(0, 0.62, 0.78)
+        let headGeom = SCNBox(width: 0.36, height: 0.42, length: 0.55, chamferRadius: 0)
+        headGeom.materials = [coatMat]
+        let headMesh = SCNNode(geometry: headGeom)
+        headMesh.position = SCNVector3(0, 0.18, 0.18)
+        headJoint.addChildNode(headMesh)
+        let eyeGeom = SCNBox(width: 0.07, height: 0.09, length: 0.02, chamferRadius: 0)
+        eyeGeom.materials = [eyeMat]
+        let eyeL = SCNNode(geometry: eyeGeom)
+        eyeL.position = SCNVector3(-0.19, 0.08, 0.30)
+        let eyeR = SCNNode(geometry: eyeGeom)
+        eyeR.position = SCNVector3(0.19, 0.08, 0.30)
+        headMesh.addChildNode(eyeL)
+        headMesh.addChildNode(eyeR)
+        let earGeom = SCNBox(width: 0.10, height: 0.18, length: 0.08, chamferRadius: 0)
+        earGeom.materials = [coatMat]
+        let earL = SCNNode(geometry: earGeom)
+        earL.position = SCNVector3(-0.12, 0.30, 0.05)
+        let earR = SCNNode(geometry: earGeom)
+        earR.position = SCNVector3(0.12, 0.30, 0.05)
+        headMesh.addChildNode(earL)
+        headMesh.addChildNode(earR)
+
+        let legGeom = SCNBox(width: 0.18, height: 0.70, length: 0.18, chamferRadius: 0)
+        legGeom.materials = [coatMat]
+        buildLeg(legFL, geom: legGeom, x: -0.20, y: -0.32, z: 0.40)
+        buildLeg(legFR, geom: legGeom, x: 0.20, y: -0.32, z: 0.40)
+        buildLeg(legBL, geom: legGeom, x: -0.20, y: -0.32, z: -0.40)
+        buildLeg(legBR, geom: legGeom, x: 0.20, y: -0.32, z: -0.40)
+        let hoofGeom = SCNBox(width: 0.20, height: 0.12, length: 0.20, chamferRadius: 0)
+        hoofGeom.materials = [hoofMat]
+        for leg in [legFL, legFR, legBL, legBR] {
+            let hoof = SCNNode(geometry: hoofGeom)
+            hoof.position = SCNVector3(0, -0.72, 0)
+            leg.addChildNode(hoof)
+        }
+
+        let tailGeom = SCNBox(width: 0.14, height: 0.65, length: 0.14, chamferRadius: 0)
+        tailGeom.materials = [maneMat]
+        let tailMesh = SCNNode(geometry: tailGeom)
+        tailMesh.position = SCNVector3(0, -0.25, -0.08)
+        tailJoint.position = SCNVector3(0, 0.10, -0.58)
         tailJoint.addChildNode(tailMesh)
 
         wingLeft.isHidden = true

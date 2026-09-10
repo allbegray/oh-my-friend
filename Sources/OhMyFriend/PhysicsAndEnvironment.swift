@@ -301,6 +301,7 @@ public final class PhysicsEngine {
         return nil
     }
     public var isGliding: Bool = false
+    public var isSlowFalling: Bool = false
 
     private var previousPosition: CGPoint
 
@@ -426,6 +427,10 @@ public final class PhysicsEngine {
                 // 겉날개 활공: 하강 속도 제한 (-140 pt/s 완만한 활공) 및 양력
                 velocity.y = max(-140.0, velocity.y + 1300.0 * dt)
                 velocity.x *= 0.995 // 수평 활공 속도 유지
+            } else if isSlowFalling {
+                // 풍선 저속낙하: 아주 느리게 두둥실 (-60 pt/s)
+                velocity.y = max(-60.0, velocity.y + 700.0 * dt)
+                velocity.x *= 0.99
             } else {
                 velocity.y += gravity * dt
                 velocity.x *= 0.98

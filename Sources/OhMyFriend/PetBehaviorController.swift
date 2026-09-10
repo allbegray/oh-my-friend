@@ -21,6 +21,7 @@ public final class PetBehaviorController {
     private var danceTimer: TimeInterval = 0
     private var danceBeatTimer: TimeInterval = 0
     private var wheatLureTimer: TimeInterval = 0
+    public var speedMultiplier: CGFloat = 1.0
 
     public init() {}
 
@@ -116,6 +117,7 @@ public final class PetBehaviorController {
             let dir: CGFloat = dx > 0 ? 1.0 : -1.0
             let isRunning = distance > runThreshold
             var speed: CGFloat = isRunning ? 150.0 : 85.0
+            speed *= speedMultiplier
             if wheatLureTimer > 0 {
                 speed *= 1.4
                 if Int(wheatLureTimer * 2.0) % 4 == 0 {
