@@ -4,6 +4,9 @@
 
 ## [v0.4.0] - 2026-09-10
 
+### 수정
+- 3D 캐릭터 오른쪽 팔(화면 좌측) 누락 버그 수정: `MinecraftCharacterNode.setupHierarchy`에서 2차 레이어(오버레이 소매) 구현 시 제거되었던 `bodyAnchor.addChildNode(rightArmJoint)` 코드를 복구하여 오른쪽 팔(메쉬, 오버레이 소매, 손에 든 아이템)이 씬에 정상 표시되도록 수정.
+
 ### 추가
 - 마인크래프트 펫 동반자 시스템(Pet Companion System) 구축:
   - 4종 3D 복셀 펫 모델(`PetNode.swift`, `PetKind.swift`):

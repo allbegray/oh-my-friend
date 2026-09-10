@@ -162,6 +162,7 @@ public final class MinecraftCharacterNode: SCNNode {
         // Mount item anchor at the bottom of right arm (hand position)
         rightHandItemAnchor.position = SCNVector3(0, -0.6, 0.2)
         rightArmMesh.addChildNode(rightHandItemAnchor)
+        bodyAnchor.addChildNode(rightArmJoint)
 
         // 4. Left Arm Joint (Pivot at left shoulder: X = 0.6, Y = 2.4)
         leftArmJoint.position = SCNVector3(0.6, 2.4, 0)
