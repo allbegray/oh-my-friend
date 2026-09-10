@@ -128,6 +128,9 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
             repeats: true
         )
         RunLoop.main.add(self.gameTimer!, forMode: .common)
+
+        // 6. Default companion: tuxedo cat on every launch
+        summonPet(kind: .cat)
     }
 
     // MARK: - Game Loop
