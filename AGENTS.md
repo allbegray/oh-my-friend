@@ -97,7 +97,18 @@ Sources/OhMyFriend/
 ├── Extra14Winter.swift                 # 14차 겨울 5종 + WinterManager
 ├── Extra15Caravan.swift                # 15차 사막 5종 + CaravanManager
 ├── Extra16End.swift                    # 16차 엔드 5종 + EndManager
-└── Extra17Events.swift                 # 17차 이벤트 5종 + EventManager(+MobHeadWard)
+├── Extra17Events.swift                 # 17차 이벤트 5종 + EventManager(+MobHeadWard)
+├── ExtraAMobs.swift                    # A 신규몹 10종 + MobsAManager
+├── ExtraBNether.swift                  # B 네더확장 10종 + NetherBManager
+├── ExtraCEnd.swift                     # C 엔드확장 10종 + EndCManager
+├── ExtraDSea.swift                     # D 바다 10종 + SeaDManager
+├── ExtraEAnimals.swift                 # E 동물사육 10종 + AnimalsEManager
+├── ExtraFRedstone.swift                # F 레드스톤 10종 + RedstoneFManager
+├── ExtraGDecor.swift                   # G 건축꾸미기 10종 + DecorGManager
+├── ExtraHMagic.swift                   # H 마법전투 10종 + MagicHManager
+├── ExtraIStructures.swift              # I 구조물보스 10종 + StructuresIManager
+└── ExtraJMeta.swift                    # J 생활메타 10종 + MetaJManager
+```
 ```
 
 - **렌더링 & 애니메이션 파이프라인**: `CharacterView` 내부의 `SCNScene`에서 `MinecraftCharacterNode`가 관절 피벗(목, 어깨, 골반)을 기반으로 회전 및 위치를 실시간 보간합니다.
@@ -108,6 +119,7 @@ Sources/OhMyFriend/
 ## 실행 기록
 
 ### 2026-09-10
+- **[신규 100선] A~J 100종 일괄 구축(v0.20.0)**: 배치 단일 파일 10개(ExtraA~ExtraJ, 분야 접두어 클래스·Manager `entries()`·`RewardCenter` 브리지로 기존 코드 무수정 병렬 안전) + `ExtraMenus.buildExtraMenu2()` 중앙 서브메뉴("✨ 신규 100선 (A~J)"). A신규몹·B네더·C엔드·D바다·E동물·F레드스톤·G건축·H마법·I구조물·J메타. 검증: `swift build` 에러 0건, 번들 생성 및 4초 실행 스모크 테스트. 백로그 전량 완료.
 - **[고증 9~17차] 잔여 백로그 44종 일괄 구축(v0.19.0)**: `ExtraBacklog.swift` 공용 허브 + `ExtraMenus.swift` 중앙 서브메뉴("🎉 추가 모션 9~17차") + 배치 단일 파일 9개(Extra9~Extra17, 각 Manager 소유 수명주기·`entries()` 메뉴 기술자·`RewardCenter` 브리지로 기존 코드 무수정 병렬 안전). 9차 야생동물·10차 어둠네더·11차 물과비·12차 소셜(발전과제 v0.13.0 제외)·13차 레드스톤·14차 겨울·15차 사막·16차 엔드·17차 이벤트. `HeldItem.carrot/salmon/sponge` 3D 모델 추가. 검증: `swift build` 에러 0건, 번들 생성 및 4초 실행 스모크 테스트. 백로그 전량 완료.
 - **[고증 8차] 감자·수박·호박·사과나무·빵 구축**: `PotatoWindow.swift`(25초/단계·캠프파이어 구운감자 +3XP·20% 썩은감자 꽝), `MelonWindow.swift`(덩굴·3~5 슬라이스·25% 반짝임 다음 양조 1.5배), `PumpkinWindow.swift` + `PumpkinWard`(심기/쓰기 단일 메뉴·엔더맨 응시 면역 가드·잭오랜턴 골렘·호박파이 체인), `TreeWindow.swift` + `AppleWindow`(30초/단계 성장·15초 낙과·`HeldItem.axe` 도끼 벌목), `BreadWindow.swift`(`playerWheat` 3개 + 캠프파이어 5초 굽기·+4XP/파이 +6XP). 양조 반짝임 증폭(`hasGlisteringMelon`) 추가, 메뉴 5종 추가. 검증: `swift build` 통과.
 - **[고증 7차] 닭·무쉬룸·리드줄·판다·나침반 구축**: `ChickenWindow.swift`(배회·20초 산란·알 30% 병아리 부화 + EggWindow), `MooshroomWindow.swift`(빈양동이 스튜 짜기·+2XP), `LeadWindow.swift`(리드줄 묶기·풀기 + LeadManager 갈색 줄 오버레이), `PandaWindow.swift`(대나무 뒹굴·25~40초 재채기 쿵), `CompassWindow.swift`(스폰 저장·펫/친구 귀환 토스트 + SpawnCompass UserDefaults 영속). `HeldItem.lead`/`bamboo` 3D 모델 추가, 메뉴 5종 추가. 검증: `swift build` 통과.

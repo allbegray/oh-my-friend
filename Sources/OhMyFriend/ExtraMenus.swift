@@ -18,6 +18,21 @@ extension AppController {
         return root
     }
 
+    func buildExtraMenu2() -> NSMenu {
+        let root = NSMenu()
+        addExtraBatch(root, title: "👹 신규 몹 (A)", entries: MobsAManager.shared.entries())
+        addExtraBatch(root, title: "🔥 네더 확장 (B)", entries: NetherBManager.shared.entries())
+        addExtraBatch(root, title: "🌌 엔드 확장 (C)", entries: EndCManager.shared.entries())
+        addExtraBatch(root, title: "🌊 바다 (D)", entries: SeaDManager.shared.entries())
+        addExtraBatch(root, title: "🐾 동물·사육 (E)", entries: AnimalsEManager.shared.entries())
+        addExtraBatch(root, title: "🧱 레드스톤 (F)", entries: RedstoneFManager.shared.entries())
+        addExtraBatch(root, title: "🏠 건축·꾸미기 (G)", entries: DecorGManager.shared.entries())
+        addExtraBatch(root, title: "🪄 마법·전투 (H)", entries: MagicHManager.shared.entries())
+        addExtraBatch(root, title: "🏛️ 구조물·보스 (I)", entries: StructuresIManager.shared.entries())
+        addExtraBatch(root, title: "🎭 생활·메타 (J)", entries: MetaJManager.shared.entries())
+        return root
+    }
+
     private func addExtraBatch(_ root: NSMenu, title: String, entries: [ExtraMenuEntry]) {
         let sub = NSMenu()
         for e in entries {

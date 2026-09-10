@@ -1128,6 +1128,10 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
         let extraSubmenuItem = NSMenuItem(title: "🎉 추가 모션 9~17차", action: nil, keyEquivalent: "")
         extraSubmenuItem.submenu = buildExtraMenu()
         menu.addItem(extraSubmenuItem)
+
+        let extra2SubmenuItem = NSMenuItem(title: "✨ 신규 100선 (A~J)", action: nil, keyEquivalent: "")
+        extra2SubmenuItem.submenu = buildExtraMenu2()
+        menu.addItem(extra2SubmenuItem)
         // 4. Scale Submenu
         let scaleMenu = NSMenu()
         let scales: [(String, CGFloat)] = [
