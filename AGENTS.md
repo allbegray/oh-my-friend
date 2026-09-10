@@ -61,6 +61,7 @@ Sources/OhMyFriend/
 ## 실행 기록
 
 ### 2026-09-10
+- **플레이어 닉네임 스킨 다운로더 개선 (Mojang 404 즉시 종료 & 서버 장애 시 Minotar 이중 검색 체계)**: 마인크래프트 정품 플레이어 닉네임 조회 시 공식 Mojang Profile API(`api.mojang.com`)를 단일 진실 공급원으로 판별하여, 404/204(존재하지 않는 닉네임) 응답 시 즉시 `notFound` 오류를 반환하고 검색을 종료(허위 Steve 노출 방지). 정상 플레이어(200 OK)의 경우 Mojang Session Server(`sessionserver.mojang.com`) -> 공식 `textures.minecraft.net` CDN 원본 PNG 직링크 -> Crafatar -> Minotar 순으로 안정적인 Fallback 체인을 적용. 만약 Mojang API 자체가 네트워크 단절/타임아웃/5xx 서버 오류로 다운된 경우에만 비상 대체 API로 Minotar를 조회하여 이중 검색을 수행. 3D 아바타 프리뷰는 겉옷/모자 오버레이를 완벽 지원하는 MC-Heads로 개선.
 - **곡괭이 공격 크래시 수정**: 크랙 1단계 렌더 시 `drawBolt`에서 `pts[1...0]` 무효 슬라이스로 앱이 즉시 종료되던 SIGTRAP 크래시 수정(노출 길이가 첫 세그먼트보다 짧은 경우 가드). 1~10단계 전 구간 드라이버 렌더로 검증.
 - **화면 기록 권한 프롬프트 제거**: 파편 텍스처용 대상 창 실사 스냅샷(`CGWindowListCreateImage`) 캡처를 삭제하고 시스템 라이트/다크 톤 팔레트 전용으로 단순화. `ScreenEnvironment.windowSnapshotCGImage` API 제거.
 - **백색 플래시 이펙트 제거**: 파편 폭발 직전 하얀 창 화면이 노출되는 것처럼 보이던 연출 제거. '앱 창 부수기' 메뉴 단축키(Cmd+B)도 제거(오입력으로 사용 중 앱이 종료되는 것 방지, 메뉴 선택 시에만 발동).

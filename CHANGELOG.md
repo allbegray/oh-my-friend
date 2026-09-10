@@ -2,6 +2,15 @@
 
 # 변경 이력
 
+## [v0.2.6] - 2026-09-10
+
+### 개선
+- 마인크래프트 플레이어 닉네임 스킨 다운로드 파이프라인 및 정확도 개편:
+  - 공식 Mojang Profile API(`api.mojang.com`)를 단일 진실 공급원으로 삼아 `404/204(존재하지 않는 닉네임)` 응답 시 즉시 검색을 종료하고 `notFound` 오류를 반환(허위 Steve 노출 방지).
+  - 유효한 정품 플레이어(200 OK)의 경우 Mojang Session Server(`sessionserver.mojang.com`) 텍스처 Base64 디코딩 -> 공식 `textures.minecraft.net` CDN 원본 PNG를 1순위로 조회하고, 실패 시 Crafatar -> Minotar 순으로 Fallback 체인 적용.
+  - Mojang API 서버 자체가 네트워크 단절, 타임아웃, 5xx 서버 오류로 다운된 경우에만 비상 대체 API로 Minotar를 호출하여 이중 검색을 수행.
+  - 3D 아바타 바디 미리보기를 모자/외투/안경 등 오버레이 레이어를 지원하는 고품질 MC-Heads 렌더러로 개선.
+
 ## [v0.2.5] - 2026-09-10
 
 ### 추가

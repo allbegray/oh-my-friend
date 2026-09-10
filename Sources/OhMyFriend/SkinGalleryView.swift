@@ -593,6 +593,9 @@ public struct SkinGalleryView: View {
             } catch {
                 await MainActor.run {
                     self.searchError = error.localizedDescription
+                    self.searchResultSkin = nil
+                    self.searchResultImage = nil
+                    self.searchResultData = nil
                     self.isSearching = false
                 }
             }

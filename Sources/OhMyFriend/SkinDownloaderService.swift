@@ -43,35 +43,94 @@ public final class SkinDownloaderService {
             throw SkinDownloadError.invalidUsername
         }
 
-        // Primary source: Minotar direct skin API
+        // Minecraft Java username validation (1~16 alphanumeric or underscore)
+        let usernameRegex = "^[a-zA-Z0-9_]{1,16}$"
+        guard trimmed.range(of: usernameRegex, options: .regularExpression) != nil else {
+            throw SkinDownloadError.invalidUsername
+        }
+
+        // 1. Primary Source: Official Mojang Profile API (Single Source of Truth)
+        if let mojangProfileURL = URL(string: "https://api.mojang.com/users/profiles/minecraft/\(trimmed)") {
+            var req = URLRequest(url: mojangProfileURL)
+            req.setValue("OhMyFriend/1.0 (Macintosh; Mac OS X)", forHTTPHeaderField: "User-Agent")
+
+            do {
+                let (profileData, profileRes) = try await session.data(for: req)
+                if let pHttp = profileRes as? HTTPURLResponse {
+                    // [Case A] Mojang 404 / 204: 플레이어가 전 세계에 존재하지 않는 것이 확실하므로 즉시 종료
+                    if pHttp.statusCode == 404 || pHttp.statusCode == 204 {
+                        throw SkinDownloadError.notFound
+                    }
+
+                    // [Case B] 200 OK: 유효한 정품 플레이어 -> UUID 기반 텍스처 조회
+                    if pHttp.statusCode == 200,
+                       let pJson = try? JSONSerialization.jsonObject(with: profileData) as? [String: Any],
+                       let uuid = pJson["id"] as? String, !uuid.isEmpty {
+
+                        // 1-A. Mojang Session Server -> Official textures.minecraft.net CDN
+                        if let sessionURL = URL(string: "https://sessionserver.mojang.com/session/minecraft/profile/\(uuid)") {
+                            var sessionReq = URLRequest(url: sessionURL)
+                            sessionReq.setValue("OhMyFriend/1.0 (Macintosh; Mac OS X)", forHTTPHeaderField: "User-Agent")
+
+                            if let (sessionData, sessionRes) = try? await session.data(for: sessionReq),
+                               let sHttp = sessionRes as? HTTPURLResponse, sHttp.statusCode == 200,
+                               let sJson = try? JSONSerialization.jsonObject(with: sessionData) as? [String: Any],
+                               let properties = sJson["properties"] as? [[String: Any]],
+                               let texturesProp = properties.first(where: { ($0["name"] as? String) == "textures" }),
+                               let base64Val = texturesProp["value"] as? String,
+                               let decodedData = Data(base64Encoded: base64Val),
+                               let decodedJson = try? JSONSerialization.jsonObject(with: decodedData) as? [String: Any],
+                               let texturesDict = decodedJson["textures"] as? [String: Any],
+                               let skinDict = texturesDict["SKIN"] as? [String: Any],
+                               let skinURLString = skinDict["url"] as? String,
+                               let textureURL = URL(string: skinURLString.replacingOccurrences(of: "http://", with: "https://")) {
+                                do {
+                                    return try await downloadSkin(from: textureURL)
+                                } catch {
+                                    // Fallback to Crafatar
+                                }
+                            }
+                        }
+
+                        // 1-B. Fallback: Crafatar (UUID 기반)
+                        if let crafatarURL = URL(string: "https://crafatar.com/skins/\(uuid)") {
+                            do {
+                                return try await downloadSkin(from: crafatarURL)
+                            } catch {
+                                // Fallback to Minotar
+                            }
+                        }
+
+                        // 1-C. Fallback: Minotar (정품 유저는 맞으나 위 서비스 지연 시)
+                        if let minotarURL = URL(string: "https://minotar.net/skin/\(trimmed)") {
+                            do {
+                                return try await downloadSkin(from: minotarURL)
+                            } catch {
+                                // All failed
+                            }
+                        }
+
+                        throw SkinDownloadError.notFound
+                    }
+                }
+            } catch let error as SkinDownloadError {
+                // 404 notFound 등 의도된 오류는 Minotar로 우회하지 않고 즉시 throw
+                throw error
+            } catch {
+                // 네트워크 타임아웃, 연결 실패, 5xx 서버 오류 시에만 하단 Minotar 비상 대체 검색으로 진행
+            }
+        }
+
+        // [Case C] 비상 대체 검색: Mojang API 자체가 네트워크 단절/5xx 서버 오류로 다운된 경우 Minotar로 이중 검색 시도
         if let minotarURL = URL(string: "https://minotar.net/skin/\(trimmed)") {
             do {
                 return try await downloadSkin(from: minotarURL)
             } catch {
-                // Fallback to Crafatar via Mojang UUID
+                // Not found
             }
         }
 
-        // Fallback: Query Mojang API for UUID then Crafatar
-        guard let mojangURL = URL(string: "https://api.mojang.com/users/profiles/minecraft/\(trimmed)") else {
-            throw SkinDownloadError.invalidUsername
-        }
-
-        let (data, response) = try await session.data(from: mojangURL)
-        guard let httpRes = response as? HTTPURLResponse, httpRes.statusCode == 200 else {
-            throw SkinDownloadError.notFound
-        }
-
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let uuid = json["id"] as? String else {
-            throw SkinDownloadError.notFound
-        }
-
-        guard let crafatarURL = URL(string: "https://crafatar.com/skins/\(uuid)") else {
-            throw SkinDownloadError.notFound
-        }
-
-        return try await downloadSkin(from: crafatarURL)
+        throw SkinDownloadError.notFound
     }
 
     /// Download Minecraft skin from any arbitrary direct image URL or web skin page (Laby.net, NameMC, Skindex, etc.)
@@ -166,6 +225,6 @@ public final class SkinDownloaderService {
     public func avatarPreviewURL(for username: String) -> URL? {
         let trimmed = username.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
-        return URL(string: "https://minotar.net/armor/body/\(trimmed)/160.png")
+        return URL(string: "https://mc-heads.net/body/\(trimmed)/160")
     }
 }
