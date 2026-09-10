@@ -22,6 +22,7 @@ public final class CharacterBehaviorController {
         case sleep(duration: TimeInterval, zzzTimer: TimeInterval)
         case backflip(progress: CGFloat)
         case tnt(timer: TimeInterval)
+        case climbDown(phaseTimer: TimeInterval, isPlacing: Bool)
         case fall
         case dragged
         case landedCrouch(timeLeft: TimeInterval)
@@ -54,10 +55,35 @@ public final class CharacterBehaviorController {
     private let tntPlaceEnd: TimeInterval = 0.95
     private let tntBackstepEnd: TimeInterval = 1.3
 
+    // Ladder descent bookkeeping (사다리 타고 창문 내려가기)
+    /// 오버레이 렌더용 등반 스냅샷 (등반 중이 아니면 nil)
+    public struct ClimbSnapshot {
+        public let ladderRect: CGRect // Cocoa 좌표 기준 사다리 전체 기둥 영역
+        public let progress: CGFloat  // 0...1
+    }
+
+    /// 사다리를 걸 수 있는 발판인지: 창문이고 창 높이가 충분해야 한다
+    public static let minimumLadderLength: CGFloat = 180.0
+    public static func canDescend(from platform: Platform) -> Bool {
+        guard case .window = platform.kind, let bottom = platform.yBottom else { return false }
+        return (platform.yTop - bottom) >= minimumLadderLength
+    }
+
+    public private(set) var climbSnapshot: ClimbSnapshot?
+    private(set) var ladderCooldown: TimeInterval = 0
+    private var climbStartY: CGFloat = 0
+    private var climbBottomY: CGFloat = 0
+    private var climbSource: Platform?
+    private let climbSpeed: CGFloat = 220.0     // points / sec
+    private let ladderPlaceDuration: TimeInterval = 0.55
+    private let ladderCooldownDuration: TimeInterval = 12.0
+    private let ladderHalfWidth: CGFloat = 22.0
+
     public init() {}
 
     // MARK: - Direct Triggers (Called by View, Menu or Shortcuts)
     public func triggerBackflip(physics: PhysicsEngine, characterNode: MinecraftCharacterNode) {
+        guard !isClimbing else { return }
         physics.jump(impulse: 560)
         SoundAndEffectsManager.shared.play(.jump)
         characterNode.showOverheadEmoji("🤸‍♂️", duration: 1.5)
@@ -65,40 +91,48 @@ public final class CharacterBehaviorController {
     }
 
     public func triggerSneakDance(characterNode: MinecraftCharacterNode) {
+        guard !isClimbing else { return }
         characterNode.showOverheadEmoji("🕺", duration: 2.0)
         SoundAndEffectsManager.shared.play(.pop)
         state = .sneakDance(repsLeft: 4, isDown: true, timer: 0.15)
     }
 
     public func triggerWave(characterNode: MinecraftCharacterNode) {
+        guard !isClimbing else { return }
         characterNode.showOverheadEmoji("👋", duration: 2.0)
         SoundAndEffectsManager.shared.play(.heart)
         state = .wave(timeLeft: 2.5)
     }
 
     public func triggerSleep(characterNode: MinecraftCharacterNode) {
+        guard !isClimbing else { return }
         characterNode.showOverheadEmoji("💤", duration: 2.5)
         state = .sleep(duration: 30.0, zzzTimer: 1.5)
     }
 
     public func triggerEating(characterNode: MinecraftCharacterNode) {
+        guard !isClimbing else { return }
         characterNode.showOverheadEmoji("🍎", duration: 2.5)
         state = .eating(timeLeft: 2.8)
     }
 
     public func triggerPlaceAndMine(characterNode: MinecraftCharacterNode) {
+        guard !isClimbing else { return }
         characterNode.showOverheadEmoji("⛏️", duration: 2.5)
         characterNode.placedBlockNode.isHidden = false
         SoundAndEffectsManager.shared.play(.pop)
         state = .placeAndMineBlock(timeLeft: 3.0, isMining: false)
     }
 
-    public func handleCharacterClicked(characterNode: MinecraftCharacterNode) {
+    public func handleCharacterClicked(physics: PhysicsEngine, characterNode: MinecraftCharacterNode) {
         SoundAndEffectsManager.shared.play(.heart)
         characterNode.showOverheadEmoji("❤️", duration: 1.8)
 
-        // Wake up if sleeping
-        if case .sleep = state {
+        if isClimbing {
+            // 등반 중 클릭 → 사다리에서 손을 놓고 떨어진다
+            releaseFromLadder(physics: physics, characterNode: characterNode)
+        } else if case .sleep = state {
+            // Wake up if sleeping
             wakeUp(characterNode: characterNode)
         } else {
             // Little playful hop
@@ -141,7 +175,7 @@ public final class CharacterBehaviorController {
         onPlaced: @escaping (CGPoint) -> Void,
         completion: @escaping (Platform?) -> Void
     ) -> Bool {
-        guard !isTNTActive else { return false }
+        guard !isTNTActive, !isClimbing else { return false }
         tntFuse = fuse
         tntTarget = platform
         tntCompletion = completion
@@ -151,6 +185,66 @@ public final class CharacterBehaviorController {
         tntBackstepDir = 1
         state = .tnt(timer: 0)
         return true
+    }
+
+    // MARK: - Ladder Descent (사다리 타고 창문 내려가기)
+    public var isClimbing: Bool {
+        if case .climbDown = state { return true }
+        return false
+    }
+
+    /// 창문 발판에 사다리를 걸고 창 아래 끝까지 내려간다. 시작할 수 없으면 false.
+    @discardableResult
+    public func startLadderDescent(
+        physics: PhysicsEngine,
+        characterNode: MinecraftCharacterNode,
+        from platform: Platform
+    ) -> Bool {
+        guard !isClimbing, !isTNTActive, physics.currentPlatform != nil,
+              let bottom = platform.yBottom, Self.canDescend(from: platform)
+        else { return false }
+
+        climbStartY = physics.position.y
+        climbBottomY = bottom
+        climbSource = platform
+        climbSnapshot = nil
+        ladderCooldown = ladderCooldownDuration
+
+        physics.beginClimb()
+        SoundAndEffectsManager.shared.play(.pop)
+        characterNode.showOverheadEmoji("🪜", duration: 1.6)
+        state = .climbDown(phaseTimer: ladderPlaceDuration, isPlacing: true)
+        return true
+    }
+
+    /// 등반 중단 (드래그/낙하로 상태가 덮어써질 때)
+    private func cancelClimbIfActive() {
+        guard isClimbing else { return }
+        climbSnapshot = nil
+        climbSource = nil
+    }
+
+    /// 사다리에서 손을 놓고 그대로 낙하 (클릭 / 사다리 끝 도달 / 창이 닫힘)
+    private func releaseFromLadder(physics: PhysicsEngine, characterNode: MinecraftCharacterNode) {
+        guard isClimbing else { return }
+        cancelClimbIfActive()
+        characterNode.isClimbing = false
+        characterNode.climbProgress = 0
+        physics.releaseClimb()
+        state = .fall
+    }
+
+    private func makeClimbSnapshot(physics: PhysicsEngine) -> ClimbSnapshot {
+        let total = max(1, climbStartY - climbBottomY)
+        let progress = min(1, max(0, (climbStartY - physics.position.y) / total))
+        // 사다리는 창문 높이만큼만: 창 상단(+4pt 겹침)에서 창 하단까지
+        let rect = CGRect(
+            x: physics.position.x - ladderHalfWidth,
+            y: climbBottomY,
+            width: ladderHalfWidth * 2,
+            height: max(1, climbStartY + 4 - climbBottomY)
+        )
+        return ClimbSnapshot(ladderRect: rect, progress: progress)
     }
 
     // MARK: - Main Update Loop
@@ -164,6 +258,8 @@ public final class CharacterBehaviorController {
     ) {
         let charPos = physics.position
         let currentPlatform = physics.currentPlatform
+
+        ladderCooldown = max(0, ladderCooldown - dt)
 
         // 1. Mouse Activity & Proximity Tracking
         let cursorDelta = hypot(cursorPos.x - lastCursorPos.x, cursorPos.y - lastCursorPos.y)
@@ -191,7 +287,7 @@ public final class CharacterBehaviorController {
         // Proximity detection for greeting wave (within 45pt of head)
         let headScreenPos = CGPoint(x: charPos.x, y: charPos.y + 65)
         let distToHead = hypot(cursorPos.x - headScreenPos.x, cursorPos.y - headScreenPos.y)
-        if distToHead < 48.0 && !characterNode.isSleeping && !characterNode.isBeingDragged {
+        if distToHead < 48.0 && !characterNode.isSleeping && !characterNode.isBeingDragged && !isClimbing {
             cursorHoverTimer += dt
             if cursorHoverTimer > 0.6 {
                 cursorHoverTimer = 0
@@ -213,8 +309,10 @@ public final class CharacterBehaviorController {
         // 3. Physics Overrides (Dragged / Airborne)
         if case .dragged = physics.state {
             interruptTNTIfActive()
+            cancelClimbIfActive()
             state = .dragged
             characterNode.isBeingDragged = true
+            characterNode.isClimbing = false
             characterNode.isFalling = false
             characterNode.isSitting = false
             characterNode.isPoking = false
@@ -233,6 +331,7 @@ public final class CharacterBehaviorController {
 
         if case .airborne = physics.state {
             interruptTNTIfActive()
+            cancelClimbIfActive()
 
             if case .backflip(var progress) = state {
                 // Keep backflip rotating
@@ -246,6 +345,7 @@ public final class CharacterBehaviorController {
             }
             state = .fall
             characterNode.isBeingDragged = false
+            characterNode.isClimbing = false
             characterNode.isFalling = true
             characterNode.isSitting = false
             characterNode.isPoking = false
@@ -276,6 +376,7 @@ public final class CharacterBehaviorController {
 
         // 4. Reset general flags
         characterNode.isBeingDragged = false
+        characterNode.isClimbing = false
         characterNode.isFalling = false
         characterNode.isHoldingTNT = false
         characterNode.isPlacingTNT = false
@@ -565,6 +666,52 @@ public final class CharacterBehaviorController {
             }
             state = .tnt(timer: timer)
 
+        case .climbDown(var phaseTimer, var isPlacing):
+            characterNode.walkSpeed = 0
+            characterNode.isSitting = false
+            characterNode.isPoking = false
+            characterNode.isWaving = false
+            characterNode.isSneaking = false
+            characterNode.isSleeping = false
+            characterNode.isEating = false
+            characterNode.isClimbing = true
+
+            // 서 있던 창문을 매 프레임 재조회 (창이 움직이면 사다리도 따라가고, 닫히면 낙하)
+            let liveSource = climbSource.flatMap { source in
+                platforms.first { $0.kind == source.kind }
+            }
+            let ladderBottom = liveSource?.yBottom
+            if let ladderBottom = ladderBottom {
+                climbBottomY = ladderBottom
+            }
+
+            if ladderBottom == nil {
+                // 창문이 닫힘 → 사다리도 사라지고 그대로 떨어진다
+                releaseFromLadder(physics: physics, characterNode: characterNode)
+            } else if isPlacing {
+                phaseTimer -= dt
+                if phaseTimer <= 0 {
+                    isPlacing = false
+                    SoundAndEffectsManager.shared.play(.pop) // 사다리 설치 완료
+                }
+                state = .climbDown(phaseTimer: max(0, phaseTimer), isPlacing: isPlacing)
+            } else {
+                physics.position.y -= climbSpeed * CGFloat(dt)
+
+                if physics.position.y <= climbBottomY {
+                    // 사다리 끝(창 아래 끝) 도달 → 남은 높이는 그냥 떨어진다
+                    releaseFromLadder(physics: physics, characterNode: characterNode)
+                } else {
+                    state = .climbDown(phaseTimer: 0, isPlacing: false)
+                }
+            }
+
+            if isClimbing {
+                let snapshot = makeClimbSnapshot(physics: physics)
+                climbSnapshot = snapshot
+                characterNode.climbProgress = snapshot.progress
+            }
+
         case .fall, .dragged:
             break
         }
@@ -631,7 +778,16 @@ public final class CharacterBehaviorController {
         let minX = max(platform.xMin + 35, screenMinX)
         let maxX = min(platform.xMax - 35, screenMaxX)
 
-        if roll < 15 {
+        let canDescend = ladderCooldown <= 0 && Self.canDescend(from: platform)
+
+        if canDescend && roll < 9 {
+            // Ladder descent (사다리 타고 창문 내려가기)
+            startLadderDescent(
+                physics: physics,
+                characterNode: characterNode,
+                from: platform
+            )
+        } else if roll < 15 {
             // Place and mine a block!
             triggerPlaceAndMine(characterNode: characterNode)
         } else if roll < 26 {

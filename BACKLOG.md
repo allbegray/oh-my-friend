@@ -9,12 +9,6 @@
 ## 중간 (M)
 - [ ] [M1] macOS 상단 메뉴바 라인을 발판으로 인식하여 메뉴바 위에 걸터앉는 인터랙션 추가
 - [ ] [M2] 키보드 타이핑 속도(WPM) 감지 시 옆에서 신나서 방방 뛰며 응원하는 모션 추가
-- [ ] [M3] 사다리 타고 창문 내려가기 (Ladder Descent) — 창문 발판 위에서 사다리를 걸고 아래 플랫폼까지 등반
-  - `PhysicsState.climbing` + `beginClimb()/endClimb(on:)` 신설 (등반 중 중력·착지 판정 정지, y는 행동 컨트롤러가 구동)
-  - `Platform` 기준 `landingBelow(from:atX:in:)` 목적지 탐색 헬퍼 (매 프레임 재계산 → 창이 움직여도 안전)
-  - `LadderOverlayWindow`(레벨 `floating - 1`) 신규: 두 레일 + 16pt 간격 발판, 진행률만큼 발판 점진 노출, 완료 시 페이드아웃
-  - `MinecraftCharacterNode.isClimbing` 등반 포즈(양팔 교차 오버헤드 리치 + 다리 교차), `CharacterBehaviorController.climbDown` 상태
-  - 진입점: 메뉴 "🪜 사다리 타고 창문 내려가기"(Cmd+L) + 자율 모드 확률 밴드, 쿨다운 12초
 - [ ] [M4] 창 치우기(최소화) 인터랙션 — "🗜️ 창 압축해서 Dock으로 밀어넣기"
   - 선행: 손쉬운 사용(Accessibility) 권한. `AXUIElementCreateApplication` → `kAXWindowsAttribute` → `kAXPositionAttribute`/`kAXSizeAttribute`로 CGWindowID 창 매칭(4pt 허용 오차) → `kAXMinimizedAttribute = true` (실패 시 `kAXMinimizeButtonAttribute` 프레스 폴백). 화면 기록 권한은 사용하지 않음.
   - `WindowMinimizer.swift` 신규: 권한 확인(`AXIsProcessTrustedWithOptions`) + `minimize(windowID:pid:) -> Result`

@@ -23,6 +23,8 @@ public struct Platform {
     public let xMax: CGFloat
     public let yTop: CGFloat
     public let title: String
+    /// 창문의 아래쪽 끝(Cocoa y). 창문 발판이 아니면 nil
+    public let yBottom: CGFloat?
 
     public func contains(x: CGFloat, tolerance: CGFloat = 10) -> Bool {
         return x >= (xMin - tolerance) && x <= (xMax + tolerance)
@@ -56,7 +58,8 @@ public final class ScreenEnvironment {
                 xMin: screenFrame.minX,
                 xMax: screenFrame.maxX,
                 yTop: dockY,
-                title: "Dock"
+                title: "Dock",
+                yBottom: nil
             ))
         } else {
             // Standard Screen Bottom
@@ -65,7 +68,8 @@ public final class ScreenEnvironment {
                 xMin: screenFrame.minX,
                 xMax: screenFrame.maxX,
                 yTop: screenFrame.minY,
-                title: "화면 바닥"
+                title: "화면 바닥",
+                yBottom: nil
             ))
         }
 
@@ -118,7 +122,8 @@ public final class ScreenEnvironment {
                     xMin: max(screenFrame.minX, cgX),
                     xMax: min(screenFrame.maxX, cgX + cgW),
                     yTop: cocoaTopY,
-                    title: "\(appName): \(windowTitle)"
+                    title: "\(appName): \(windowTitle)",
+                    yBottom: max(screenFrame.minY, cocoaY)
                 )
                 platforms.append(p)
             }
@@ -170,6 +175,7 @@ public enum PhysicsState {
     case onGround(platform: Platform)
     case airborne
     case dragged
+    case climbing
 }
 
 public final class PhysicsEngine {
@@ -218,12 +224,28 @@ public final class PhysicsEngine {
         state = .airborne
     }
 
+    /// 사다리 등반 시작: 중력·착지 판정을 멈추고 y를 행동 컨트롤러가 직접 구동한다
+    public func beginClimb() {
+        velocity = .zero
+        state = .climbing
+    }
+
+    /// 등반 중 사다리에서 손을 놓아 그대로 낙하시킨다
+    public func releaseClimb() {
+        velocity = .zero
+        state = .airborne
+    }
+
     public func update(deltaTime dt: CGFloat, platforms: [Platform], screenFrame: CGRect) {
         guard dt > 0 else { return }
 
         switch state {
         case .dragged:
             // Handled externally via setDragged
+            return
+
+        case .climbing:
+            // 등반 중: 위치는 CharacterBehaviorController가 직접 구동한다
             return
 
         case .onGround(let platform):
@@ -306,7 +328,7 @@ public final class PhysicsEngine {
                 position.y = bottomFloor
                 velocity.y = 0
                 velocity.x = 0
-                state = .onGround(platform: Platform(kind: .floor, xMin: screenFrame.minX, xMax: screenFrame.maxX, yTop: bottomFloor, title: "화면 바닥"))
+                state = .onGround(platform: Platform(kind: .floor, xMin: screenFrame.minX, xMax: screenFrame.maxX, yTop: bottomFloor, title: "화면 바닥", yBottom: nil))
             }
         }
 

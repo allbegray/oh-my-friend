@@ -25,6 +25,10 @@ public final class AppController: NSObject, CharacterViewDelegate, NSMenuDelegat
     private var tntPlacementPoint: CGPoint = .zero
     private var isBreakInProgress = false
 
+    // Ladder descent (사다리 타고 창문 내려가기)
+    private var ladderMenuItem: NSMenuItem?
+    private var ladderOverlay: LadderOverlayWindow?
+
     public override init() {
         super.init()
     }
@@ -101,6 +105,9 @@ public final class AppController: NSObject, CharacterViewDelegate, NSMenuDelegat
         // 1.5. TNT: 도화선 점멸 동기화
         syncTNT()
 
+        // 1.6. Ladder descent: sync ladder overlay with climb progress
+        syncLadderOverlay()
+
         // 2. Physics Update
         physics.update(
             deltaTime: CGFloat(dt),
@@ -163,6 +170,8 @@ public final class AppController: NSObject, CharacterViewDelegate, NSMenuDelegat
             } else {
                 desc = "🧨 TNT 설치하는 중..."
             }
+        case .climbDown:
+            desc = "🪜 사다리 타고 창문 내려가는 중"
         case .fall:
             desc = "으악! 떨어지는 중! 🪂"
         case .dragged:
@@ -196,7 +205,7 @@ public final class AppController: NSObject, CharacterViewDelegate, NSMenuDelegat
     }
 
     public func characterViewDidClick(_ view: CharacterView) {
-        behavior.handleCharacterClicked(characterNode: window.characterView.characterNode)
+        behavior.handleCharacterClicked(physics: physics, characterNode: window.characterView.characterNode)
     }
 
     public func characterViewDidDoubleClick(_ view: CharacterView) {
@@ -206,6 +215,7 @@ public final class AppController: NSObject, CharacterViewDelegate, NSMenuDelegat
     // MARK: - NSMenuDelegate
     public func menuNeedsUpdate(_ menu: NSMenu) {
         attackMenuItem?.isEnabled = canStartTNTBreak()
+        ladderMenuItem?.isEnabled = canStartLadderDescent()
     }
     // MARK: - Status Bar & Menus
     private func setupStatusBar() {
@@ -345,6 +355,11 @@ public final class AppController: NSObject, CharacterViewDelegate, NSMenuDelegat
         let sleepItem = NSMenuItem(title: "💤 지금 낮잠자기 (Sleep)", action: #selector(didSelectSleep), keyEquivalent: "z")
         sleepItem.target = self
         actMenu.addItem(sleepItem)
+
+        let ladderItem = NSMenuItem(title: "🪜 사다리 타고 창문 내려가기 (Ladder Descent)", action: #selector(didSelectLadderDescent), keyEquivalent: "l")
+        ladderItem.target = self
+        actMenu.addItem(ladderItem)
+        self.ladderMenuItem = ladderItem
 
         let actSubmenuItem = NSMenuItem(title: "✨ 재미있는 모션 실행", action: nil, keyEquivalent: "")
         actSubmenuItem.submenu = actMenu
@@ -619,6 +634,26 @@ public final class AppController: NSObject, CharacterViewDelegate, NSMenuDelegat
         tntEntityWindow?.setFuseProgress(progress)
     }
 
+    /// 등반 스냅샷에 맞춰 사다리 오버레이를 생성/갱신/정리한다
+    private func syncLadderOverlay() {
+        guard let snapshot = behavior.climbSnapshot else {
+            if let overlay = ladderOverlay {
+                overlay.retire()
+                ladderOverlay = nil
+            }
+            return
+        }
+
+        if let overlay = ladderOverlay {
+            overlay.update(ladderRect: snapshot.ladderRect)
+        } else {
+            let overlay = LadderOverlayWindow(ladderRect: snapshot.ladderRect)
+            overlay.update(ladderRect: snapshot.ladderRect)
+            overlay.orderFrontRegardless()
+            ladderOverlay = overlay
+        }
+    }
+
     @objc private func didSelectResetFloor() {
         let mainScreen = NSScreen.main ?? NSScreen.screens[0]
         physics.position = CGPoint(
@@ -722,5 +757,21 @@ public final class AppController: NSObject, CharacterViewDelegate, NSMenuDelegat
 
     @objc private func didSelectSleep() {
         behavior.triggerSleep(characterNode: window.characterView.characterNode)
+    }
+
+    // MARK: - Ladder Descent (사다리 타고 창문 내려가기)
+    private func canStartLadderDescent() -> Bool {
+        guard !behavior.isClimbing,
+              let platform = physics?.currentPlatform else { return false }
+        return CharacterBehaviorController.canDescend(from: platform)
+    }
+
+    @objc private func didSelectLadderDescent() {
+        guard canStartLadderDescent(), let platform = physics.currentPlatform else { return }
+        behavior.startLadderDescent(
+            physics: physics,
+            characterNode: window.characterView.characterNode,
+            from: platform
+        )
     }
 }

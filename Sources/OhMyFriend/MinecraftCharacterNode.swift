@@ -74,6 +74,10 @@ public final class MinecraftCharacterNode: SCNNode {
     public var backflipAngle: CGFloat = 0
     public var isEating: Bool = false
 
+    // Ladder climbing (사다리 등반)
+    public var isClimbing: Bool = false
+    public var climbProgress: CGFloat = 0
+
     public override init() {
         super.init()
         setupHierarchy()
@@ -348,7 +352,7 @@ public final class MinecraftCharacterNode: SCNNode {
         tntHandNode.isHidden = !(isHoldingTNT || isPlacingTNT)
 
         // 1. Smooth Head LookAt Interpolation
-        if !isSleeping && !isBackflipping {
+        if !isSleeping && !isBackflipping && !isClimbing {
             let lerpFactor: CGFloat = min(dt * 8.0, 1.0)
             currentHeadYaw += (targetHeadYaw - currentHeadYaw) * lerpFactor
             currentHeadPitch += (targetHeadPitch - currentHeadPitch) * lerpFactor
@@ -392,6 +396,18 @@ public final class MinecraftCharacterNode: SCNNode {
             leftArmJoint.eulerAngles = SCNVector3(0.3, 0, -0.2)
             rightLegJoint.eulerAngles = SCNVector3(0, 0, 0.1)
             leftLegJoint.eulerAngles = SCNVector3(0, 0, -0.1)
+            return
+        }
+
+        if isClimbing {
+            // Climbing: 창문을 마주보고(등을 보이며) 양팔 교차로 위를 움켜쥐고 다리를 교차로 디디며 내려간다
+            let cycle = sin(animTime * 5.0)
+            modelRoot.eulerAngles = SCNVector3(0, CGFloat.pi, 0)
+            bodyAnchor.position = SCNVector3(0, cycle * 0.06, 0)
+            rightArmJoint.eulerAngles = SCNVector3(-2.35 + cycle * 0.45, 0, 0.12)
+            leftArmJoint.eulerAngles = SCNVector3(-2.35 - cycle * 0.45, 0, -0.12)
+            rightLegJoint.eulerAngles = SCNVector3(0.45 - cycle * 0.35, 0, 0)
+            leftLegJoint.eulerAngles = SCNVector3(0.45 + cycle * 0.35, 0, 0)
             return
         }
 
