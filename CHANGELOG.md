@@ -2,6 +2,21 @@
 
 # 변경 이력
 
+## [v0.3.0] - 2026-09-10
+
+### 추가
+- [H1] 마인크래프트 스킨 2차 레이어(모자/자켓/소매/바지 외투) 3D 오버레이 렌더링 지원:
+  - Minecraft 1.8+ 64x64 표준 규격 6대 2차 레이어(모자, 상의 자켓, 좌/우 소매, 좌/우 바지) 정밀 UV 매핑.
+  - 관절 피벗에 연동되는 6개 3D 오버레이 메쉬 노드(`headOverlayMesh`, `torsoOverlayMesh`, `rightArmOverlayMesh`, `leftArmOverlayMesh`, `rightLegOverlayMesh`, `leftLegOverlayMesh`) 추가 (+0.08 크기로 기준 메쉬를 입체적으로 감쌈).
+  - 투명 픽셀 판별 알고리즘(`hasVisiblePixels`): 100% 투명하거나 미사용된 부위는 불필요한 드로우콜 없이 노드를 자동 숨김(`isHidden = true`) 처리.
+  - 기본 스킨(Alex의 3D 입체 머리카락/포니테일, Steve 헤어, Zombie 옷자락)에 2차 레이어 적용.
+- [H2] 다중 모니터 환경에서 디스플레이 간 자유로운 이동 및 경계선 전환 물리 최적화:
+  - `ScreenEnvironment.totalDesktopBounds` 및 `hasAdjacentScreen(from:onLeft:atY:)` 구현.
+  - 다중 모니터 경계선 관통 물리 지원: 인접한 디스플레이가 존재하는 경우 화면 가장자리 클램프/바운스를 해제하여 모니터 간 자유로운 비행, 낙하, 걸어서 이동 지원.
+  - `followCursor` 모드에서 커서가 다른 모니터에 있을 때 경계선을 넘어 끝까지 추적하도록 개선.
+  - 여러 디스플레이에 걸쳐 있는 와이드 창문 플랫폼을 전체 데스크톱 영역에 맞춰 걷기 지원.
+  - 모니터 간 높낮이 차이에 따른 동적 바닥 안전망 및 착지 시스템 최적화.
+
 ## [v0.2.8] - 2026-09-10
 
 ### 변경

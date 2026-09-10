@@ -34,6 +34,14 @@ public final class MinecraftCharacterNode: SCNNode {
     public let leftLegJoint = SCNNode()
     public let leftLegMesh = SCNNode()
 
+    // 2nd Layer (Overlays: Hat, Jacket, Sleeves, Pants)
+    public let headOverlayMesh = SCNNode()
+    public let torsoOverlayMesh = SCNNode()
+    public let rightArmOverlayMesh = SCNNode()
+    public let leftArmOverlayMesh = SCNNode()
+    public let rightLegOverlayMesh = SCNNode()
+    public let leftLegOverlayMesh = SCNNode()
+
     // Hand Item Attachment Node
     public let rightHandItemAnchor = SCNNode()
     public var currentHeldItem: HeldItem = .none {
@@ -109,12 +117,26 @@ public final class MinecraftCharacterNode: SCNNode {
         torsoNode.position = SCNVector3(0, 1.8, 0)
         bodyAnchor.addChildNode(torsoNode)
 
+        // 1-Overlay. Torso Jacket: W=0.88, H=1.28, L=0.48
+        let torsoOverlayBox = SCNBox(width: 0.88, height: 1.28, length: 0.48, chamferRadius: 0)
+        torsoOverlayMesh.geometry = torsoOverlayBox
+        torsoOverlayMesh.position = SCNVector3(0, 0, 0)
+        torsoOverlayMesh.isHidden = true
+        torsoNode.addChildNode(torsoOverlayMesh)
+
         // 2. Head Joint (Pivot at neck: Y=2.4)
         headJoint.position = SCNVector3(0, 2.4, 0)
         let headBox = SCNBox(width: 0.8, height: 0.8, length: 0.8, chamferRadius: 0)
         headMesh.geometry = headBox
         headMesh.position = SCNVector3(0, 0.4, 0)
         headJoint.addChildNode(headMesh)
+
+        // 2-Overlay. Head Hat: W=0.88, H=0.88, L=0.88
+        let headOverlayBox = SCNBox(width: 0.88, height: 0.88, length: 0.88, chamferRadius: 0)
+        headOverlayMesh.geometry = headOverlayBox
+        headOverlayMesh.position = SCNVector3(0, 0.4, 0)
+        headOverlayMesh.isHidden = true
+        headJoint.addChildNode(headOverlayMesh)
         bodyAnchor.addChildNode(headJoint)
 
         // 3. Right Arm Joint (Pivot at right shoulder: X = -0.6, Y = 2.4)
@@ -123,7 +145,13 @@ public final class MinecraftCharacterNode: SCNNode {
         rightArmMesh.geometry = armBox
         rightArmMesh.position = SCNVector3(0, -0.6, 0)
         rightArmJoint.addChildNode(rightArmMesh)
-        bodyAnchor.addChildNode(rightArmJoint)
+
+        // 3-Overlay. Right Arm Sleeve: W=0.48, H=1.28, L=0.48
+        let rightArmOverlayBox = SCNBox(width: 0.48, height: 1.28, length: 0.48, chamferRadius: 0)
+        rightArmOverlayMesh.geometry = rightArmOverlayBox
+        rightArmOverlayMesh.position = SCNVector3(0, -0.6, 0)
+        rightArmOverlayMesh.isHidden = true
+        rightArmJoint.addChildNode(rightArmOverlayMesh)
 
         // Mount item anchor at the bottom of right arm (hand position)
         rightHandItemAnchor.position = SCNVector3(0, -0.6, 0.2)
@@ -135,6 +163,13 @@ public final class MinecraftCharacterNode: SCNNode {
         leftArmMesh.geometry = leftArmBox
         leftArmMesh.position = SCNVector3(0, -0.6, 0)
         leftArmJoint.addChildNode(leftArmMesh)
+
+        // 4-Overlay. Left Arm Sleeve: W=0.48, H=1.28, L=0.48
+        let leftArmOverlayBox = SCNBox(width: 0.48, height: 1.28, length: 0.48, chamferRadius: 0)
+        leftArmOverlayMesh.geometry = leftArmOverlayBox
+        leftArmOverlayMesh.position = SCNVector3(0, -0.6, 0)
+        leftArmOverlayMesh.isHidden = true
+        leftArmJoint.addChildNode(leftArmOverlayMesh)
         bodyAnchor.addChildNode(leftArmJoint)
 
         // 5. Right Leg Joint (Pivot at right hip: X = -0.2, Y = 1.2)
@@ -143,6 +178,13 @@ public final class MinecraftCharacterNode: SCNNode {
         rightLegMesh.geometry = legBox
         rightLegMesh.position = SCNVector3(0, -0.6, 0)
         rightLegJoint.addChildNode(rightLegMesh)
+
+        // 5-Overlay. Right Leg Pants: W=0.48, H=1.28, L=0.48
+        let rightLegOverlayBox = SCNBox(width: 0.48, height: 1.28, length: 0.48, chamferRadius: 0)
+        rightLegOverlayMesh.geometry = rightLegOverlayBox
+        rightLegOverlayMesh.position = SCNVector3(0, -0.6, 0)
+        rightLegOverlayMesh.isHidden = true
+        rightLegJoint.addChildNode(rightLegOverlayMesh)
         bodyAnchor.addChildNode(rightLegJoint)
 
         // 6. Left Leg Joint (Pivot at left hip: X = 0.2, Y = 1.2)
@@ -151,6 +193,13 @@ public final class MinecraftCharacterNode: SCNNode {
         leftLegMesh.geometry = leftLegBox
         leftLegMesh.position = SCNVector3(0, -0.6, 0)
         leftLegJoint.addChildNode(leftLegMesh)
+
+        // 6-Overlay. Left Leg Pants: W=0.48, H=1.28, L=0.48
+        let leftLegOverlayBox = SCNBox(width: 0.48, height: 1.28, length: 0.48, chamferRadius: 0)
+        leftLegOverlayMesh.geometry = leftLegOverlayBox
+        leftLegOverlayMesh.position = SCNVector3(0, -0.6, 0)
+        leftLegOverlayMesh.isHidden = true
+        leftLegJoint.addChildNode(leftLegOverlayMesh)
         bodyAnchor.addChildNode(leftLegJoint)
 
         // 7. TNT block (equipped in the right hand while placing)
@@ -354,6 +403,23 @@ public final class MinecraftCharacterNode: SCNNode {
         leftArmMesh.geometry?.materials = skin.materials(for: .leftArm)
         rightLegMesh.geometry?.materials = skin.materials(for: .rightLeg)
         leftLegMesh.geometry?.materials = skin.materials(for: .leftLeg)
+
+        // 2nd Layer (Overlays: Hat, Jacket, Sleeves, Pants)
+        applyOverlay(node: headOverlayMesh, materials: skin.overlayMaterials(for: .head))
+        applyOverlay(node: torsoOverlayMesh, materials: skin.overlayMaterials(for: .torso))
+        applyOverlay(node: rightArmOverlayMesh, materials: skin.overlayMaterials(for: .rightArm))
+        applyOverlay(node: leftArmOverlayMesh, materials: skin.overlayMaterials(for: .leftArm))
+        applyOverlay(node: rightLegOverlayMesh, materials: skin.overlayMaterials(for: .rightLeg))
+        applyOverlay(node: leftLegOverlayMesh, materials: skin.overlayMaterials(for: .leftLeg))
+    }
+
+    private func applyOverlay(node: SCNNode, materials: [SCNMaterial]?) {
+        if let materials = materials {
+            node.geometry?.materials = materials
+            node.isHidden = false
+        } else {
+            node.isHidden = true
+        }
     }
 
     // MARK: - Update per frame (called by renderer loop)

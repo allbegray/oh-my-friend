@@ -112,7 +112,7 @@ public final class AppController: NSObject, CharacterViewDelegate, NSMenuDelegat
         physics.update(
             deltaTime: CGFloat(dt),
             platforms: cachedPlatforms,
-            screenFrame: screen.frame
+            screen: screen
         )
 
         // 3. 3D Character Node Animation Update

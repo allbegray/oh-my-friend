@@ -37,9 +37,75 @@ public final class ScreenEnvironment {
 
     private init() {}
 
-    /// Get current screen based on point (or main screen)
+    /// Total bounding box covering all connected displays
+    public var totalDesktopBounds: CGRect {
+        let screens = NSScreen.screens
+        guard let first = screens.first else { return .zero }
+        return screens.reduce(first.frame) { $0.union($1.frame) }
+    }
+
+    /// Get current screen based on point, finding closest screen if between displays
     public func screen(for point: CGPoint) -> NSScreen {
-        return NSScreen.screens.first { NSPointInRect(point, $0.frame) } ?? NSScreen.main ?? NSScreen.screens[0]
+        let screens = NSScreen.screens
+        if let match = screens.first(where: { NSPointInRect(point, $0.frame) }) {
+            return match
+        }
+        // Find closest screen by distance to handle inter-screen gaps or floating-point margins
+        var bestScreen = screens.first ?? NSScreen.main ?? NSScreen()
+        var minDistance: CGFloat = .greatestFiniteMagnitude
+
+        for s in screens {
+            let f = s.frame
+            let dx = max(f.minX - point.x, max(0, point.x - f.maxX))
+            let dy = max(f.minY - point.y, max(0, point.y - f.maxY))
+            let dist = hypot(dx, dy)
+            if dist < minDistance {
+                minDistance = dist
+                bestScreen = s
+            }
+        }
+        return bestScreen
+    }
+
+    /// Check if moving horizontally past an edge connects to an adjacent display at height y
+    public func hasAdjacentScreen(from screen: NSScreen, onLeft: Bool, atY y: CGFloat) -> Bool {
+        let testX = onLeft ? (screen.frame.minX - 12) : (screen.frame.maxX + 12)
+        let testPoint = CGPoint(x: testX, y: y)
+
+        for other in NSScreen.screens {
+            if other == screen { continue }
+            let f = other.frame
+            if f.contains(testPoint) {
+                return true
+            }
+            // Allow tolerance for slight monitor height or edge misalignments (±35pt)
+            let xClose = onLeft ? (abs(f.maxX - screen.frame.minX) <= 25) : (abs(f.minX - screen.frame.maxX) <= 25)
+            let yContained = (y >= f.minY - 35) && (y <= f.maxY + 35)
+            if xClose && yContained {
+                return true
+            }
+        }
+        return false
+    }
+
+    /// Return adjacent display if one exists past the screen edge at height y
+    public func adjacentScreen(from screen: NSScreen, onLeft: Bool, atY y: CGFloat) -> NSScreen? {
+        let testX = onLeft ? (screen.frame.minX - 12) : (screen.frame.maxX + 12)
+        let testPoint = CGPoint(x: testX, y: y)
+
+        for other in NSScreen.screens {
+            if other == screen { continue }
+            let f = other.frame
+            if f.contains(testPoint) {
+                return other
+            }
+            let xClose = onLeft ? (abs(f.maxX - screen.frame.minX) <= 25) : (abs(f.minX - screen.frame.maxX) <= 25)
+            let yContained = (y >= f.minY - 35) && (y <= f.maxY + 35)
+            if xClose && yContained {
+                return other
+            }
+        }
+        return nil
     }
 
     /// Detect screen bounds, Dock top edge, and on-screen windows
@@ -117,13 +183,14 @@ public final class ScreenEnvironment {
             // Check if within current screen bounds
             let cocoaRect = CGRect(x: cgX, y: cocoaY, width: cgW, height: cgH)
             if screenFrame.intersects(cocoaRect) {
+                let desktopBounds = ScreenEnvironment.shared.totalDesktopBounds
                 let p = Platform(
                     kind: .window(id: windowId, appName: appName, pid: ownerPid),
-                    xMin: max(screenFrame.minX, cgX),
-                    xMax: min(screenFrame.maxX, cgX + cgW),
+                    xMin: max(desktopBounds.minX, cgX),
+                    xMax: min(desktopBounds.maxX, cgX + cgW),
                     yTop: cocoaTopY,
                     title: "\(appName): \(windowTitle)",
-                    yBottom: max(screenFrame.minY, cocoaY)
+                    yBottom: max(desktopBounds.minY, cocoaY)
                 )
                 platforms.append(p)
             }
@@ -275,7 +342,13 @@ public final class PhysicsEngine {
     }
 
     public func update(deltaTime dt: CGFloat, platforms: [Platform], screenFrame: CGRect) {
+        let sc = ScreenEnvironment.shared.screen(for: position)
+        update(deltaTime: dt, platforms: platforms, screen: sc)
+    }
+
+    public func update(deltaTime dt: CGFloat, platforms: [Platform], screen: NSScreen) {
         guard dt > 0 else { return }
+        let screenFrame = screen.frame
 
         switch state {
         case .dragged:
@@ -307,8 +380,16 @@ public final class PhysicsEngine {
                 velocity.y = 0
             }
 
-            // Screen horizontal bounds clamping
-            position.x = max(screenFrame.minX + 20, min(screenFrame.maxX - 20, position.x))
+            // Multi-monitor aware horizontal bounds clamping:
+            // If an adjacent screen exists on this side, let the character step into the next monitor!
+            let canPassLeft = ScreenEnvironment.shared.hasAdjacentScreen(from: screen, onLeft: true, atY: position.y)
+            let canPassRight = ScreenEnvironment.shared.hasAdjacentScreen(from: screen, onLeft: false, atY: position.y)
+
+            if !canPassLeft && position.x < screenFrame.minX + 20 {
+                position.x = screenFrame.minX + 20
+            } else if !canPassRight && position.x > screenFrame.maxX - 20 {
+                position.x = screenFrame.maxX - 20
+            }
 
         case .airborne:
             // Apply gravity
@@ -319,10 +400,17 @@ public final class PhysicsEngine {
             let nextY = position.y + velocity.y * dt
             let nextX = position.x + velocity.x * dt
 
-            // Screen horizontal clamping
-            let clampedX = max(screenFrame.minX + 20, min(screenFrame.maxX - 20, nextX))
-            if clampedX != nextX {
-                velocity.x = -velocity.x * 0.3 // bounce off screen edge
+            // Multi-monitor aware horizontal clamping & bouncing
+            let canPassLeft = ScreenEnvironment.shared.hasAdjacentScreen(from: screen, onLeft: true, atY: nextY)
+            let canPassRight = ScreenEnvironment.shared.hasAdjacentScreen(from: screen, onLeft: false, atY: nextY)
+
+            var clampedX = nextX
+            if !canPassLeft && nextX < screenFrame.minX + 20 {
+                clampedX = screenFrame.minX + 20
+                velocity.x = -velocity.x * 0.3 // bounce off outer edge
+            } else if !canPassRight && nextX > screenFrame.maxX - 20 {
+                clampedX = screenFrame.maxX - 20
+                velocity.x = -velocity.x * 0.3 // bounce off outer edge
             }
 
             // Check collision with platforms (moving downward: velocity.y < 0)
@@ -334,7 +422,6 @@ public final class PhysicsEngine {
                     guard p.contains(x: clampedX, tolerance: 15) else { continue }
 
                     // Did we cross the platform surface from above?
-                    // previous position.y was at or above platform.yTop, and nextY is at or below platform.yTop
                     if position.y >= (p.yTop - 15) && nextY <= (p.yTop + 5) {
                         if let best = bestLanding {
                             if p.yTop > best.y {
@@ -360,13 +447,16 @@ public final class PhysicsEngine {
             position.x = clampedX
             position.y = nextY
 
-            // Bottom-most emergency safety net (below screen bottom)
-            let bottomFloor = screenFrame.minY
-            if position.y <= bottomFloor {
+            // Multi-monitor aware floor safety net:
+            // Check floor of whichever display the character is currently over
+            let activeScreen = ScreenEnvironment.shared.screen(for: CGPoint(x: clampedX, y: nextY))
+            let bottomFloor = activeScreen.frame.minY
+            if nextY <= bottomFloor {
                 position.y = bottomFloor
+                position.x = clampedX
                 velocity.y = 0
                 velocity.x = 0
-                state = .onGround(platform: Platform(kind: .floor, xMin: screenFrame.minX, xMax: screenFrame.maxX, yTop: bottomFloor, title: "화면 바닥", yBottom: nil))
+                state = .onGround(platform: Platform(kind: .floor, xMin: activeScreen.frame.minX, xMax: activeScreen.frame.maxX, yTop: bottomFloor, title: "화면 바닥", yBottom: nil))
             }
         }
 

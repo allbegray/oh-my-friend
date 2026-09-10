@@ -55,6 +55,144 @@ public final class SkinTexture {
         }
     }
 
+    /// 2차 레이어 (오버레이/모자/자켓/소매/바지 외투) SCNMaterial 배열 (Front, Right, Back, Left, Top, Bottom)
+    /// 투명한 픽셀이 하나도 없거나(미사용) 32px 클래식 스킨의 미지원 부위인 경우 nil 반환
+    public func overlayMaterials(for part: BodyPart) -> [SCNMaterial]? {
+        guard let crops = overlayRects(for: part) else { return nil }
+
+        // 투명 픽셀 검사: 6개 면 전체에 유의미한 가시 픽셀이 하나라도 있는지 확인
+        var hasAnyPixel = false
+        var croppedImages: [CGImage?] = []
+        croppedImages.reserveCapacity(crops.count)
+
+        for rect in crops {
+            if let subCG = crop(rect: rect) {
+                croppedImages.append(subCG)
+                if !hasAnyPixel && hasVisiblePixels(in: subCG) {
+                    hasAnyPixel = true
+                }
+            } else {
+                croppedImages.append(nil)
+            }
+        }
+
+        guard hasAnyPixel else { return nil }
+
+        return zip(crops, croppedImages).map { rect, subCG in
+            let mat = SCNMaterial()
+            if let subCG = subCG {
+                let subImage = NSImage(cgImage: subCG, size: NSSize(width: rect.width, height: rect.height))
+                mat.diffuse.contents = subImage
+                mat.diffuse.magnificationFilter = .nearest
+                mat.diffuse.minificationFilter = .nearest
+                mat.diffuse.mipFilter = .none
+                mat.roughness.contents = 1.0
+                mat.lightingModel = .lambert
+                mat.isDoubleSided = true
+                mat.blendMode = .alpha
+                mat.writesToDepthBuffer = true
+                mat.readsFromDepthBuffer = true
+            }
+            return mat
+        }
+    }
+
+    private func overlayRects(for part: BodyPart) -> [CGRect]? {
+        // Minecraft 1.8+ 2nd layer UV coordinates in 64x64 skin
+        // Order: [Front, Right, Back, Left, Top, Bottom]
+        switch part {
+        case .head:
+            // Hat layer exists in both 64x64 and classic 64x32
+            return [
+                CGRect(x: 40, y: 8, width: 8, height: 8),    // Front
+                CGRect(x: 32, y: 8, width: 8, height: 8),    // Right
+                CGRect(x: 56, y: 8, width: 8, height: 8),    // Back
+                CGRect(x: 48, y: 8, width: 8, height: 8),    // Left
+                CGRect(x: 40, y: 0, width: 8, height: 8),    // Top
+                CGRect(x: 48, y: 0, width: 8, height: 8)     // Bottom
+            ]
+        case .torso:
+            guard !isClassic32 else { return nil }
+            return [
+                CGRect(x: 20, y: 36, width: 8, height: 12), // Front
+                CGRect(x: 16, y: 36, width: 4, height: 12), // Right
+                CGRect(x: 32, y: 36, width: 8, height: 12), // Back
+                CGRect(x: 28, y: 36, width: 4, height: 12), // Left
+                CGRect(x: 20, y: 32, width: 8, height: 4),  // Top
+                CGRect(x: 28, y: 32, width: 8, height: 4)   // Bottom
+            ]
+        case .rightArm:
+            guard !isClassic32 else { return nil }
+            return [
+                CGRect(x: 44, y: 36, width: 4, height: 12), // Front
+                CGRect(x: 40, y: 36, width: 4, height: 12), // Right
+                CGRect(x: 52, y: 36, width: 4, height: 12), // Back
+                CGRect(x: 48, y: 36, width: 4, height: 12), // Left
+                CGRect(x: 44, y: 32, width: 4, height: 4),  // Top
+                CGRect(x: 48, y: 32, width: 4, height: 4)   // Bottom
+            ]
+        case .leftArm:
+            guard !isClassic32 else { return nil }
+            return [
+                CGRect(x: 52, y: 52, width: 4, height: 12), // Front
+                CGRect(x: 48, y: 52, width: 4, height: 12), // Right
+                CGRect(x: 60, y: 52, width: 4, height: 12), // Back
+                CGRect(x: 56, y: 52, width: 4, height: 12), // Left
+                CGRect(x: 52, y: 48, width: 4, height: 4),  // Top
+                CGRect(x: 56, y: 48, width: 4, height: 4)   // Bottom
+            ]
+        case .rightLeg:
+            guard !isClassic32 else { return nil }
+            return [
+                CGRect(x: 4, y: 36, width: 4, height: 12),  // Front
+                CGRect(x: 0, y: 36, width: 4, height: 12),  // Right
+                CGRect(x: 12, y: 36, width: 4, height: 12), // Back
+                CGRect(x: 8, y: 36, width: 4, height: 12),  // Left
+                CGRect(x: 4, y: 32, width: 4, height: 4),   // Top
+                CGRect(x: 8, y: 32, width: 4, height: 4)    // Bottom
+            ]
+        case .leftLeg:
+            guard !isClassic32 else { return nil }
+            return [
+                CGRect(x: 4, y: 52, width: 4, height: 12),  // Front
+                CGRect(x: 0, y: 52, width: 4, height: 12),  // Right
+                CGRect(x: 12, y: 52, width: 4, height: 12), // Back
+                CGRect(x: 8, y: 52, width: 4, height: 12),  // Left
+                CGRect(x: 4, y: 48, width: 4, height: 4),   // Top
+                CGRect(x: 8, y: 48, width: 4, height: 4)    // Bottom
+            ]
+        }
+    }
+
+    private func hasVisiblePixels(in image: CGImage) -> Bool {
+        let width = image.width
+        let height = image.height
+        guard width > 0 && height > 0 else { return false }
+
+        var data = [UInt32](repeating: 0, count: width * height)
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        guard let ctx = CGContext(
+            data: &data,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: width * 4,
+            space: colorSpace,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else {
+            return true // Fallback: try rendering if context creation fails
+        }
+        ctx.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+
+        for pixel in data {
+            let alpha = (pixel >> 24) & 0xFF
+            if alpha > 15 {
+                return true
+            }
+        }
+        return false
+    }
+
     private func rects(for part: BodyPart) -> [CGRect] {
         // Minecraft skin UV coordinates (X, Y, W, H) in a 64x64 or 64x32 texture
         // Order: [Front, Right, Back, Left, Top, Bottom]
@@ -289,6 +427,39 @@ public struct BuiltinSkinGenerator {
         fill(x: 16, y: 60, w: 16, h: 2, col: pantsDarkCol)
         fill(x: 16, y: 62, w: 16, h: 2, col: shoeCol)
 
+
+        // 7. 2nd Layer (Overlays) for Built-in Skins
+        switch type {
+        case .alex:
+            // Alex's 3D hair strands and ponytail on Hat layer
+            // Hat top
+            fill(x: 40, y: 0, w: 8, h: 8, col: hairCol)
+            // Hat front bangs
+            fill(x: 40, y: 8, w: 8, h: 2, col: hairCol)
+            set(x: 40, y: 10, col: hairCol)
+            set(x: 41, y: 10, col: hairCol)
+            set(x: 46, y: 10, col: hairCol)
+            set(x: 47, y: 10, col: hairCol)
+            // Hat sides (long hair hanging down)
+            fill(x: 32, y: 8, w: 8, h: 7, col: hairCol)
+            fill(x: 48, y: 8, w: 8, h: 7, col: hairCol)
+            // Hat back (ponytail)
+            fill(x: 56, y: 8, w: 8, h: 8, col: hairCol)
+
+        case .steve:
+            // Steve's 3D hair fringe on Hat layer
+            fill(x: 40, y: 0, w: 8, h: 8, col: hairCol)
+            fill(x: 40, y: 8, w: 8, h: 2, col: hairCol)
+            fill(x: 32, y: 8, w: 8, h: 4, col: hairCol)
+            fill(x: 48, y: 8, w: 8, h: 4, col: hairCol)
+            fill(x: 56, y: 8, w: 8, h: 5, col: hairCol)
+
+        case .zombie:
+            // Zombie's ragged collar and sleeve fringes on jacket
+            fill(x: 20, y: 36, w: 8, h: 2, col: shirtDarkCol)
+            set(x: 21, y: 38, col: shirtDarkCol)
+            set(x: 26, y: 38, col: shirtDarkCol)
+        }
         // Create CGImage from pixel array
         let colorSpace = CGColorSpaceCreateDeviceRGB()
         let bitmapInfo = CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue)

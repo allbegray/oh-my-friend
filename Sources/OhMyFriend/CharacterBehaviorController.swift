@@ -618,11 +618,13 @@ public final class CharacterBehaviorController {
                 stuckTime = 0
             }
 
+            let canPassLeft = ScreenEnvironment.shared.hasAdjacentScreen(from: screen, onLeft: true, atY: physics.position.y)
+            let canPassRight = ScreenEnvironment.shared.hasAdjacentScreen(from: screen, onLeft: false, atY: physics.position.y)
+
             let screenMinX = screen.frame.minX + 35.0
             let screenMaxX = screen.frame.maxX - 35.0
-            let hitScreenLeft = (physics.position.x <= screenMinX) && (direction < 0)
-            let hitScreenRight = (physics.position.x >= screenMaxX) && (direction > 0)
-
+            let hitScreenLeft = (physics.position.x <= screenMinX) && (direction < 0) && !canPassLeft
+            let hitScreenRight = (physics.position.x >= screenMaxX) && (direction > 0) && !canPassRight
             var hitPlatformLeft = false
             var hitPlatformRight = false
             if let p = currentPlatform {
@@ -834,8 +836,11 @@ public final class CharacterBehaviorController {
             let dist = cursorPos.x - physics.position.x
             if abs(dist) > 40 {
                 let dir: CGFloat = dist > 0 ? 1.0 : -1.0
-                let screenMinX = screen.frame.minX + 45
-                let screenMaxX = screen.frame.maxX - 45
+                let canPassLeft = ScreenEnvironment.shared.hasAdjacentScreen(from: screen, onLeft: true, atY: physics.position.y)
+                let canPassRight = ScreenEnvironment.shared.hasAdjacentScreen(from: screen, onLeft: false, atY: physics.position.y)
+                let desktopBounds = ScreenEnvironment.shared.totalDesktopBounds
+                let screenMinX = canPassLeft ? (desktopBounds.minX + 35) : (screen.frame.minX + 45)
+                let screenMaxX = canPassRight ? (desktopBounds.maxX - 35) : (screen.frame.maxX - 45)
                 let minBound = max(platform.xMin + 35, screenMinX)
                 let maxBound = min(platform.xMax - 35, screenMaxX)
                 let targetX = min(maxBound, max(minBound, cursorPos.x))
@@ -852,10 +857,14 @@ public final class CharacterBehaviorController {
         // Autonomous Decisions (Rich Variety!)
         let roll = Double.random(in: 0...100)
 
-        let screenMinX = screen.frame.minX + 45
-        let screenMaxX = screen.frame.maxX - 45
-        let minX = max(platform.xMin + 35, screenMinX)
-        let maxX = min(platform.xMax - 35, screenMaxX)
+        let canPassLeft = ScreenEnvironment.shared.hasAdjacentScreen(from: screen, onLeft: true, atY: physics.position.y)
+        let canPassRight = ScreenEnvironment.shared.hasAdjacentScreen(from: screen, onLeft: false, atY: physics.position.y)
+        var minX = max(platform.xMin + 35, screen.frame.minX + 45)
+        var maxX = min(platform.xMax - 35, screen.frame.maxX - 45)
+        if platform.kind == .floor || platform.kind == .dock {
+            if canPassLeft { minX = screen.frame.minX - 80 }
+            if canPassRight { maxX = screen.frame.maxX + 80 }
+        }
 
         let canDescend = ladderCooldown <= 0 && Self.canDescend(from: platform)
 
