@@ -21,7 +21,7 @@ public final class CharacterBehaviorController {
         case eating(timeLeft: TimeInterval)
         case sleep(duration: TimeInterval, zzzTimer: TimeInterval)
         case backflip(progress: CGFloat)
-        case attack(timeLeft: TimeInterval)
+        case tnt(timer: TimeInterval)
         case fall
         case dragged
         case landedCrouch(timeLeft: TimeInterval)
@@ -42,10 +42,17 @@ public final class CharacterBehaviorController {
     // Near Cursor Proximity Tracking for Wave
     private var cursorHoverTimer: TimeInterval = 0
 
-    // Pickaxe attack bookkeeping
-    private var attackDuration: TimeInterval = 0
-    private var attackTarget: Platform?
-    private var attackCompletion: ((Platform?) -> Void)?
+    // TNT bookkeeping (설치 → 점화 → 도화선 → 폭발)
+    private var tntFuse: TimeInterval = 4.0
+    private var tntTarget: Platform?
+    private var tntCompletion: ((Platform?) -> Void)?
+    private var tntPlacedCallback: ((CGPoint) -> Void)?
+    private var tntPlacedFired = false
+    private var tntPlacementX: CGFloat = 0
+    private var tntBackstepDir: CGFloat = 1
+    private let tntEquipEnd: TimeInterval = 0.45
+    private let tntPlaceEnd: TimeInterval = 0.95
+    private let tntBackstepEnd: TimeInterval = 1.3
 
     public init() {}
 
@@ -106,31 +113,43 @@ public final class CharacterBehaviorController {
         state = .idle(timeLeft: 1.5)
     }
 
-    // MARK: - Pickaxe Attack (앱 창 부수기)
-    public var isAttacking: Bool {
-        if case .attack = state { return true }
+    // MARK: - TNT (앱 창 폭파)
+    public var isTNTActive: Bool {
+        if case .tnt = state { return true }
         return false
     }
 
-    /// Pickaxe attack progress 0...1 while attacking, nil otherwise
-    public var attackProgress: CGFloat? {
-        guard case let .attack(timeLeft) = state, attackDuration > 0 else { return nil }
-        return min(1, max(0, 1 - CGFloat(timeLeft / attackDuration)))
+    /// 도화선 진행 0...1 (점화 시점부터 폭발까지), TNT 연출 중이 아니면 nil
+    public var tntProgress: CGFloat? {
+        guard case let .tnt(timer) = state, tntFuse > 0 else { return nil }
+        let fuseElapsed = timer - tntPlaceEnd
+        return min(1, max(0, CGFloat(fuseElapsed / tntFuse)))
     }
 
-    /// Start a pickaxe attack. `completion` fires once when the attack ends
-    /// naturally (with the target platform) or is interrupted (with nil).
+    /// 폭발까지 남은 시간(초), TNT 연출 중이 아니면 nil
+    public var tntFuseRemaining: TimeInterval? {
+        guard case let .tnt(timer) = state, tntFuse > 0 else { return nil }
+        return max(0, tntPlaceEnd + tntFuse - timer)
+    }
+
+    /// TNT를 내려놓고 점화한다.
+    /// `onPlaced`는 TNT가 창 표면에 놓이는 순간(화면 좌표), `completion`은 폭발(대상 플랫폼) 또는 중단(nil) 시점에 한 번 호출된다.
     @discardableResult
-    public func startPickaxeAttack(
+    public func startTNTPlacement(
         on platform: Platform,
-        duration: TimeInterval = 2.0,
+        fuse: TimeInterval = 4.0,
+        onPlaced: @escaping (CGPoint) -> Void,
         completion: @escaping (Platform?) -> Void
     ) -> Bool {
-        guard !isAttacking else { return false }
-        attackDuration = duration
-        attackTarget = platform
-        attackCompletion = completion
-        state = .attack(timeLeft: duration)
+        guard !isTNTActive else { return false }
+        tntFuse = fuse
+        tntTarget = platform
+        tntCompletion = completion
+        tntPlacedCallback = onPlaced
+        tntPlacedFired = false
+        tntPlacementX = 0
+        tntBackstepDir = 1
+        state = .tnt(timer: 0)
         return true
     }
 
@@ -193,7 +212,7 @@ public final class CharacterBehaviorController {
 
         // 3. Physics Overrides (Dragged / Airborne)
         if case .dragged = physics.state {
-            interruptAttackIfActive()
+            interruptTNTIfActive()
             state = .dragged
             characterNode.isBeingDragged = true
             characterNode.isFalling = false
@@ -205,14 +224,15 @@ public final class CharacterBehaviorController {
             characterNode.isBackflipping = false
             characterNode.isEating = false
             characterNode.placedBlockNode.isHidden = true
-            characterNode.isMining = false
+            characterNode.isHoldingTNT = false
+            characterNode.isPlacingTNT = false
             characterNode.walkSpeed = 0
             wasAirborne = true
             return
         }
 
         if case .airborne = physics.state {
-            interruptAttackIfActive()
+            interruptTNTIfActive()
 
             if case .backflip(var progress) = state {
                 // Keep backflip rotating
@@ -235,7 +255,8 @@ public final class CharacterBehaviorController {
             characterNode.isBackflipping = false
             characterNode.isEating = false
             characterNode.placedBlockNode.isHidden = true
-            characterNode.isMining = false
+            characterNode.isHoldingTNT = false
+            characterNode.isPlacingTNT = false
             characterNode.walkSpeed = 0
             wasAirborne = true
             return
@@ -247,7 +268,8 @@ public final class CharacterBehaviorController {
             state = .landedCrouch(timeLeft: 0.35)
             characterNode.isFalling = false
             characterNode.isBackflipping = false
-            characterNode.isMining = false
+            characterNode.isHoldingTNT = false
+            characterNode.isPlacingTNT = false
             characterNode.walkSpeed = 0
             SoundAndEffectsManager.shared.play(.land)
         }
@@ -255,7 +277,8 @@ public final class CharacterBehaviorController {
         // 4. Reset general flags
         characterNode.isBeingDragged = false
         characterNode.isFalling = false
-        characterNode.isMining = false
+        characterNode.isHoldingTNT = false
+        characterNode.isPlacingTNT = false
 
         // 5. Finite State Machine
         switch state {
@@ -495,39 +518,72 @@ public final class CharacterBehaviorController {
                 state = .poke(timeLeft: timeLeft, label: "")
             }
 
-        case .attack(var timeLeft):
-            timeLeft -= dt
+        case .tnt(var timer):
+            timer += dt
             characterNode.walkSpeed = 0
             characterNode.isSitting = false
             characterNode.isPoking = false
-            characterNode.isMining = true
 
-            if timeLeft <= 0 {
-                // Attack finished -> hand the target window over to the break effect
-                finishAttack(platform: attackTarget)
-                chooseNextState(physics: physics, platforms: platforms, screen: screen, cursorPos: cursorPos, characterNode: characterNode)
+            if timer < tntEquipEnd {
+                // 1) TNT를 꺼내 머리 위로 치켜든다
+                characterNode.isHoldingTNT = true
+                characterNode.isPlacingTNT = false
+            } else if timer < tntPlaceEnd {
+                // 2) 앉아서 발밑(창 표면)에 내려놓는다
+                characterNode.isHoldingTNT = false
+                characterNode.isPlacingTNT = true
             } else {
-                state = .attack(timeLeft: timeLeft)
+                // 3) 점화 완료 — TNT는 화면 공간에 놓이고 캐릭터는 뒤로 물러난다
+                characterNode.isHoldingTNT = false
+                characterNode.isPlacingTNT = false
+
+                if !tntPlacedFired {
+                    tntPlacedFired = true
+                    tntPlacementX = physics.position.x
+                    if let target = tntTarget {
+                        let center = (target.xMin + target.xMax) / 2
+                        tntBackstepDir = center >= physics.position.x ? 1 : -1
+                    }
+                    tntPlacedCallback?(CGPoint(x: tntPlacementX, y: tntTarget?.yTop ?? physics.position.y))
+                    SoundAndEffectsManager.shared.play(.ignite)
+                }
+
+                // 도화선이 타는 동안 살금살금 뒤로 (플랫폼 밖으로는 못 나감)
+                if timer < tntBackstepEnd, let target = tntTarget {
+                    let step = 130 * CGFloat(dt) * tntBackstepDir
+                    physics.position.x = min(target.xMax - 14, max(target.xMin + 14, physics.position.x + step))
+                }
+
+                if timer >= tntPlaceEnd + tntFuse {
+                    // 4) 폭발! 캐릭터는 폭풍에 날아가고 연출은 콜백으로 넘긴다
+                    let away = -tntBackstepDir
+                    physics.launch(vx: away * 380, vy: 560)
+                    finishTNT(platform: tntTarget)
+                    state = .fall
+                    return
+                }
             }
+            state = .tnt(timer: timer)
 
         case .fall, .dragged:
             break
         }
     }
 
-    private func interruptAttackIfActive() {
-        if case .attack = state {
-            finishAttack(platform: nil)
+    private func interruptTNTIfActive() {
+        if case .tnt = state {
+            finishTNT(platform: nil)
         }
     }
 
-    private func finishAttack(platform: Platform?) {
-        guard case .attack = state else { return }
+    private func finishTNT(platform: Platform?) {
+        guard case .tnt = state else { return }
         state = .idle(timeLeft: 0.4)
-        attackDuration = 0
-        attackTarget = nil
-        let completion = attackCompletion
-        attackCompletion = nil
+        tntTarget = nil
+        tntPlacedCallback = nil
+        tntPlacedFired = false
+        let completion = tntCompletion
+        tntCompletion = nil
         completion?(platform)
     }
 

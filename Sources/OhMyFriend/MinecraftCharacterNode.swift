@@ -25,8 +25,8 @@ public final class MinecraftCharacterNode: SCNNode {
     public let leftArmJoint = SCNNode()
     public let leftArmMesh = SCNNode()
 
-    // Pickaxe held in the right hand (only visible while mining)
-    public let pickaxeNode = SCNNode()
+    // TNT block held in the right hand (during place & ignite)
+    public let tntHandNode = SCNNode()
 
     public let rightLegJoint = SCNNode()
     public let rightLegMesh = SCNNode()
@@ -62,7 +62,8 @@ public final class MinecraftCharacterNode: SCNNode {
     public var isSitting: Bool = false
     public var isFalling: Bool = false
     public var isPoking: Bool = false
-    public var isMining: Bool = false
+    public var isHoldingTNT: Bool = false
+    public var isPlacingTNT: Bool = false
     public var isBeingDragged: Bool = false
 
     // New Interactive Animations
@@ -138,33 +139,31 @@ public final class MinecraftCharacterNode: SCNNode {
         leftLegJoint.addChildNode(leftLegMesh)
         bodyAnchor.addChildNode(leftLegJoint)
 
-        // 7. Pickaxe (equipped in the right hand while mining)
-        buildPickaxe()
-        pickaxeNode.position = SCNVector3(0, -0.6, 0) // hand level
-        rightArmMesh.addChildNode(pickaxeNode)
-        pickaxeNode.isHidden = true
+        // 7. TNT block (equipped in the right hand while placing)
+        buildTNTHandItem()
+        tntHandNode.position = SCNVector3(0, -0.95, 0) // just past the hand
+        rightArmMesh.addChildNode(tntHandNode)
+        tntHandNode.isHidden = true
     }
 
-    private func buildPickaxe() {
-        // Wooden handle extending downward from the hand
-        let handleNode = SCNNode()
-        handleNode.geometry = SCNBox(width: 0.09, height: 1.1, length: 0.09, chamferRadius: 0)
-        handleNode.position = SCNVector3(0, -0.55, 0)
+    private func buildTNTHandItem() {
+        let red = SCNMaterial()
+        red.diffuse.contents = NSColor(srgbRed: 0.80, green: 0.22, blue: 0.14, alpha: 1.0)
+        let white = SCNMaterial()
+        white.diffuse.contents = NSColor(white: 0.93, alpha: 1.0)
 
-        // Stone head (crossbar at the far end)
-        let headNode = SCNNode()
-        headNode.geometry = SCNBox(width: 0.54, height: 0.15, length: 0.15, chamferRadius: 0)
-        headNode.position = SCNVector3(0, -1.0, 0)
+        let body = SCNNode()
+        body.geometry = SCNBox(width: 0.5, height: 0.5, length: 0.5, chamferRadius: 0)
+        body.geometry?.materials = [red]
 
-        let wood = SCNMaterial()
-        wood.diffuse.contents = NSColor(srgbRed: 0.45, green: 0.30, blue: 0.16, alpha: 1.0)
-        let stone = SCNMaterial()
-        stone.diffuse.contents = NSColor(srgbRed: 0.60, green: 0.60, blue: 0.62, alpha: 1.0)
-        handleNode.geometry?.materials = [wood]
-        headNode.geometry?.materials = [stone]
+        // TNT 텍스처의 하얀 밴드
+        let band = SCNNode()
+        band.geometry = SCNBox(width: 0.52, height: 0.16, length: 0.52, chamferRadius: 0)
+        band.geometry?.materials = [white]
+        band.position = SCNVector3(0, 0.02, 0)
 
-        pickaxeNode.addChildNode(handleNode)
-        pickaxeNode.addChildNode(headNode)
+        tntHandNode.addChildNode(body)
+        tntHandNode.addChildNode(band)
     }
 
     private func setupPlacedBlock() {
@@ -346,7 +345,7 @@ public final class MinecraftCharacterNode: SCNNode {
     // MARK: - Update per frame (called by renderer loop)
     public func update(deltaTime dt: CGFloat) {
         animTime += dt
-        pickaxeNode.isHidden = !isMining
+        tntHandNode.isHidden = !(isHoldingTNT || isPlacingTNT)
 
         // 1. Smooth Head LookAt Interpolation
         if !isSleeping && !isBackflipping {
@@ -493,11 +492,18 @@ public final class MinecraftCharacterNode: SCNNode {
                 let chomp = sin(animTime * 14.0) * 0.15
                 rightArmJoint.eulerAngles = SCNVector3(-CGFloat.pi / 1.7 + chomp, 0, -0.2)
                 leftArmJoint.eulerAngles = SCNVector3(0, 0, -0.05)
-            } else if isMining {
-                // Mining: raise the pickaxe overhead, then chop down repeatedly
-                let chop = (sin(animTime * 14.0) + 1.0) * 0.5 // 0...1
-                rightArmJoint.eulerAngles = SCNVector3(-2.5 + chop * 1.9, 0, 0.1)
-                leftArmJoint.eulerAngles = SCNVector3(-0.1, 0, -0.1)
+            } else if isHoldingTNT {
+                // TNT를 머리 위로 치켜들기 (점화 준비)
+                let tremble = sin(animTime * 22.0) * 0.05
+                rightArmJoint.eulerAngles = SCNVector3(-2.85 + tremble, 0, 0.12)
+                leftArmJoint.eulerAngles = SCNVector3(-0.2, 0, -0.08)
+            } else if isPlacingTNT {
+                // 앉아서 발밑에 TNT를 내려놓기
+                bodyAnchor.position.y = -0.35
+                rightArmJoint.eulerAngles = SCNVector3(-0.55, 0, 0.1)
+                leftArmJoint.eulerAngles = SCNVector3(0.15, 0, -0.05)
+                rightLegJoint.eulerAngles = SCNVector3(0.25, 0, 0)
+                leftLegJoint.eulerAngles = SCNVector3(0.25, 0, 0)
             } else if isPoking {
                 // Minecraft punching animation: arm straight forward swinging up and down
                 let punch = sin(animTime * 14.0) * 0.7

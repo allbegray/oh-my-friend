@@ -1,9 +1,8 @@
 import AppKit
 
-// MARK: - 마인크래프트 블록 파괴 연출 오버레이
-// 대상 앱 창 위에 투명 패널을 띄워 ① 창 중앙에서 퍼지는 크랙(5단계) ② 백색 플래시 + 블록 파편 낙하를 그린다.
-// 파편 색은 대상 창 실사 스냅샷(화면 기록 권한 있을 때)을 샘플링하고,
-// 권한이 없어 스냅샷이 비어 있으면 시스템 모드와 비슷한 톤의 팔레트로 폴백한다.
+// MARK: - TNT 폭파 연출 오버레이
+// 대상 앱 창 위에 투명 패널을 띄워 ① 도화선 점멸(마인크래프트 primed TNT처럼 하얗게 펄스)
+// ② 폭발 섬광·연기·불똥과 함께 창 전체가 블록 파편으로 비산하는 모습을 그린다.
 public final class BlockBreakOverlayWindow: NSPanel {
     private let effectView: BlockBreakEffectView
 
@@ -55,21 +54,22 @@ public final class BlockBreakOverlayWindow: NSPanel {
         fatalError("init(coder:) has not been implemented")
     }
 
-    /// 크랙 단계 표시 (0 = 없음, 1...10 = 갈라짐 진행)
-    public func showCrack(stage: Int) {
-        effectView.crackStage = min(10, max(0, stage))
+    /// 도화선 진행 0...1 — 창이 primed TNT처럼 하얗게 점멸한다
+    public func showFuse(progress: CGFloat) {
+        effectView.fuseProgress = min(1, max(0, progress))
     }
 
-    /// 백색 플래시와 함께 창이 블록 파편으로 부서진다
-    public func shatter() {
-        effectView.beginShatter { [weak self] in
+    /// 폭발: 화면 좌표의 TNT 위치에서 섬광·연기와 함께 창이 블록 파편으로 터진다
+    public func explode(at tntScreenPoint: CGPoint) {
+        let local = CGPoint(x: tntScreenPoint.x - frame.minX, y: tntScreenPoint.y - frame.minY)
+        effectView.beginExplosion(atLocal: local) { [weak self] in
             guard let self = self else { return }
             self.close()
             self.onBreakFinished?()
         }
     }
 
-    /// 연출 중단 (공격이 끊긴 경우)
+    /// 연출 중단 (드래그/낙하로 중단된 경우)
     public func cancel() {
         effectView.cancelAnimation()
         close()
@@ -78,30 +78,16 @@ public final class BlockBreakOverlayWindow: NSPanel {
 
 // MARK: - 연출을 직접 그리는 뷰
 public final class BlockBreakEffectView: NSView {
-    /// 크랙 단계 (1...10). 0이면 아무것도 그리지 않는다.
-    public var crackStage: Int = 0 {
+    /// 도화선 진행 0...1 (0이면 점멸 없음)
+    public var fuseProgress: CGFloat = 0 {
         didSet {
-            if crackStage != oldValue {
+            if fuseProgress != oldValue {
                 needsDisplay = true
             }
         }
     }
 
     private let windowRectInLocal: CGRect
-
-    // 번개형 크랙 트리 (창당 1회 생성, 단계는 노출 길이만 조절)
-    private struct CrackBolt {
-        var pts: [CGPoint]
-        var cum: [CGFloat] // 누적 길이 (pts와 1:1)
-        var total: CGFloat
-    }
-    private struct CrackBranch {
-        var bolt: CrackBolt
-        var attachAlong: CGFloat // 부모 볼트의 시작점부터 붙는 지점까지 길이
-    }
-    private var mainBolts: [CrackBolt] = []
-    private var branches: [[CrackBranch]] = []
-    private var crackBuilt = false
 
     // 파편 상태
     private struct DebrisBlock {
@@ -116,15 +102,41 @@ public final class BlockBreakEffectView: NSView {
         var delay: CGFloat
     }
 
+    // 폭발 연기 (회색 원이 커지며 사라짐)
+    private struct SmokePuff {
+        var x: CGFloat
+        var y: CGFloat
+        var maxRadius: CGFloat
+        var alpha: CGFloat
+        var delay: CGFloat
+    }
+
+    // 폭발 불똥 (주황 사각 파편)
+    private struct Spark {
+        var x: CGFloat
+        var y: CGFloat
+        var vx: CGFloat
+        var vy: CGFloat
+        var size: CGFloat
+        var delay: CGFloat
+    }
+
     private var debris: [DebrisBlock] = []
+    private var smoke: [SmokePuff] = []
+    private var sparks: [Spark] = []
+
+    private var explosionPoint: CGPoint = .zero
+    private var hasExploded = false
     private var burstTime: TimeInterval = 0
     private var timer: Timer?
-    private var onShatterDone: (() -> Void)?
-    private var hasShattered = false
+    private var onDone: (() -> Void)?
 
     private static let gravity: CGFloat = 1500.0
     private static let fadeStart: CGFloat = 1.25
     private static let fadeEnd: CGFloat = 1.85
+    private static let flashDuration: CGFloat = 0.16
+    private static let smokeLife: CGFloat = 0.95
+    private static let sparkLife: CGFloat = 0.55
 
     public init(windowRectInLocal: CGRect) {
         self.windowRectInLocal = windowRectInLocal
@@ -139,14 +151,15 @@ public final class BlockBreakEffectView: NSView {
         timer?.invalidate()
     }
 
-    // MARK: - 파편 연출
+    // MARK: - 폭발 시작
 
-    public func beginShatter(onDone: @escaping () -> Void) {
-        guard !hasShattered else { return }
-        hasShattered = true
-        crackStage = 0
-        onShatterDone = onDone
+    public func beginExplosion(atLocal point: CGPoint, onDone: @escaping () -> Void) {
+        guard !hasExploded else { return }
+        hasExploded = true
+        explosionPoint = point
+        self.onDone = onDone
         buildDebris()
+        buildExplosionFX()
         burstTime = 0
 
         let t = Timer(timeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in
@@ -160,8 +173,11 @@ public final class BlockBreakEffectView: NSView {
     public func cancelAnimation() {
         timer?.invalidate()
         timer = nil
-        hasShattered = false
-        crackStage = 0
+        hasExploded = false
+        fuseProgress = 0
+        debris.removeAll()
+        smoke.removeAll()
+        sparks.removeAll()
         needsDisplay = true
     }
 
@@ -184,6 +200,8 @@ public final class BlockBreakEffectView: NSView {
             NSColor(srgbRed: 0.28, green: 0.29, blue: 0.32, alpha: 1), // 텍스트류 다크 파편
         ]
     }
+
+    // MARK: - 파편 생성 (창 크기에 정확히 타일링)
 
     private func buildDebris() {
         debris.removeAll()
@@ -217,8 +235,6 @@ public final class BlockBreakEffectView: NSView {
             )
         }
 
-        let winTopY = win.maxY
-        let midX = win.midX
         for row in 0..<rows {
             for col in 0..<cols {
                 let centerX = win.minX + (CGFloat(col) + 0.5) * cellW
@@ -246,21 +262,51 @@ public final class BlockBreakEffectView: NSView {
                     delay: 0
                 )
 
-                // 위쪽(파괴 시작점)에 가까울수록 먼저 떨어진다.
-                // 앞부분 0.06초는 모든 파편이 제자리에 있어 창이 블록 격자로 바뀐 모습이 보인다.
-                let depth = (winTopY - centerY) / win.height
-                block.delay = 0.06 + depth * 0.22 + rng.range(0, 0.05)
+                // 폭발 순간 거의 동시에(짧은 무작위 편차만) 튄다
+                block.delay = 0.02 + rng.range(0, 0.06)
 
-                // 창 중심에서 바깥으로 세게 터진다 (+ 모든 파편에 최소 수평 비산)
-                let dx = (centerX - midX) / max(win.width / 2, 1)
-                let dy = (centerY - win.midY) / max(win.height / 2, 1)
+                // TNT 폭발 지점에서 바깥으로 세게 터진다 (+ 모든 파편에 최소 비산)
+                let dx = (centerX - explosionPoint.x) / max(win.width / 2, 1)
+                let dy = (centerY - explosionPoint.y) / max(win.height / 2, 1)
                 let lateralSign: CGFloat = dx >= 0 ? 1 : -1
                 block.vx = lateralSign * (abs(dx) * rng.range(220, 560) + rng.range(40, 170)) + rng.range(-50, 50)
                 block.vy = abs(dy) * rng.range(140, 300) + rng.range(160, 720)
-                // 대기 중에는 축 정렬 상태로 창을 정확히 덮고, 떨어지기 시작하면 회전한다
-                block.spin = 0
                 debris.append(block)
             }
+        }
+    }
+
+    private func buildExplosionFX() {
+        var rng = SplitMix64(seed: 0x7FF4_9C2B_53D1_8E4F)
+        let blast = explosionPoint
+
+        // 회색 연기 구름 18개 — 폭발점 주변에서 피어오른다
+        smoke.removeAll()
+        for _ in 0..<18 {
+            let angle = rng.range(0, 2 * .pi)
+            let dist = rng.range(0, 70)
+            smoke.append(SmokePuff(
+                x: blast.x + cos(angle) * dist,
+                y: blast.y + sin(angle) * dist,
+                maxRadius: rng.range(26, 68),
+                alpha: rng.range(0.35, 0.6),
+                delay: rng.range(0, 0.12)
+            ))
+        }
+
+        // 주황 불똥 26개 — 사방으로 빠르게 튄다
+        sparks.removeAll()
+        for _ in 0..<26 {
+            let angle = rng.range(0, 2 * .pi)
+            let speed = rng.range(240, 780)
+            sparks.append(Spark(
+                x: blast.x,
+                y: blast.y,
+                vx: cos(angle) * speed,
+                vy: sin(angle) * speed,
+                size: rng.range(3, 6.5),
+                delay: rng.range(0, 0.08)
+            ))
         }
     }
 
@@ -281,7 +327,7 @@ public final class BlockBreakEffectView: NSView {
             timer?.invalidate()
             timer = nil
             needsDisplay = true
-            onShatterDone?()
+            onDone?()
         } else {
             needsDisplay = true
         }
@@ -292,179 +338,83 @@ public final class BlockBreakEffectView: NSView {
     public override func draw(_ dirtyRect: NSRect) {
         guard let ctx = NSGraphicsContext.current?.cgContext else { return }
 
-        if hasShattered {
-            drawDebris(ctx)
-        } else if crackStage > 0 {
-            drawCracks(ctx)
+        if hasExploded {
+            drawExplosion(ctx)
+        } else if fuseProgress > 0 {
+            drawFuseBlink(ctx)
         }
     }
 
-    // MARK: - 마인크래프트식 크랙: 중앙에서 번개처럼 10단계로 점진 확산
+    // MARK: - 도화선 점멸 (primed TNT처럼 하얗게)
 
-    private func drawCracks(_ ctx: CGContext) {
-        let win = windowRectInLocal
-        let stage = crackStage // 1...10
+    private func drawFuseBlink(_ ctx: CGContext) {
+        let p = min(1, max(0, fuseProgress))
+        // 마인크래프트 primed TNT처럼 온/오프로 끊어서 점멸 (진행에 따라 점점 빨라진다)
+        let phase = 2 * CGFloat.pi * (8 * p + 4 * p * p)
+        guard sin(phase) > 0 else { return }
+        let alpha = 0.45 + 0.35 * p
 
-        // 번개형 크랙 트리 1회 생성 (중앙에서 창 경계까지)
-        if !crackBuilt {
-            crackBuilt = true
-            buildCrackTree(win)
-        }
-
-        let progress = CGFloat(stage) / 10.0 // 0.1...1.0
-        // 단계마다 크랙의 "눈에 보이는 끝"이 중앙에서 바깥으로 자란다.
-        let eased = pow(progress, 1.35)
-        let width: CGFloat = 1.4 + 2.6 * progress
-        ctx.setLineJoin(.round)
-        ctx.setLineCap(.round)
-
-        func strokeAllBolts() {
-            for (i, bolt) in mainBolts.enumerated() {
-                let reveal = min(1, max(0, eased + boltJitter(i))) // 볼트별 미세 편차
-                let reach = reveal * bolt.total
-                drawBolt(ctx, bolt, upTo: reach)
-
-                // 곁가지는 부모 크랙이 그 지점까지 자란 뒤에 함께 드러난다
-                for branch in branches[i] where branch.attachAlong <= reach {
-                    let branchReach = min(1, max(0, eased + boltJitter(i) * 0.5)) * branch.bolt.total
-                    drawBolt(ctx, branch.bolt, upTo: branchReach)
-                }
-            }
-        }
-
-        // 1) 하이라이트 패스: 밝은 창 배경에서도 어두운 크랙이 보이도록 테두리
-        ctx.setStrokeColor(NSColor(white: 1, alpha: 0.16 + 0.14 * progress).cgColor)
-        ctx.setLineWidth(width + 3.5)
-        strokeAllBolts()
-
-        // 2) 마인크래프트 destroy 텍스처처럼 어두운 크랙 코어
-        ctx.setStrokeColor(NSColor(white: 0.02, alpha: 0.5 + 0.4 * progress).cgColor)
-        ctx.setLineWidth(width)
-        strokeAllBolts()
+        ctx.setFillColor(NSColor(white: 1, alpha: alpha).cgColor)
+        ctx.fill(windowRectInLocal)
     }
 
-    private func boltJitter(_ index: Int) -> CGFloat {
-        // 볼트마다 고정된 미세 위상 차 (±0.05) — 전부 동시에 자라지 않게
-        let phases: [CGFloat] = [0.04, -0.02, 0.0, -0.04, 0.02, -0.05, 0.03, -0.03, 0.05, -0.01, 0.01, -0.035]
-        return phases[index % phases.count]
-    }
+    // MARK: - 폭발 렌더링
 
-    private func drawBolt(_ ctx: CGContext, _ bolt: CrackBolt, upTo length: CGFloat) {
-        guard bolt.pts.count >= 2, length > 1 else { return }
-        var endIndex = 0
-        while endIndex + 1 < bolt.cum.count && bolt.cum[endIndex + 1] <= length {
-            endIndex += 1
-        }
-        ctx.beginPath()
-        ctx.move(to: bolt.pts[0])
-        if endIndex >= 1 {
-            for p in bolt.pts[1...endIndex] {
-                ctx.addLine(to: p)
-            }
-        }
-        // 마지막 점은 정확히 "지금까지 자란 길이" 위치에 (부드러운 성장)
-        if endIndex + 1 < bolt.cum.count, bolt.cum[endIndex] < length {
-            let segLen = bolt.cum[endIndex + 1] - bolt.cum[endIndex]
-            if segLen > 0.001 {
-                let t = (length - bolt.cum[endIndex]) / segLen
-                let a = bolt.pts[endIndex]
-                let b = bolt.pts[endIndex + 1]
-                ctx.addLine(to: CGPoint(x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t))
-            }
-        }
-        ctx.strokePath()
-    }
-
-    // MARK: 크랙 트리 생성 (중점 변위법 — 번개 모양)
-
-    private func buildCrackTree(_ win: CGRect) {
-        var rng = SplitMix64(seed: 0x9E37_79B9_7F4A_7C15)
-        let center = CGPoint(x: win.midX, y: win.midY)
-
-        func boundaryPoint(from c: CGPoint, angle: CGFloat) -> CGPoint {
-            let dx = cos(angle)
-            let dy = sin(angle)
-            var t: CGFloat = .infinity
-            if abs(dx) > 1e-6 {
-                t = min(t, (dx > 0 ? win.maxX - c.x : c.x - win.minX) / abs(dx))
-            }
-            if abs(dy) > 1e-6 {
-                t = min(t, (dy > 0 ? win.maxY - c.y : c.y - win.minY) / abs(dy))
-            }
-            return CGPoint(x: c.x + dx * t, y: c.y + dy * t)
-        }
-
-        // 1) 주 크랙: 중앙에서 창 경계(사방)까지
-        let armCount = 12
-        for i in 0..<armCount {
-            let angle = CGFloat(i) * 2 * .pi / CGFloat(armCount) + rng.range(-0.12, 0.12)
-            let end = boundaryPoint(from: center, angle: angle)
-            let dist = hypot(end.x - center.x, end.y - center.y)
-            let bolt = makeBolt(from: center, to: end, jag: dist * 0.22, depth: 7, rng: &rng)
-            mainBolts.append(bolt)
-
-            // 2) 곁가지: 주 크랙 중간쯤에서 갈라져 옆으로 번짐
-            var boltBranches: [CrackBranch] = []
-            let branchCount = 2 + (i % 3 == 0 ? 1 : 0)
-            for _ in 0..<branchCount {
-                let attachFrac = rng.range(0.18, 0.7)
-                let attach = attachFrac * bolt.total
-                let idx = bolt.cum.firstIndex { $0 >= attach } ?? 0
-                let attachPt = bolt.pts[min(idx, bolt.pts.count - 1)]
-                // 붙는 지점에서의 진행 방향 기준 좌우로 갈라짐
-                let dirIdx = min(idx + 1, bolt.pts.count - 1)
-                let segDir = atan2(bolt.pts[dirIdx].y - bolt.pts[max(idx - 1, 0)].y,
-                                   bolt.pts[dirIdx].x - bolt.pts[max(idx - 1, 0)].x)
-                let spread = rng.range(0.5, 1.4) * (Bool.random() ? 1 : -1)
-                let branchEnd = boundaryPoint(from: attachPt, angle: segDir + spread)
-                let bDist = hypot(branchEnd.x - attachPt.x, branchEnd.y - attachPt.y)
-                let branch = makeBolt(from: attachPt, to: branchEnd, jag: bDist * 0.18, depth: 6, rng: &rng)
-                boltBranches.append(CrackBranch(bolt: branch, attachAlong: attach))
-            }
-            branches.append(boltBranches)
-        }
-    }
-
-    /// 중점 변위법으로 번개 모양의 꺾인 경로를 만든다
-    private func makeBolt(from a: CGPoint, to b: CGPoint, jag: CGFloat, depth: Int, rng: inout SplitMix64) -> CrackBolt {
-        var pts: [CGPoint] = [a, b]
-        var amplitude = jag
-        var d = depth
-        while d > 0 {
-            var next: [CGPoint] = [pts[0]]
-            for i in 0..<(pts.count - 1) {
-                let p1 = pts[i]
-                let p2 = pts[i + 1]
-                let mid = CGPoint(x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2)
-                let len = max(hypot(p2.x - p1.x, p2.y - p1.y), 0.0001)
-                let nx = -(p2.y - p1.y) / len
-                let ny = (p2.x - p1.x) / len
-                let off = rng.range(-amplitude, amplitude)
-                next.append(CGPoint(x: mid.x + nx * off, y: mid.y + ny * off))
-                next.append(p2)
-            }
-            pts = next
-            amplitude *= 0.55
-            d -= 1
-        }
-        // 누적 길이 계산
-        var cum: [CGFloat] = [0]
-        var total: CGFloat = 0
-        for i in 1..<pts.count {
-            total += hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y)
-            cum.append(total)
-        }
-        return CrackBolt(pts: pts, cum: cum, total: total)
-    }
-
-    private func drawDebris(_ ctx: CGContext) {
+    private func drawExplosion(_ ctx: CGContext) {
         let t = CGFloat(burstTime)
+        let blast = explosionPoint
 
+        // 1) 섬광 (0.16초): 주황 링 위에 흰 코어가 겹쳐 터진다
+        if t < BlockBreakEffectView.flashDuration {
+            let f = t / BlockBreakEffectView.flashDuration
+
+            // 부드러운 바깥 광휘
+            let glowRadius = 40 + 720 * f
+            ctx.setFillColor(NSColor(white: 1, alpha: (1 - f) * 0.20).cgColor)
+            ctx.fillEllipse(in: CGRect(x: blast.x - glowRadius, y: blast.y - glowRadius,
+                                       width: glowRadius * 2, height: glowRadius * 2))
+
+            // 주황 링 (아래 레이어)
+            let ringRadius = 24 + 640 * f
+            ctx.setFillColor(NSColor(srgbRed: 1.0, green: 0.60, blue: 0.18, alpha: (1 - f) * 0.55).cgColor)
+            ctx.fillEllipse(in: CGRect(x: blast.x - ringRadius, y: blast.y - ringRadius,
+                                       width: ringRadius * 2, height: ringRadius * 2))
+
+            // 흰 코어 (맨 위)
+            let coreRadius = 20 + 440 * f
+            ctx.setFillColor(NSColor(white: 1, alpha: (1 - f) * 0.95).cgColor)
+            ctx.fillEllipse(in: CGRect(x: blast.x - coreRadius, y: blast.y - coreRadius,
+                                       width: coreRadius * 2, height: coreRadius * 2))
+        }
+
+        // 2) 연기 구름
+        for puff in smoke {
+            let elapsed = t - puff.delay
+            guard elapsed > 0, elapsed < BlockBreakEffectView.smokeLife else { continue }
+            let f = elapsed / BlockBreakEffectView.smokeLife
+            let radius = puff.maxRadius * (0.25 + 0.75 * min(1, f * 2.2))
+            let alpha = puff.alpha * (1 - f)
+            ctx.setFillColor(NSColor(white: 0.42, alpha: alpha).cgColor)
+            ctx.fillEllipse(in: CGRect(x: puff.x - radius, y: puff.y - radius, width: radius * 2, height: radius * 2))
+        }
+
+        // 3) 불똥 (포물선)
+        for spark in sparks {
+            let elapsed = t - spark.delay
+            guard elapsed > 0, elapsed < BlockBreakEffectView.sparkLife else { continue }
+            let f = elapsed / BlockBreakEffectView.sparkLife
+            let x = spark.x + spark.vx * elapsed
+            let y = spark.y + spark.vy * elapsed - 450 * elapsed * elapsed
+            let size = spark.size * (1 - f * 0.5)
+            ctx.setFillColor(NSColor(srgbRed: 1.0, green: 0.66, blue: 0.22, alpha: 1 - f).cgColor)
+            ctx.fill(CGRect(x: x - size / 2, y: y - size / 2, width: size, height: size))
+        }
+
+        // 4) 창 블록 파편
         for b in debris {
             let elapsed = t - b.delay
+            guard elapsed > 0 else { continue }
 
-            // 사라지는 구간 알파 처리
-            // (아직 대기 중인 파편은 제자리에서 창을 덮은 채 유지 → 부서지기 전 모습과 정확히 일치)
             let alpha: CGFloat
             if elapsed <= BlockBreakEffectView.fadeStart {
                 alpha = 1
@@ -480,7 +430,7 @@ public final class BlockBreakEffectView: NSView {
             ctx.translateBy(x: b.x, y: b.y)
             ctx.rotate(by: b.spin)
 
-            // 창 실사 색(또는 유사 팔레트) + 복셀 큐브 느낌의 엣지 쉐이딩
+            // 창 톤 색 + 복셀 큐브 느낌의 엣지 쉐이딩
             ctx.setFillColor(b.color.withAlphaComponent(alpha).cgColor)
             ctx.fill(CGRect(x: -half, y: -half, width: size, height: size))
 

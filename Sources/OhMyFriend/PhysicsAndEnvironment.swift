@@ -212,6 +212,12 @@ public final class PhysicsEngine {
         }
     }
 
+    /// TNT 폭발 넉백 등 외부 힘으로 즉시 튕겨나간다
+    public func launch(vx: CGFloat, vy: CGFloat) {
+        velocity = CGPoint(x: vx, y: vy)
+        state = .airborne
+    }
+
     public func update(deltaTime dt: CGFloat, platforms: [Platform], screenFrame: CGRect) {
         guard dt > 0 else { return }
 

@@ -7,6 +7,8 @@ public enum SoundEffect {
     case eat       // Eating food
     case heart     // Interaction / Click
     case alert     // Wake up / surprise
+    case ignite    // TNT ignition (flint & steel spark)
+    case explode   // TNT explosion boom
 }
 
 public final class SoundAndEffectsManager {
@@ -20,6 +22,7 @@ public final class SoundAndEffectsManager {
     private var purrSound: NSSound?
     private var heroSound: NSSound?
     private var pingSound: NSSound?
+    private var bassoSound: NSSound?
 
     private init() {
         popSound = NSSound(named: "Pop")
@@ -28,6 +31,7 @@ public final class SoundAndEffectsManager {
         purrSound = NSSound(named: "Purr")
         heroSound = NSSound(named: "Hero")
         pingSound = NSSound(named: "Ping")
+        bassoSound = NSSound(named: "Basso")
     }
 
     public func play(_ sfx: SoundEffect) {
@@ -52,6 +56,12 @@ public final class SoundAndEffectsManager {
         case .alert:
             pingSound?.stop()
             pingSound?.play()
+        case .ignite:
+            tinkSound?.stop()
+            tinkSound?.play()
+        case .explode:
+            bassoSound?.stop()
+            bassoSound?.play()
         }
     }
 }

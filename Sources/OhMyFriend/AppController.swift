@@ -21,8 +21,9 @@ public final class AppController: NSObject, CharacterViewDelegate, NSMenuDelegat
     // Pickaxe attack (앱 창 부수기)
     private var attackMenuItem: NSMenuItem?
     private var breakOverlay: BlockBreakOverlayWindow?
+    private var tntEntityWindow: TNTEntityWindow?
+    private var tntPlacementPoint: CGPoint = .zero
     private var isBreakInProgress = false
-    private var lastCrackStage = 0
 
     public override init() {
         super.init()
@@ -97,8 +98,8 @@ public final class AppController: NSObject, CharacterViewDelegate, NSMenuDelegat
             cursorPos: cursorPos
         )
 
-        // 1.5. Pickaxe attack: sync crack overlay with swing progress
-        syncBreakOverlay()
+        // 1.5. TNT: 도화선 점멸 동기화
+        syncTNT()
 
         // 2. Physics Update
         physics.update(
@@ -156,8 +157,12 @@ public final class AppController: NSObject, CharacterViewDelegate, NSMenuDelegat
             desc = "쿨쿨 낮잠 자는 중... 💤"
         case .backflip:
             desc = "공중제비 도는 중! 🤸‍♂️"
-        case .attack:
-            desc = "⛏️ 앱 창 부수는 중! 💥"
+        case .tnt:
+            if let remain = behavior.tntFuseRemaining {
+                desc = String(format: "🧨 TNT 폭발까지 %.1f초!", remain)
+            } else {
+                desc = "🧨 TNT 설치하는 중..."
+            }
         case .fall:
             desc = "으악! 떨어지는 중! 🪂"
         case .dragged:
@@ -200,7 +205,7 @@ public final class AppController: NSObject, CharacterViewDelegate, NSMenuDelegat
 
     // MARK: - NSMenuDelegate
     public func menuNeedsUpdate(_ menu: NSMenu) {
-        attackMenuItem?.isEnabled = canStartPickaxeAttack()
+        attackMenuItem?.isEnabled = canStartTNTBreak()
     }
     // MARK: - Status Bar & Menus
     private func setupStatusBar() {
@@ -430,12 +435,12 @@ public final class AppController: NSObject, CharacterViewDelegate, NSMenuDelegat
         menu.addItem(soundItem)
 
         let attackItem = NSMenuItem(
-            title: "⛏️ 앱 창 부수기 (곡괭이 공격)",
-            action: #selector(didSelectPickaxeAttack),
+            title: "🧨 TNT로 창 부수기",
+            action: #selector(didSelectTNTBreak),
             keyEquivalent: ""
         )
         attackItem.target = self
-        attackItem.isEnabled = canStartPickaxeAttack()
+        attackItem.isEnabled = canStartTNTBreak()
         self.attackMenuItem = attackItem
         menu.addItem(attackItem)
         menu.addItem(NSMenuItem.separator())
@@ -543,8 +548,8 @@ public final class AppController: NSObject, CharacterViewDelegate, NSMenuDelegat
         physics.jump(impulse: 500)
     }
 
-    // MARK: - Pickaxe Attack (앱 창 부수기)
-    private func canStartPickaxeAttack() -> Bool {
+    // MARK: - TNT (앱 창 폭파)
+    private func canStartTNTBreak() -> Bool {
         guard !isBreakInProgress,
               let platform = physics?.currentPlatform,
               case .window(_, _, let ownerPid) = platform.kind,
@@ -552,13 +557,13 @@ public final class AppController: NSObject, CharacterViewDelegate, NSMenuDelegat
         return true
     }
 
-    @objc private func didSelectPickaxeAttack() {
-        guard canStartPickaxeAttack(),
+    @objc private func didSelectTNTBreak() {
+        guard canStartTNTBreak(),
               let platform = physics.currentPlatform,
               case .window(let windowID, _, let ownerPid) = platform.kind,
               let frame = ScreenEnvironment.shared.windowCocoaFrame(windowID: windowID) else { return }
 
-        // 1. 공격 대상 창 위에 크랙 오버레이 생성
+        // 1. 대상 창 위에 폭파 연출 오버레이 생성 (도화선 점멸 → 폭발)
         let screen = ScreenEnvironment.shared.screen(for: physics.position)
         let overlay = BlockBreakOverlayWindow(over: frame, on: screen)
         overlay.onBreakFinished = { [weak self] in
@@ -568,25 +573,39 @@ public final class AppController: NSObject, CharacterViewDelegate, NSMenuDelegat
         overlay.orderFrontRegardless()
         self.breakOverlay = overlay
         self.isBreakInProgress = true
-        self.lastCrackStage = 0
 
-        // 2. 곡괭이 휘두르기 시작 (고정 2초, 진행률에 맞춰 크랙 10단계 표시)
-        let started = behavior.startPickaxeAttack(on: platform, duration: 2.0) { [weak self] endedOn in
-            guard let self = self else { return }
-            if endedOn != nil {
-                // 3. 대상 앱 정상 종료 요청 후 화면이 블록 파편으로 부서진다
-                if let app = NSRunningApplication(processIdentifier: ownerPid) {
-                    app.terminate()
+        // 2. TNT 설치 → 점화 → 도화선 4초(마인크래프트 표준) → 폭발
+        let started = behavior.startTNTPlacement(
+            on: platform,
+            fuse: 4.0,
+            onPlaced: { [weak self] point in
+                // 창 표면에 놓인 TNT 블록을 화면 공간에 표시
+                guard let self = self else { return }
+                self.tntPlacementPoint = point
+                let entity = TNTEntityWindow(at: point)
+                entity.orderFrontRegardless()
+                self.tntEntityWindow = entity
+            },
+            completion: { [weak self] endedOn in
+                guard let self = self else { return }
+                self.tntEntityWindow?.close()
+                self.tntEntityWindow = nil
+
+                if endedOn != nil {
+                    // 3. 폭발! 대상 앱 종료 + 폭발음 + 창이 블록 파편으로 비산
+                    if let app = NSRunningApplication(processIdentifier: ownerPid) {
+                        app.terminate()
+                    }
+                    SoundAndEffectsManager.shared.play(.explode)
+                    overlay.explode(at: self.tntPlacementPoint)
+                } else {
+                    // 중단(드래그/낙하) → 연출 취소
+                    overlay.cancel()
+                    self.breakOverlay = nil
+                    self.isBreakInProgress = false
                 }
-                SoundAndEffectsManager.shared.play(.pop) // 블록 파괴음
-                overlay.shatter()
-            } else {
-                // 공격이 끊김(드래그/낙하) → 연출 중단
-                overlay.cancel()
-                self.breakOverlay = nil
-                self.isBreakInProgress = false
             }
-        }
+        )
         if !started {
             overlay.cancel()
             self.breakOverlay = nil
@@ -594,13 +613,10 @@ public final class AppController: NSObject, CharacterViewDelegate, NSMenuDelegat
         }
     }
 
-    private func syncBreakOverlay() {
-        guard let overlay = breakOverlay, let progress = behavior.attackProgress else { return }
-        let stage = min(10, max(1, Int(progress * 10) + 1))
-        if stage != lastCrackStage {
-            lastCrackStage = stage
-            overlay.showCrack(stage: stage)
-        }
+    private func syncTNT() {
+        guard let progress = behavior.tntProgress else { return }
+        breakOverlay?.showFuse(progress: progress)
+        tntEntityWindow?.setFuseProgress(progress)
     }
 
     @objc private func didSelectResetFloor() {

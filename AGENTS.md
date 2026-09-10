@@ -44,7 +44,8 @@ Sources/OhMyFriend/
 ├── SkinTexture.swift                   # 64x64/64x32 텍스처 파서, 기본 내장 스킨 3종 픽셀아트 생성기
 ├── PhysicsAndEnvironment.swift         # CGWindowList 창문 감지, Dock 영역 분석, 중력/낙하 물리 엔진
 ├── CharacterBehaviorController.swift   # 자율 행동 FSM (배회, 시선 추적, 창문 걸터앉기, Dock 노크)
-├── BlockBreakOverlayWindow.swift       # 곡괭이 공격: 대상 창 크랙(10단계, 번개형 점진 확산)→블록 파편 연출 오버레이
+├── BlockBreakOverlayWindow.swift       # TNT 폭파: 도화선 점멸→폭발 섬광·연기·블록 파편 오버레이
+├── TNTEntityWindow.swift               # 창 표면에 놓인 TNT 블록 엔티티(픽셀아트 + 도화선 점멸)
 ├── SkinCatalogManager.swift            # 추천 스킨 카탈로그 데이터 및 로컬 보관함(~/Library/.../Skins) 관리자
 ├── SkinDownloaderService.swift         # Mojang/Minotar/Crafatar API 비동기 다운로더 및 URL 검증기
 ├── SkinGalleryView.swift               # SwiftUI 기반 4개 탭 스킨 갤러리 UI
@@ -63,6 +64,7 @@ Sources/OhMyFriend/
 - **백색 플래시 이펙트 제거**: 파편 폭발 직전 하얀 창 화면이 노출되는 것처럼 보이던 연출 제거. '앱 창 부수기' 메뉴 단축키(Cmd+B)도 제거(오입력으로 사용 중 앱이 종료되는 것 방지, 메뉴 선택 시에만 발동).
 - **파편 격자 창 크기 정합**: `Int(width/cell)` 내림으로 오른쪽·위 가장자리에 남던 빈 틈을 제거하고 창 폭/높이를 셀 수로 나눠 정확히 타일링. 대기 중인 파편도 제자리에 렌더링하도록 수정해, 부서지기 전 0.06초 동안 창이 블록 격자로 바뀐 모습이 창 영역과 일치(가장자리 커버리지 0.93~0.94, 창 밖 유출 0.00 측정).
 - **파편 비산 범위·힘 강화**: 오버레이 패널 여백이 곧 드로잉 클리핑 경계임을 반영해 좌우 340 / 상단 420 / 하단 640pt까지 확장하고 초기 속도·회전을 상향(측정: t=0.6초 시점 창 밖 좌 284 / 우 308 / 상 271pt 비산, 좌우 총 폭 1452pt ≈ 창 폭의 1.7배).
+- **곡괭이 채굴 → TNT 폭파 연출 전환**: 마인크래프트 TNT 실제 동작(도화선 80틱=4초, 점화 중 하얗게 점멸)을 조사해 반영. 캐릭터가 TNT를 치켜들고(0.45초) 앉아서 창 표면에 내려놓은 뒤(0.95초) 점화음과 함께 도화선 4초 동안 창이 사각 펄스로 점멸하고, 도화선 종료 순간 대상 앱 종료 + 폭발음 + 흰 코어·주황 링 섬광·연기·불똥·창 블록 파편 비산이 동시에 일어난다. 캐릭터는 폭풍에 튕겨 날아가 착지(`PhysicsEngine.launch`). 기존 크랙 단계 이펙트·곡괭이 모델은 제거하고 화면 공간 TNT 엔티티(`TNTEntityWindow.swift`, 픽셀아트)와 사운드 `.ignite`/`.explode` 추가.
 
 ### 2026-09-09
 - **초기 프로젝트 생성**: Swift Package Manager 프로젝트 구조 생성 및 `Package.swift` 구성.
