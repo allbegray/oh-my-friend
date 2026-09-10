@@ -2,6 +2,33 @@
 
 # 문제 해결 지식
 
+## [CommandLineTools에 SwiftUIMacros 플러그인 부재로 전체 빌드 실패]
+
+### 증상
+`swift build` 실행 시 `SkinGalleryView.swift`의 `@State` 매크로에서 아래 오류로 전체 빌드 실패:
+```text
+error: external macro implementation type 'SwiftUIMacros.StateMacro' could not be found for macro 'State()'; plugin for module 'SwiftUIMacros' not found
+```
+
+### 원인
+- SwiftUI의 `@State` 등은 매크로이며, 그 구현체(`libSwiftUIMacros.dylib`)는 풀 Xcode에만 들어 있고 CommandLineTools에는 없음.
+- 증분 빌드 캐시(`.build`)가 살아 있는 동안은 갤러리 파일을 다시 파싱하지 않아 문제가 드러나지 않다가, `rm -rf .build` 후 전체 재빌드에서 폭발함.
+
+### 해결
+1. 풀 Xcode 설치 후 `scripts/run.sh`·`scripts/build_app.sh` 선두에 툴체인 가드 추가:
+   ```bash
+   if [ -d "/Applications/Xcode.app/Contents/Developer" ]; then
+       export DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer"
+   fi
+   ```
+   (`sudo xcode-select` 없이 동작. CI는 기본 Xcode를 쓰므로 영향 없음)
+
+### 재발 방지
+- `.build`를 함부로 지우지 않는다. 지워야 하면 위 가드(또는 풀 Xcode) 상태에서 전체 빌드가 통과하는지 먼저 확인한다.
+- SwiftUI 매크로를 쓰는 파일 추가 시 로컬 CLT 빌드 가능 여부를 확인한다.
+
+---
+
 ## [CommandLineTools와 SPM 매니페스트 링커 불일치 오류]
 
 ### 증상
