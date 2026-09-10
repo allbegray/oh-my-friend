@@ -122,6 +122,19 @@ public final class CreeperNode: SCNNode {
         patchNode.position = SCNVector3(0, 0, 0)
         bodyAnchor.addChildNode(patchNode)
 
+        // Mottled camo speckles (front + sides) for texture richness
+        let speckSpots: [(CGFloat, CGFloat, CGFloat)] = [(-0.13, 0.28, 0.15), (0.14, 0.10, 0.15), (-0.05, -0.22, 0.15), (0.22, 0.28, 0.0), (-0.22, -0.05, 0.0)]
+        for (sx, sy, sz) in speckSpots {
+            let speckGeom = SCNBox(width: 0.09, height: 0.11, length: 0.02, chamferRadius: 0)
+            speckGeom.materials = [darkGreenMat]
+            let speck = SCNNode(geometry: speckGeom)
+            speck.position = SCNVector3(sx, sy, sz)
+            if sz == 0 {
+                speck.eulerAngles.y = sx > 0 ? CGFloat.pi / 2.0 : -CGFloat.pi / 2.0
+            }
+            bodyAnchor.addChildNode(speck)
+        }
+
         // 2. Head: W=0.55, H=0.55, L=0.55 at Y=0.65 relative to body
         let headBox = SCNBox(width: 0.55, height: 0.55, length: 0.55, chamferRadius: 0)
         headBox.materials = [greenMat]

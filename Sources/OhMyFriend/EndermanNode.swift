@@ -137,8 +137,8 @@ public final class EndermanNode: SCNNode {
         headMesh.geometry = upperHeadBox
         headMesh.position = SCNVector3(0, 0.16, 0)
 
-        // Glowing Purple Eyes (2 blocks, 0.10 x 0.05 on front face)
-        let eyeBox = SCNBox(width: 0.10, height: 0.05, length: 0.02, chamferRadius: 0)
+        // Glowing Purple Eyes (2 blocks, larger for readability at distance)
+        let eyeBox = SCNBox(width: 0.13, height: 0.08, length: 0.02, chamferRadius: 0)
         eyeBox.materials = [purpleEyeMat]
         let eyeL = SCNNode(geometry: eyeBox)
         eyeL.position = SCNVector3(-0.11, 0.02, 0.23)

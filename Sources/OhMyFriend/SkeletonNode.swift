@@ -133,6 +133,15 @@ public final class SkeletonNode: SCNNode {
         sNode.position = SCNVector3(0, 0, 0)
         bodyAnchor.addChildNode(sNode)
 
+        // Rib bars (front): 4 horizontal ribs with dark gaps between
+        for i in 0..<4 {
+            let ribGeom = SCNBox(width: 0.40, height: 0.08, length: 0.04, chamferRadius: 0)
+            ribGeom.materials = [boneMat]
+            let rib = SCNNode(geometry: ribGeom)
+            rib.position = SCNVector3(0, 0.26 - CGFloat(i) * 0.17, 0.12)
+            bodyAnchor.addChildNode(rib)
+        }
+
         // 2. Head (Skull): W=0.50, H=0.50, L=0.50 at Y=0.55 relative to body
         let skullBox = SCNBox(width: 0.50, height: 0.50, length: 0.50, chamferRadius: 0)
         skullBox.materials = [boneMat]
@@ -140,7 +149,7 @@ public final class SkeletonNode: SCNNode {
         headNode.position = SCNVector3(0, 0.55, 0)
 
         // Sunken hollow eye sockets (Front +Z)
-        let eyeBox = SCNBox(width: 0.11, height: 0.11, length: 0.02, chamferRadius: 0)
+        let eyeBox = SCNBox(width: 0.14, height: 0.13, length: 0.02, chamferRadius: 0)
         eyeBox.materials = [socketMat]
         let eyeL = SCNNode(geometry: eyeBox)
         eyeL.position = SCNVector3(-0.12, 0.05, 0.25)
@@ -162,6 +171,15 @@ public final class SkeletonNode: SCNNode {
         let mouthNode = SCNNode(geometry: mouthBox)
         mouthNode.position = SCNVector3(0, -0.16, 0.25)
         headNode.addChildNode(mouthNode)
+
+        // Teeth: 3 bone teeth hanging over the mouth slit
+        for i in -1...1 {
+            let toothGeom = SCNBox(width: 0.05, height: 0.07, length: 0.02, chamferRadius: 0)
+            toothGeom.materials = [boneMat]
+            let tooth = SCNNode(geometry: toothGeom)
+            tooth.position = SCNVector3(CGFloat(i) * 0.08, -0.15, 0.26)
+            headNode.addChildNode(tooth)
+        }
 
         // 3. Thin Bone Arms: W=0.12, H=0.75, L=0.12
         let armBox = SCNBox(width: 0.12, height: 0.75, length: 0.12, chamferRadius: 0)
@@ -200,18 +218,23 @@ public final class SkeletonNode: SCNNode {
         let stringMat = SCNMaterial()
         stringMat.diffuse.contents = NSColor(white: 0.95, alpha: 1.0)
 
-        // Curved wooden bow frame
-        let bowShaft = SCNBox(width: 0.05, height: 0.95, length: 0.05, chamferRadius: 0)
-        bowShaft.materials = [woodMat]
-        let bNode = SCNNode(geometry: bowShaft)
-        bNode.position = SCNVector3(0, 0, 0.20)
-        bowNode.addChildNode(bNode)
+        // Curved wooden bow frame (two angled limbs)
+        let limbGeom = SCNBox(width: 0.06, height: 0.55, length: 0.06, chamferRadius: 0)
+        limbGeom.materials = [woodMat]
+        let limbTop = SCNNode(geometry: limbGeom)
+        limbTop.position = SCNVector3(0, 0.22, 0.24)
+        limbTop.eulerAngles.x = 0.45
+        bowNode.addChildNode(limbTop)
+        let limbBottom = SCNNode(geometry: limbGeom)
+        limbBottom.position = SCNVector3(0, -0.22, 0.24)
+        limbBottom.eulerAngles.x = -0.45
+        bowNode.addChildNode(limbBottom)
 
-        // Bowstring
-        let stringGeom = SCNBox(width: 0.02, height: 0.90, length: 0.02, chamferRadius: 0)
+        // Bowstring (drawn ahead of the limbs so it reads from the front)
+        let stringGeom = SCNBox(width: 0.025, height: 1.0, length: 0.025, chamferRadius: 0)
         stringGeom.materials = [stringMat]
         let sNode = SCNNode(geometry: stringGeom)
-        sNode.position = SCNVector3(0, 0, 0.12)
+        sNode.position = SCNVector3(0, 0, 0.30)
         bowNode.addChildNode(sNode)
 
         bowNode.position = SCNVector3(0, -0.35, 0.15)
