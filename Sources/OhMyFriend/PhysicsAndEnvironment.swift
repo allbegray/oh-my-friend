@@ -266,6 +266,14 @@ public final class PhysicsEngine {
         state = .airborne
     }
 
+    /// 사다리 등반 완료: 목적지 발판 위(창문 위쪽 끝)에 올라선다
+    public func endClimb(on platform: Platform) {
+        position.y = platform.yTop
+        velocity = .zero
+        previousPosition = position
+        state = .onGround(platform: platform)
+    }
+
     public func update(deltaTime dt: CGFloat, platforms: [Platform], screenFrame: CGRect) {
         guard dt > 0 else { return }
 

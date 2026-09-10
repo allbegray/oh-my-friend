@@ -22,7 +22,7 @@ public final class CharacterBehaviorController {
         case sleep(duration: TimeInterval, zzzTimer: TimeInterval)
         case backflip(progress: CGFloat)
         case tnt(timer: TimeInterval)
-        case climbDown(phaseTimer: TimeInterval, isPlacing: Bool)
+        case climb(phaseTimer: TimeInterval, isPlacing: Bool, isUp: Bool)
         case fall
         case dragged
         case landedCrouch(timeLeft: TimeInterval)
@@ -72,16 +72,15 @@ public final class CharacterBehaviorController {
     public private(set) var climbSnapshot: ClimbSnapshot?
     private(set) var ladderCooldown: TimeInterval = 0
     private var climbStartY: CGFloat = 0
-    private var climbBottomY: CGFloat = 0
+    private var climbEndY: CGFloat = 0
     private var climbSource: Platform?
+    private var climbIsUp = false
     private let climbSpeed: CGFloat = 220.0     // points / sec
     private let ladderPlaceDuration: TimeInterval = 0.55
     private let ladderCooldownDuration: TimeInterval = 12.0
     private let ladderHalfWidth: CGFloat = 22.0
 
-    /// 드래그로 창문에 내려놓았을 때 자동 등반을 예약하는 플래그
-    private var pendingDropDescent = false
-    /// 이 속도 이하로 내려놓으면 '던지기'가 아니라 '놓기'로 보고 창문 위에 올려놓는다
+    /// 이 속도 이하로 내려놓으면 '던지기'가 아니라 '놓기'로 본다
     public static let dropSnapSpeedLimit: CGFloat = 260.0
 
     public init() {}
@@ -192,9 +191,9 @@ public final class CharacterBehaviorController {
         return true
     }
 
-    // MARK: - Ladder Descent (사다리 타고 창문 내려가기)
+    // MARK: - Ladder Climb (사다리 타고 창문 오르내리기)
     public var isClimbing: Bool {
-        if case .climbDown = state { return true }
+        if case .climb = state { return true }
         return false
     }
 
@@ -209,41 +208,68 @@ public final class CharacterBehaviorController {
               let bottom = platform.yBottom, Self.canDescend(from: platform)
         else { return false }
 
-        climbStartY = physics.position.y
-        climbBottomY = bottom
-        climbSource = platform
+        beginLadderClimb(
+            physics: physics,
+            characterNode: characterNode,
+            source: platform,
+            startY: physics.position.y,
+            endY: bottom,
+            isUp: false
+        )
+        return true
+    }
+
+    /// 드래그로 창문 안에 내려놓았을 때: **놓인 자리에서 그 창문 위쪽 끝까지** 사다리를 걸고 올라간다.
+    /// - Returns: 놓인 자리에 창문이 없으면 false (기존 던지기/낙하 동작 유지)
+    @discardableResult
+    public func climbUpFromDrop(
+        physics: PhysicsEngine,
+        characterNode: MinecraftCharacterNode,
+        platforms: [Platform]
+    ) -> Bool {
+        guard !isClimbing, !isTNTActive else { return false }
+
+        let point = physics.position
+
+        // 놓은 지점을 담고 있는 창문 중 가장 앞에 있는(가장 위에 떠 있는) 창문을 고른다
+        guard let window = platforms.first(where: { platform in
+            guard case .window = platform.kind, let bottom = platform.yBottom else { return false }
+            return point.x >= platform.xMin && point.x <= platform.xMax
+                && point.y >= bottom && point.y < platform.yTop
+        }) else { return false }
+
+        beginLadderClimb(
+            physics: physics,
+            characterNode: characterNode,
+            source: window,
+            startY: physics.position.y,
+            endY: window.yTop,
+            isUp: true
+        )
+        return true
+    }
+
+    /// 하강/상승 공통 세팅: 등반 상태로 들어가고 사다리 설치 모션을 시작한다
+    private func beginLadderClimb(
+        physics: PhysicsEngine,
+        characterNode: MinecraftCharacterNode,
+        source: Platform,
+        startY: CGFloat,
+        endY: CGFloat,
+        isUp: Bool
+    ) {
+        climbStartY = startY
+        climbEndY = endY
+        climbSource = source
+        climbIsUp = isUp
         climbSnapshot = nil
         ladderCooldown = ladderCooldownDuration
 
         physics.beginClimb()
         SoundAndEffectsManager.shared.play(.pop)
         characterNode.showOverheadEmoji("🪜", duration: 1.6)
-        state = .climbDown(phaseTimer: ladderPlaceDuration, isPlacing: true)
-        return true
-    }
-
-    /// 드래그로 내려놓은 자리가 창문 안이면 그 창문 위쪽 끝에 올려놓고 사다리 등반을 예약한다.
-    /// - Returns: 창문 위에 올려놓았으면 true (놓은 자리에 창문이 없으면 false)
-    @discardableResult
-    public func placeDropOnWindow(physics: PhysicsEngine, platforms: [Platform]) -> Bool {
-        let point = physics.position
-
-        // 놓은 지점을 담고 있는 창문 중 위쪽 끝이 가장 가까운(=앞에 보이는) 창문을 고른다
-        let window = platforms
-            .filter { platform in
-                guard case .window = platform.kind, let bottom = platform.yBottom else { return false }
-                return point.x >= platform.xMin && point.x <= platform.xMax
-                    && point.y >= bottom && point.y <= platform.yTop
-            }
-            .min { $0.yTop < $1.yTop }
-
-        guard let window = window else { return false }
-
-        // 창문 위쪽 끝(타이틀바)에 조용히 내려놓는다
-        physics.position.y = window.yTop
-        physics.velocity = .zero
-        pendingDropDescent = true
-        return true
+        characterNode.climbUp = isUp
+        state = .climb(phaseTimer: ladderPlaceDuration, isPlacing: true, isUp: isUp)
     }
 
     /// 등반 중단 (드래그/낙하로 상태가 덮어써질 때)
@@ -263,15 +289,30 @@ public final class CharacterBehaviorController {
         state = .fall
     }
 
+    /// 창문 위쪽 끝까지 올라왔다: 창문 위(타이틀바)에 올라선다
+    private func finishClimbUp(on platform: Platform, physics: PhysicsEngine, characterNode: MinecraftCharacterNode) {
+        climbSnapshot = nil
+        climbSource = nil
+        characterNode.isClimbing = false
+        characterNode.climbProgress = 1
+        physics.endClimb(on: platform)
+        SoundAndEffectsManager.shared.play(.land)
+        state = .idle(timeLeft: 1.2)
+    }
+
     private func makeClimbSnapshot(physics: PhysicsEngine) -> ClimbSnapshot {
-        let total = max(1, climbStartY - climbBottomY)
-        let progress = min(1, max(0, (climbStartY - physics.position.y) / total))
-        // 사다리는 창문 높이만큼만: 창 상단(+4pt 겹침)에서 창 하단까지
+        let total = max(1, abs(climbEndY - climbStartY))
+        let progressed = climbIsUp ? (physics.position.y - climbStartY) : (climbStartY - physics.position.y)
+        let progress = min(1, max(0, progressed / total))
+
+        // 사다리는 창문 면을 따라 생성된다: 내려갈 때는 창 하단까지, 올라갈 때는 놓인 자리부터 창 상단까지
+        let bottom = climbIsUp ? climbStartY - 12 : climbEndY
+        let top = climbIsUp ? climbEndY + 4 : climbStartY + 4
         let rect = CGRect(
             x: physics.position.x - ladderHalfWidth,
-            y: climbBottomY,
+            y: bottom,
             width: ladderHalfWidth * 2,
-            height: max(1, climbStartY + 4 - climbBottomY)
+            height: max(1, top - bottom)
         )
         return ClimbSnapshot(ladderRect: rect, progress: progress)
     }
@@ -339,7 +380,6 @@ public final class CharacterBehaviorController {
         if case .dragged = physics.state {
             interruptTNTIfActive()
             cancelClimbIfActive()
-            pendingDropDescent = false
             state = .dragged
             characterNode.isBeingDragged = true
             characterNode.isClimbing = false
@@ -696,7 +736,7 @@ public final class CharacterBehaviorController {
             }
             state = .tnt(timer: timer)
 
-        case .climbDown(var phaseTimer, var isPlacing):
+        case .climb(var phaseTimer, var isPlacing, let isUp):
             characterNode.walkSpeed = 0
             characterNode.isSitting = false
             characterNode.isPoking = false
@@ -705,17 +745,17 @@ public final class CharacterBehaviorController {
             characterNode.isSleeping = false
             characterNode.isEating = false
             characterNode.isClimbing = true
+            characterNode.climbUp = isUp
 
-            // 서 있던 창문을 매 프레임 재조회 (창이 움직이면 사다리도 따라가고, 닫히면 낙하)
+            // 사다리를 건 창문을 매 프레임 재조회 (창이 움직이면 사다리도 따라가고, 닫히면 낙하)
             let liveSource = climbSource.flatMap { source in
                 platforms.first { $0.kind == source.kind }
             }
-            let ladderBottom = liveSource?.yBottom
-            if let ladderBottom = ladderBottom {
-                climbBottomY = ladderBottom
+            if let liveSource = liveSource {
+                climbEndY = isUp ? liveSource.yTop : (liveSource.yBottom ?? climbEndY)
             }
 
-            if ladderBottom == nil {
+            if liveSource == nil {
                 // 창문이 닫힘 → 사다리도 사라지고 그대로 떨어진다
                 releaseFromLadder(physics: physics, characterNode: characterNode)
             } else if isPlacing {
@@ -724,15 +764,24 @@ public final class CharacterBehaviorController {
                     isPlacing = false
                     SoundAndEffectsManager.shared.play(.pop) // 사다리 설치 완료
                 }
-                state = .climbDown(phaseTimer: max(0, phaseTimer), isPlacing: isPlacing)
+                state = .climb(phaseTimer: max(0, phaseTimer), isPlacing: isPlacing, isUp: isUp)
+            } else if isUp {
+                physics.position.y += climbSpeed * CGFloat(dt)
+
+                if physics.position.y >= climbEndY, let target = liveSource {
+                    // 창문 위쪽 끝 도달 → 창문 위에 올라선다
+                    finishClimbUp(on: target, physics: physics, characterNode: characterNode)
+                } else {
+                    state = .climb(phaseTimer: 0, isPlacing: false, isUp: true)
+                }
             } else {
                 physics.position.y -= climbSpeed * CGFloat(dt)
 
-                if physics.position.y <= climbBottomY {
+                if physics.position.y <= climbEndY {
                     // 사다리 끝(창 아래 끝) 도달 → 남은 높이는 그냥 떨어진다
                     releaseFromLadder(physics: physics, characterNode: characterNode)
                 } else {
-                    state = .climbDown(phaseTimer: 0, isPlacing: false)
+                    state = .climb(phaseTimer: 0, isPlacing: false, isUp: false)
                 }
             }
 
@@ -774,14 +823,6 @@ public final class CharacterBehaviorController {
         guard let platform = physics.currentPlatform else {
             state = .idle(timeLeft: 1.5)
             return
-        }
-
-        // 드래그로 창문에 내려놓은 직후라면 사다리 등반을 자동으로 시작한다 (모드와 무관한 사용자 동작)
-        if pendingDropDescent {
-            pendingDropDescent = false
-            if startLadderDescent(physics: physics, characterNode: characterNode, from: platform) {
-                return
-            }
         }
 
         switch mode {

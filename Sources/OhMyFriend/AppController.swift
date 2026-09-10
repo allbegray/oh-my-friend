@@ -170,8 +170,8 @@ public final class AppController: NSObject, CharacterViewDelegate, NSMenuDelegat
             } else {
                 desc = "🧨 TNT 설치하는 중..."
             }
-        case .climbDown:
-            desc = "🪜 사다리 타고 창문 내려가는 중"
+        case .climb(_, _, let isUp):
+            desc = isUp ? "🪜 사다리 타고 창문 올라가는 중" : "🪜 사다리 타고 창문 내려가는 중"
         case .fall:
             desc = "으악! 떨어지는 중! 🪂"
         case .dragged:
@@ -195,10 +195,14 @@ public final class AppController: NSObject, CharacterViewDelegate, NSMenuDelegat
     public func characterViewDidEndDrag(_ view: CharacterView, throwVelocity: CGPoint) {
         physics.releaseDrag(throwVelocity: throwVelocity)
 
-        // 약하게 내려놓았고 그 자리가 창문 안이면 창문 위에 얹고 사다리 등반을 예약한다.
+        // 약하게 놓았고 그 자리가 창문 안이면, 놓인 자리에서 그 창문 위쪽 끝까지 사다리를 걸고 올라간다.
         // 세게 던진 경우(throwVelocity 큼)는 기존처럼 그대로 날아간다.
         if hypot(throwVelocity.x, throwVelocity.y) <= CharacterBehaviorController.dropSnapSpeedLimit {
-            behavior.placeDropOnWindow(physics: physics, platforms: cachedPlatforms)
+            behavior.climbUpFromDrop(
+                physics: physics,
+                characterNode: window.characterView.characterNode,
+                platforms: cachedPlatforms
+            )
         }
     }
 

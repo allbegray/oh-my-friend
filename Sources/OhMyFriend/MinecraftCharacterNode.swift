@@ -78,12 +78,15 @@ public final class MinecraftCharacterNode: SCNNode {
     public var isClimbing: Bool = false {
         didSet {
             if oldValue && !isClimbing {
-                // 사다리에서 내려오면 몸을 돌려 정면을 본다 (등을 보이던 회전 해제)
+                // 사다리에서 내려오면 몸을 돌려 정면을 보고, 방향 플래그도 정리한다
+                climbUp = false
                 modelRoot.eulerAngles = SCNVector3(0, 0, 0)
             }
         }
     }
     public var climbProgress: CGFloat = 0
+    /// 창문 위쪽으로 올라가는 중인지 (오르내리는 팔다리 위상 반전용)
+    public var climbUp: Bool = false
 
     public override init() {
         super.init()
@@ -407,8 +410,8 @@ public final class MinecraftCharacterNode: SCNNode {
         }
 
         if isClimbing {
-            // Climbing: 창문을 마주보고(등을 보이며) 양팔 교차로 위를 움켜쥐고 다리를 교차로 디디며 내려간다
-            let cycle = sin(animTime * 5.0)
+            // Climbing: 창문을 마주보고(등을 보이며) 양팔 교차로 위를 움켜쥐고 다리를 교차로 디디며 오르내린다
+            let cycle = sin(animTime * 5.0) * (climbUp ? -1.0 : 1.0)
             modelRoot.eulerAngles = SCNVector3(0, CGFloat.pi, 0)
             bodyAnchor.position = SCNVector3(0, cycle * 0.06, 0)
             rightArmJoint.eulerAngles = SCNVector3(-2.35 + cycle * 0.45, 0, 0.12)

@@ -55,7 +55,7 @@ Sources/OhMyFriend/
 
 - **렌더링 & 애니메이션 파이프라인**: `CharacterView` 내부의 `SCNScene`에서 `MinecraftCharacterNode`가 관절 피벗(목, 어깨, 골반)을 기반으로 회전 및 위치를 실시간 보간합니다.
 - **물리 & 윈도우 추적**: `ScreenEnvironment`가 0.5초 주기로 활성 앱 윈도우 타이틀바의 Cocoa 좌표계 상단을 스캔하여 발판(`Platform`) 목록을 갱신하고, `PhysicsEngine`이 중력 가속도와 착지 판정을 처리합니다.
-- **등반 연출 파이프라인**: `CharacterBehaviorController`가 매 프레임 등반 스냅샷(사다리 사각형 + 진행률)을 만들고, `AppController.syncLadderOverlay()`가 `LadderOverlayWindow`를 생성·갱신·정리합니다. 사다리는 창문 높이만큼만 생성되어 화면 좌표계에 고정되고(창이 움직이면 따라 이동), 캐릭터 창보다 한 단계 아래 레벨(`floating - 1`)에 그려집니다.
+- **등반 연출 파이프라인**: `CharacterBehaviorController`가 매 프레임 등반 스냅샷(사다리 사각형 + 진행률)을 만들고, `AppController.syncLadderOverlay()`가 `LadderOverlayWindow`를 생성·갱신·정리합니다. 사다리는 창문 면을 따라(내려갈 때는 창문 위쪽 끝→창 아래 끝, 올라갈 때는 놓인 자리→창문 위쪽 끝) 생성되어 화면 좌표계에 고정되고(창이 움직이면 따라 이동), 캐릭터 창보다 한 단계 아래 레벨(`floating - 1`)에 그려집니다.
 - **스킨 파이프라인**: 로컬 파일, 기본 내장 픽셀아트 생성기, 온라인 다운로더(Mojang/Minotar)를 통해 64x64 PNG 데이터를 확보하고, 각 면(Front, Right, Back, Left, Top, Bottom)을 슬라이스하여 Nearest-neighbor 재질로 큐브에 매핑합니다.
 
 ## 실행 기록
@@ -75,6 +75,7 @@ Sources/OhMyFriend/
 - **등반 중 인터랙션 안전장치**: 등반 중에는 공중제비/쉬프트 댄스/손 흔들기/낮잠/먹기/블록 캐기/곡괭이 공격 트리거를 무시하고, 캐릭터를 드래그하거나 클릭하면 사다리에서 손을 놓고 낙하한다(`cancelClimbIfActive`, `releaseClimb`). 등반 중 커서 근접 인사(Wave)도 스킵한다.
 - **사다리에서 내려온 뒤 정면 보기 수정**: 등반이 끝난 뒤에도 몸이 뒤로 돌아 있던 문제를 수정. 뒤돌기는 등반 중에만 적용하고, `MinecraftCharacterNode.isClimbing`에 `didSet`을 두어 true→false로 바뀌는 순간(사다리 끝 도달·클릭·드래그·창 닫힘) 몸 회전을 0으로 되돌린다. 검증: 드라이버·창 서버 하네스에서 등반 중 yaw = π, 내려온 직후 yaw = 0 확인.
 - **드래그 드롭 → 사다리 자동 등반**: 캐릭터를 창문 안(창 아래 끝~위 끝)에 놓으면 그 창문 위쪽 끝에 얹고 착지 모션 뒤 사다리 등반을 자동 시작하도록 `CharacterBehaviorController.placeDropOnWindow(physics:platforms:)`와 `dropSnapSpeedLimit`(260pt/s) 추가, `AppController.characterViewDidEndDrag`에서 연결. 세게 던지면 기존 던지기 유지, 창문이 없는 지점에서는 무동작, 겹친 창문은 위쪽 끝이 가장 가까운 것을 고른다. 검증: 헤드리스 드라이버 12개 체크(얹기·겹침 선택·창문 밖 무동작·자동 등반 시작 144프레임·사다리 = 창 높이 378/200/44/404·창 하단 이탈 후 바닥 착지·반복 없음), 창 서버 하네스에서 드롭만으로 등반 시작→착지 전 구간 + 오버레이 소멸까지 확인.
+- **드래그 드롭 동작 교체 (순간이동 하강 → 사다리 상승)**: 위 동작을 "창문 위로 올린 뒤 내려오기"에서 **"놓인 자리에서 그 창문 위쪽 끝까지만 사다리를 세우고 올라가기"**로 교체. `CharacterBehaviorController.climbUpFromDrop(physics:characterNode:platforms:)`가 놓인 지점을 담은 창문 중 z-순서상 가장 앞 창문을 골라 그 자리에서 상승 등반을 시작하고, FSM 등반 상태를 `climb(phaseTimer:isPlacing:isUp:)`로 일반화해 하강(창 아래 끝까지 내려간 뒤 낙하)과 상승(창문 위쪽 끝에 올라섬)을 함께 처리한다. `PhysicsEngine.endClimb(on:)` 복귀, `MinecraftCharacterNode.climbUp`으로 팔다리 위상 반전, 상태 문구도 오르내리기를 구분. 검증: 헤드리스 드라이버(놓인 자리 350pt 유지·순간이동 없음·상승 103프레임·y 단조 증가·창문 위 600pt 정확 착지·사다리 338~604·창문 밖/이미 위쪽 끝이면 미발동), 창 서버 하네스 17개 체크(사다리 266pt = 놓인 자리→창문 위, 등반 중 위치 변동 0.0pt, 251pt 상승 후 창문 위 착지, 완료 1.72초·오버레이 소멸 2.35초, 등반 중 yaw = π → 올라온 뒤 0).
 
 ### 2026-09-09
 - **초기 프로젝트 생성**: Swift Package Manager 프로젝트 구조 생성 및 `Package.swift` 구성.
