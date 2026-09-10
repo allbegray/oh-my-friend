@@ -169,7 +169,8 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
                     self?.handleCreeperExploded(at: blastPos)
                 },
                 onDefeated: { [weak self] in
-                    self?.handleCreeperDefeated()
+                    let currentWeapon = self?.window.characterView.characterNode.currentHeldItem ?? .none
+                    self?.handleCreeperDefeated(with: currentWeapon)
                 }
             )
             cPhys.update(deltaTime: CGFloat(dt), platforms: cachedPlatforms, screen: screen)
@@ -1135,7 +1136,7 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
             creeperPhysics: cPhys,
             creeperNode: cw.creeperView.creeperNode,
             onDefeated: { [weak self] in
-                self?.handleCreeperDefeated()
+                self?.handleCreeperDefeated(with: weapon)
             }
         )
     }
@@ -1150,7 +1151,47 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
         }
     }
 
-    private func handleCreeperDefeated() {
+    private func handleCreeperDefeated(with weapon: HeldItem) {
+        let victoryQuote: String
+        switch weapon {
+        case .diamondSword:
+            let quotes = [
+                "칼날 끝에 자비란 없다! ⚔️",
+                "크리퍼 따위, 내 검엔 한 방이지! 🗡️",
+                "터지기 전에 베었다! 완벽한 칼각! ✨",
+                "화약 득템! 폭탄 만들러 가볼까? 💥"
+            ]
+            victoryQuote = quotes.randomElement() ?? quotes[0]
+        case .diamondPickaxe:
+            let quotes = [
+                "단단한 놈은 곡괭이로 캐는 법! ⛏️",
+                "광물인 줄 알고 캤더니 크리퍼였네? 💎",
+                "곡괭이 맛이 어떠냐! ⛏️"
+            ]
+            victoryQuote = quotes.randomElement() ?? quotes[0]
+        case .torch:
+            let quotes = [
+                "불장난은 위험하다고 했잖아? 🔥",
+                "횃불 하나로 제압 완료! 🕯️",
+                "어둠 속에 숨을 생각 마라! ⚡"
+            ]
+            victoryQuote = quotes.randomElement() ?? quotes[0]
+        default:
+            let quotes = [
+                "이 구역의 평화는 내가 지킨다! 🛡️",
+                "어딜 감히 내 데스크톱에 얼씬거려! 👊",
+                "휴, 터지기 전에 컷! 나 좀 멋진 듯? 😎"
+            ]
+            victoryQuote = quotes.randomElement() ?? quotes[0]
+        }
+
+        // 승리의 포즈 및 멋진 대사 출력
+        window.characterView.characterNode.showOverheadEmoji(victoryQuote, duration: 3.2)
+        SoundAndEffectsManager.shared.play(.heart)
+
+        // 승리의 기쁨 점프
+        physics.jump(impulse: 340)
+
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
             self?.despawnCreeper()
         }

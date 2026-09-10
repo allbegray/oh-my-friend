@@ -328,11 +328,12 @@ public final class MinecraftCharacterNode: SCNNode {
         overheadEmojiNode.childNodes.forEach { $0.removeFromParentNode() }
 
         // Render emoji to text geometry
-        let textGeom = SCNText(string: emoji, extrusionDepth: 0.05)
-        textGeom.font = NSFont.systemFont(ofSize: 0.5)
+        let fontSize: CGFloat = emoji.count > 6 ? 0.34 : 0.50
+        let textGeom = SCNText(string: emoji, extrusionDepth: 0.04)
+        textGeom.font = NSFont.boldSystemFont(ofSize: fontSize)
         let mat = SCNMaterial()
         mat.diffuse.contents = NSColor.white
-        textGeom.materials = [mat]
+        mat.lightingModel = .constant
 
         let tNode = SCNNode(geometry: textGeom)
         // Center the text
