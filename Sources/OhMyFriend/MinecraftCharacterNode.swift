@@ -81,6 +81,7 @@ public final class MinecraftCharacterNode: SCNNode {
     public var isBackflipping: Bool = false
     public var backflipAngle: CGFloat = 0
     public var isEating: Bool = false
+    public var isCheering: Bool = false
 
     // Ladder climbing (사다리 등반)
     public var isClimbing: Bool = false {
@@ -525,6 +526,21 @@ public final class MinecraftCharacterNode: SCNNode {
                 rightArmJoint.eulerAngles = SCNVector3(-0.3, 0, 0.1)
                 leftArmJoint.eulerAngles = SCNVector3(-0.3, 0, -0.1)
             }
+            return
+        }
+
+        if isCheering {
+            // Cheering / Fan dance: joyfully hopping up and down, waving both arms in the air!
+            let hop = abs(sin(animTime * 14.0)) * 0.28
+            bodyAnchor.position = SCNVector3(0, hop, 0)
+
+            let armWave = sin(animTime * 14.0) * 0.4
+            rightArmJoint.eulerAngles = SCNVector3(-2.6 + armWave, 0, 0.25)
+            leftArmJoint.eulerAngles = SCNVector3(-2.6 - armWave, 0, -0.25)
+
+            let legKick = sin(animTime * 14.0) * 0.2
+            rightLegJoint.eulerAngles = SCNVector3(legKick, 0, 0)
+            leftLegJoint.eulerAngles = SCNVector3(-legKick, 0, 0)
             return
         }
 

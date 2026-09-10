@@ -26,6 +26,7 @@ public final class CharacterBehaviorController {
         case fall
         case dragged
         case landedCrouch(timeLeft: TimeInterval)
+        case cheer(wpm: Double, timeLeft: TimeInterval, cheerCooldown: TimeInterval)
     }
 
     public private(set) var state: State = .idle(timeLeft: 2.0)
@@ -128,6 +129,34 @@ public final class CharacterBehaviorController {
         state = .placeAndMineBlock(timeLeft: 3.0, isMining: false)
     }
 
+
+    public func triggerSitOnMenuBar(physics: PhysicsEngine, characterNode: MinecraftCharacterNode) {
+        guard !isClimbing, !isTNTActive else { return }
+        let screen = ScreenEnvironment.shared.screen(for: physics.position)
+        let menuBarY = screen.visibleFrame.maxY
+        physics.position = CGPoint(x: physics.position.x, y: menuBarY)
+        let menuBarPlatform = Platform(
+            kind: .menuBar,
+            xMin: screen.frame.minX,
+            xMax: screen.frame.maxX,
+            yTop: menuBarY,
+            title: "메뉴바",
+            yBottom: menuBarY - 24
+        )
+        physics.landOn(platform: menuBarPlatform)
+        characterNode.showOverheadEmoji("🪑", duration: 2.0)
+        SoundAndEffectsManager.shared.play(.pop)
+        state = .sit(timeLeft: Double.random(in: 6.0...12.0))
+    }
+
+    public func triggerCheer(characterNode: MinecraftCharacterNode) {
+        guard !isClimbing, !isTNTActive else { return }
+        characterNode.isCheering = true
+        characterNode.showOverheadEmoji("🎉", duration: 2.0)
+        SoundAndEffectsManager.shared.play(.heart)
+        TypingActivityMonitor.shared.simulateKeystrokes(count: 15)
+        state = .cheer(wpm: 65.0, timeLeft: 3.5, cheerCooldown: 1.0)
+    }
     public func handleCharacterClicked(physics: PhysicsEngine, characterNode: MinecraftCharacterNode) {
         SoundAndEffectsManager.shared.play(.heart)
         characterNode.showOverheadEmoji("❤️", duration: 1.8)
@@ -230,6 +259,28 @@ public final class CharacterBehaviorController {
         guard !isClimbing, !isTNTActive else { return false }
 
         let point = physics.position
+
+        // 1. 메뉴바 바로 위/근처에 놓인 경우: 메뉴바 위에 즉시 착지하여 걸터앉기
+        if let menuBar = platforms.first(where: { $0.kind == .menuBar }) {
+            if abs(point.y - menuBar.yTop) <= 25 {
+                physics.landOn(platform: menuBar)
+                characterNode.showOverheadEmoji("🪑", duration: 1.8)
+                SoundAndEffectsManager.shared.play(.pop)
+                state = .sit(timeLeft: Double.random(in: 6.0...12.0))
+                return true
+            } else if point.y >= (menuBar.yTop - 140) && point.y < menuBar.yTop {
+                // 메뉴바 바로 아래 구간: 메뉴바까지 사다리를 타고 올라간다
+                beginLadderClimb(
+                    physics: physics,
+                    characterNode: characterNode,
+                    source: menuBar,
+                    startY: physics.position.y,
+                    endY: menuBar.yTop,
+                    isUp: true
+                )
+                return true
+            }
+        }
 
         // 놓은 지점을 담고 있는 창문 중 가장 앞에 있는(가장 위에 떠 있는) 창문을 고른다
         guard let window = platforms.first(where: { platform in
@@ -451,8 +502,48 @@ public final class CharacterBehaviorController {
         characterNode.isHoldingTNT = false
         characterNode.isPlacingTNT = false
 
+
+        // 4.5. Typing WPM Check & Cheering Mode
+        let currentWpm = TypingActivityMonitor.shared.currentWPM
+        if currentWpm >= 35.0 && !isClimbing && !isTNTActive {
+            switch state {
+            case .idle, .walk, .sit, .lookAround, .wave:
+                characterNode.isCheering = true
+                characterNode.showOverheadEmoji("🔥", duration: 1.5)
+                SoundAndEffectsManager.shared.play(.heart)
+                state = .cheer(wpm: currentWpm, timeLeft: 2.2, cheerCooldown: 0)
+            case .cheer(_, _, var cooldown):
+                characterNode.isCheering = true
+                cooldown -= dt
+                if cooldown <= 0 {
+                    cooldown = 1.1
+                    let cheerEmojis = ["🔥", "⚡", "👏", "🎉", "💯"]
+                    characterNode.showOverheadEmoji(cheerEmojis.randomElement() ?? "🔥", duration: 1.2)
+                }
+                state = .cheer(wpm: currentWpm, timeLeft: 2.2, cheerCooldown: cooldown)
+            default:
+                break
+            }
+        }
         // 5. Finite State Machine
         switch state {
+        case .cheer(let currentWpm, var timeLeft, let cooldown):
+            timeLeft -= dt
+            characterNode.walkSpeed = 0
+            characterNode.isCheering = true
+            characterNode.isSitting = false
+            characterNode.isSleeping = false
+            characterNode.isWaving = false
+            characterNode.isEating = false
+            characterNode.isPoking = false
+
+            if timeLeft <= 0 {
+                characterNode.isCheering = false
+                chooseNextState(physics: physics, platforms: platforms, screen: screen, cursorPos: cursorPos, characterNode: characterNode)
+            } else {
+                state = .cheer(wpm: currentWpm, timeLeft: timeLeft, cheerCooldown: cooldown)
+            }
+
         case .landedCrouch(var timeLeft):
             timeLeft -= dt
             characterNode.walkSpeed = 0
@@ -946,7 +1037,8 @@ public final class CharacterBehaviorController {
 
         // 3. 15% chance: Stand and look around or peek over cliff
         if let p = platform, p.kind != .floor && p.kind != .dock {
-            state = .poke(timeLeft: 2.5, label: "아래 내려다보기")
+            let label = (p.kind == .menuBar) ? "화면 아래 내려다보기" : "아래 내려다보기"
+            state = .poke(timeLeft: 2.5, label: label)
         } else {
             let lookAway = isLeft ? CGFloat(0.7) : CGFloat(-0.7)
             state = .lookAround(timeLeft: 2.5, targetYaw: lookAway)

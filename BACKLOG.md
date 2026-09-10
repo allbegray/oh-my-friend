@@ -6,9 +6,7 @@
 (현재 등록된 높음 순위 백로그가 없습니다.)
 
 ## 중간 (M)
-- [ ] [M1] macOS 상단 메뉴바 라인을 발판으로 인식하여 메뉴바 위에 걸터앉는 인터랙션 추가
-- [ ] [M2] 키보드 타이핑 속도(WPM) 감지 시 옆에서 신나서 방방 뛰며 응원하는 모션 추가
-- [ ] [M4] 창 치우기(최소화) 인터랙션 — "🗜️ 창 압축해서 Dock으로 밀어넣기"
+- [ ] [M1] 창 치우기(최소화) 인터랙션 — "🗜️ 창 압축해서 Dock으로 밀어넣기"
   - 선행: 손쉬운 사용(Accessibility) 권한. `AXUIElementCreateApplication` → `kAXWindowsAttribute` → `kAXPositionAttribute`/`kAXSizeAttribute`로 CGWindowID 창 매칭(4pt 허용 오차) → `kAXMinimizedAttribute = true` (실패 시 `kAXMinimizeButtonAttribute` 프레스 폴백). 화면 기록 권한은 사용하지 않음.
   - `WindowMinimizer.swift` 신규: 권한 확인(`AXIsProcessTrustedWithOptions`) + `minimize(windowID:pid:) -> Result`
   - FSM: `CharacterBehaviorController.State.squash(timeLeft:)`, `startSquashMinimize(on:duration:completion:)`, `squashProgress` (`startPickaxeAttack` 패턴 복제)

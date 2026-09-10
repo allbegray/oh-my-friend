@@ -146,7 +146,11 @@ public final class AppController: NSObject, CharacterViewDelegate, NSMenuDelegat
             }
         case .sit:
             if let p = physics.currentPlatform {
-                desc = "\(p.title)에 걸터앉아 쉬는 중 🪑"
+                if p.kind == .menuBar {
+                    desc = "상단 메뉴바에 걸터앉아 쉬는 중 🪑"
+                } else {
+                    desc = "\(p.title)에 걸터앉아 쉬는 중 🪑"
+                }
             } else {
                 desc = "걸터앉아 다리 흔들기"
             }
@@ -164,6 +168,8 @@ public final class AppController: NSObject, CharacterViewDelegate, NSMenuDelegat
             desc = "쿨쿨 낮잠 자는 중... 💤"
         case .backflip:
             desc = "공중제비 도는 중! 🤸‍♂️"
+        case .cheer(let wpm, _, _):
+            desc = "코딩 신나게 응원 중! 🔥 (WPM: \(Int(wpm)))"
         case .tnt:
             if let remain = behavior.tntFuseRemaining {
                 desc = String(format: "🧨 TNT 폭발까지 %.1f초!", remain)
@@ -371,6 +377,14 @@ public final class AppController: NSObject, CharacterViewDelegate, NSMenuDelegat
         actMenu.addItem(ladderItem)
         self.ladderMenuItem = ladderItem
 
+
+        let menuBarSitItem = NSMenuItem(title: "🪑 상단 메뉴바에 걸터앉기", action: #selector(didSelectSitOnMenuBar), keyEquivalent: "m")
+        menuBarSitItem.target = self
+        actMenu.addItem(menuBarSitItem)
+
+        let cheerItem = NSMenuItem(title: "🎉 코딩 신나게 응원하기 (Cheer)", action: #selector(didSelectCheer), keyEquivalent: "c")
+        cheerItem.target = self
+        actMenu.addItem(cheerItem)
         let actSubmenuItem = NSMenuItem(title: "✨ 재미있는 모션 실행", action: nil, keyEquivalent: "")
         actSubmenuItem.submenu = actMenu
         menu.addItem(actSubmenuItem)
@@ -458,6 +472,26 @@ public final class AppController: NSObject, CharacterViewDelegate, NSMenuDelegat
         soundItem.target = self
         soundItem.state = SoundAndEffectsManager.shared.isSoundEnabled ? .on : .off
         menu.addItem(soundItem)
+
+        // Typing Cheer Toggle
+        let typingCheerItem = NSMenuItem(
+            title: "⌨️ 타이핑 응원 모드 (WPM 감지)",
+            action: #selector(didToggleTypingCheer(_:)),
+            keyEquivalent: ""
+        )
+        typingCheerItem.target = self
+        typingCheerItem.state = TypingActivityMonitor.shared.isEnabled ? .on : .off
+        menu.addItem(typingCheerItem)
+
+        if !TypingActivityMonitor.shared.isAccessibilityTrusted {
+            let permItem = NSMenuItem(
+                title: "  ℹ️ 타 앱 타이핑 감지: 손쉬운 사용 권한 필요",
+                action: #selector(didSelectOpenAccessibilitySettings),
+                keyEquivalent: ""
+            )
+            permItem.target = self
+            menu.addItem(permItem)
+        }
 
         let attackItem = NSMenuItem(
             title: "🧨 TNT로 창 부수기",
@@ -797,6 +831,26 @@ public final class AppController: NSObject, CharacterViewDelegate, NSMenuDelegat
 
     @objc private func didSelectSleep() {
         behavior.triggerSleep(characterNode: window.characterView.characterNode)
+    }
+
+    @objc private func didSelectSitOnMenuBar() {
+        behavior.triggerSitOnMenuBar(physics: physics, characterNode: window.characterView.characterNode)
+    }
+
+    @objc private func didSelectCheer() {
+        behavior.triggerCheer(characterNode: window.characterView.characterNode)
+    }
+
+    @objc private func didToggleTypingCheer(_ sender: NSMenuItem) {
+        TypingActivityMonitor.shared.isEnabled.toggle()
+        sender.state = TypingActivityMonitor.shared.isEnabled ? .on : .off
+        statusItem?.menu = buildContextMenu()
+    }
+
+    @objc private func didSelectOpenAccessibilitySettings() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+            NSWorkspace.shared.open(url)
+        }
     }
 
     // MARK: - Ladder Descent (사다리 타고 창문 내려가기)

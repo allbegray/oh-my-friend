@@ -6,12 +6,14 @@ public struct Platform {
     public enum Kind: Equatable {
         case floor
         case dock
+        case menuBar
         case window(id: CGWindowID, appName: String, pid: pid_t)
 
         public static func == (lhs: Kind, rhs: Kind) -> Bool {
             switch (lhs, rhs) {
             case (.floor, .floor): return true
             case (.dock, .dock): return true
+            case (.menuBar, .menuBar): return true
             case let (.window(id1, _, _), .window(id2, _, _)): return id1 == id2
             default: return false
             }
@@ -136,6 +138,19 @@ public final class ScreenEnvironment {
                 yTop: screenFrame.minY,
                 title: "화면 바닥",
                 yBottom: nil
+            ))
+        }
+
+        // 1.5. Top Menu Bar Platform (Ledge at visibleFrame.maxY)
+        let menuBarY = visibleFrame.maxY
+        if menuBarY < screenFrame.maxY - 10 {
+            platforms.append(Platform(
+                kind: .menuBar,
+                xMin: screenFrame.minX,
+                xMax: screenFrame.maxX,
+                yTop: menuBarY,
+                title: "메뉴바",
+                yBottom: menuBarY - 24
             ))
         }
 
@@ -328,6 +343,13 @@ public final class PhysicsEngine {
     }
 
     /// 등반 중 사다리에서 손을 놓아 그대로 낙하시킨다
+
+    /// 특정 발판 위에 즉시 착지시킨다
+    public func landOn(platform: Platform) {
+        position.y = platform.yTop
+        velocity = .zero
+        state = .onGround(platform: platform)
+    }
     public func releaseClimb() {
         velocity = .zero
         state = .airborne
