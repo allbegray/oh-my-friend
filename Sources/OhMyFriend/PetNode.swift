@@ -36,6 +36,9 @@ public final class PetNode: SCNNode {
     private var currentHeadPitch: CGFloat = 0
 
     private var animTime: CGFloat = 0
+    private var blinkNodes: [SCNNode] = []
+    private var blinkTimer: TimeInterval = 3.0
+    private var blinkPhase: TimeInterval = -1
 
     public init(kind: PetKind = .wolf) {
         self.kind = kind
@@ -110,8 +113,9 @@ public final class PetNode: SCNNode {
     }
     // MARK: - 3D Voxel Model Builders
     private func setupModel() {
-        // 관절은 씬에 붙인 채로 내용물만 비운다 (예전에 bodyAnchor 자식 전체를 지워서
-        // 머리·다리·꼬리가 씬에서 떨어져나가는 버그가 있었음).
+        // 관절은 씬에 붙인 채로 내용물만 비운다 (bodyAnchor 자식 전체 삭제 시
+        // 머리·다리·꼬리가 씬에서 떨어져나감).
+        blinkNodes = []
         let joints = [headJoint, legFL, legFR, legBL, legBR, tailJoint, wingLeft, wingRight]
         for joint in joints {
             joint.geometry = nil
@@ -214,6 +218,14 @@ public final class PetNode: SCNNode {
         wolfEyeR.position = SCNVector3(0.13, 0.08, 0.25)
         headMesh.addChildNode(wolfEyeL)
         headMesh.addChildNode(wolfEyeR)
+        blinkNodes = [wolfEyeL, wolfEyeR]
+
+        // Light chest patch (tamed wolf underbelly)
+        let chestPatchGeom = SCNBox(width: 0.30, height: 0.30, length: 0.04, chamferRadius: 0)
+        chestPatchGeom.materials = [darkFurMat]
+        let chestPatch = SCNNode(geometry: chestPatchGeom)
+        chestPatch.position = SCNVector3(0, -0.08, 0.44)
+        bodyAnchor.addChildNode(chestPatch)
 
         // Ears (Pointed)
         let earGeom = SCNBox(width: 0.12, height: 0.16, length: 0.08, chamferRadius: 0)
@@ -298,6 +310,16 @@ public final class PetNode: SCNNode {
         eyeR.position = SCNVector3(0.10, 0.06, 0.21)
         headMesh.addChildNode(eyeL)
         headMesh.addChildNode(eyeR)
+        blinkNodes = [eyeL, eyeR]
+
+        // White paws (front feet tips) + white tail tip
+        let pawGeom = SCNBox(width: 0.13, height: 0.10, length: 0.13, chamferRadius: 0)
+        pawGeom.materials = [whiteMat]
+        for leg in [legFL, legFR] {
+            let paw = SCNNode(geometry: pawGeom)
+            paw.position = SCNVector3(0, -0.36, 0.01)
+            leg.addChildNode(paw)
+        }
 
         // Pointed Ears
         let earGeom = SCNBox(width: 0.10, height: 0.14, length: 0.06, chamferRadius: 0)
@@ -377,9 +399,20 @@ public final class PetNode: SCNNode {
             let white = SCNNode(geometry: pWhiteGeom)
             white.position = SCNVector3(x, 0.06, 0.15)
             headMesh.addChildNode(white)
+            blinkNodes.append(white)
             let pupil = SCNNode(geometry: pPupilGeom)
             pupil.position = SCNVector3(x, 0.06, 0.16)
             headMesh.addChildNode(pupil)
+            blinkNodes.append(pupil)
+        }
+
+        // Yellow wing bands
+        let bandGeom = SCNBox(width: 0.07, height: 0.10, length: 0.25, chamferRadius: 0)
+        bandGeom.materials = [yellowMat]
+        for wing in [wingLeft, wingRight] {
+            let band = SCNNode(geometry: bandGeom)
+            band.position = SCNVector3(0, 0.05, 0)
+            wing.addChildNode(band)
         }
 
         // 2 Wings (Red with Yellow/Blue tips)
@@ -454,6 +487,16 @@ public final class PetNode: SCNNode {
         eyeR.position = SCNVector3(0.16, 0.08, 0.25)
         headMesh.addChildNode(eyeL)
         headMesh.addChildNode(eyeR)
+        blinkNodes = [eyeL, eyeR]
+
+        // Ears (upright triangles read as boxes)
+        let pigEarGeom = SCNBox(width: 0.10, height: 0.12, length: 0.06, chamferRadius: 0)
+        pigEarGeom.materials = [pinkMat]
+        for x in [-0.16, 0.16] as [CGFloat] {
+            let ear = SCNNode(geometry: pigEarGeom)
+            ear.position = SCNVector3(x, 0.28, 0.02)
+            headMesh.addChildNode(ear)
+        }
 
         // 4 Stumpy legs: W=0.18, H=0.32, L=0.18
         let legGeom = SCNBox(width: 0.18, height: 0.32, length: 0.18, chamferRadius: 0)
@@ -525,6 +568,7 @@ public final class PetNode: SCNNode {
         eyeR.position = SCNVector3(0.19, 0.08, 0.30)
         headMesh.addChildNode(eyeL)
         headMesh.addChildNode(eyeR)
+        blinkNodes = [eyeL, eyeR]
         let earGeom = SCNBox(width: 0.10, height: 0.18, length: 0.08, chamferRadius: 0)
         earGeom.materials = [coatMat]
         let earL = SCNNode(geometry: earGeom)
@@ -542,11 +586,24 @@ public final class PetNode: SCNNode {
         buildLeg(legBR, geom: legGeom, x: 0.20, y: -0.32, z: -0.40)
         let hoofGeom = SCNBox(width: 0.20, height: 0.12, length: 0.20, chamferRadius: 0)
         hoofGeom.materials = [hoofMat]
+        let whiteMarkMat = makeLambert(color: NSColor(red: 0.93, green: 0.93, blue: 0.90, alpha: 1.0))
+        let sockGeom = SCNBox(width: 0.19, height: 0.16, length: 0.19, chamferRadius: 0)
+        sockGeom.materials = [whiteMarkMat]
         for leg in [legFL, legFR, legBL, legBR] {
             let hoof = SCNNode(geometry: hoofGeom)
             hoof.position = SCNVector3(0, -0.72, 0)
             leg.addChildNode(hoof)
+            let sock = SCNNode(geometry: sockGeom)
+            sock.position = SCNVector3(0, -0.58, 0)
+            leg.addChildNode(sock)
         }
+
+        // White face blaze
+        let blazeGeom = SCNBox(width: 0.10, height: 0.30, length: 0.02, chamferRadius: 0)
+        blazeGeom.materials = [whiteMarkMat]
+        let blaze = SCNNode(geometry: blazeGeom)
+        blaze.position = SCNVector3(0, 0.10, 0.28)
+        headMesh.addChildNode(blaze)
 
         let tailGeom = SCNBox(width: 0.14, height: 0.65, length: 0.14, chamferRadius: 0)
         tailGeom.materials = [maneMat]
@@ -584,8 +641,7 @@ public final class PetNode: SCNNode {
         headJoint.eulerAngles = SCNVector3(currentHeadPitch, currentHeadYaw, 0)
 
         // 2. Sleeping
-        if isSleeping {
-            bodyAnchor.eulerAngles = SCNVector3(0, 0, CGFloat.pi / 2.0)
+        if isSleeping {            bodyAnchor.eulerAngles = SCNVector3(0, 0, CGFloat.pi / 2.0)
             let sleepBreath = sin(animTime * 2.0) * 0.03
             bodyAnchor.position.y = 0.25 + sleepBreath
             legFL.eulerAngles = SCNVector3(0, 0, 0.3)
@@ -595,6 +651,23 @@ public final class PetNode: SCNNode {
             return
         } else {
             bodyAnchor.eulerAngles = SCNVector3Zero
+        }
+
+        // Blink (eyes squash briefly every few seconds)
+        blinkTimer -= Double(dt)
+        if blinkTimer <= 0 {
+            blinkTimer = Double.random(in: 2.5...5.0)
+            blinkPhase = 0.12
+        }
+        if blinkPhase > 0 {
+            blinkPhase -= Double(dt)
+            for eye in blinkNodes {
+                eye.scale.y = 0.15
+            }
+        } else {
+            for eye in blinkNodes {
+                eye.scale.y = 1.0
+            }
         }
 
         // 3. Sitting
