@@ -186,9 +186,21 @@ public final class BlockBreakEffectView: NSView {
     private func buildDebris() {
         debris.removeAll()
         let win = windowRectInLocal
-        let cell: CGFloat = 24.0
-        let cols = max(1, Int(win.width / cell))
-        let rows = max(1, Int(win.height / cell))
+
+        // 창 크기에 정확히 맞는 타일 격자 — 남는 가장자리 없이 창 전체를 덮는다
+        var targetCell: CGFloat = 22.0
+        var cols = max(1, Int((win.width / targetCell).rounded()))
+        var rows = max(1, Int((win.height / targetCell).rounded()))
+        while cols * rows > 3200 {
+            targetCell *= 1.15
+            cols = max(1, Int((win.width / targetCell).rounded()))
+            rows = max(1, Int((win.height / targetCell).rounded()))
+        }
+        let cellW = win.width / CGFloat(cols)
+        let cellH = win.height / CGFloat(rows)
+        // 정사각형 파편을 셀 안에 맞춘다 (작은 셀 기준, 최소 간격 확보)
+        let blockSize = max(2, min(cellW, cellH) - 2.0)
+
         var rng = SplitMix64(seed: 0x9E37_79B9_7F4A_7C15)
         let palette = windowTonePalette()
 
@@ -207,10 +219,8 @@ public final class BlockBreakEffectView: NSView {
         let midX = win.midX
         for row in 0..<rows {
             for col in 0..<cols {
-                let x = win.minX + CGFloat(col) * cell
-                let y = win.minY + CGFloat(row) * cell
-                let centerX = x + cell / 2
-                let centerY = y + cell / 2
+                let centerX = win.minX + (CGFloat(col) + 0.5) * cellW
+                let centerY = win.minY + (CGFloat(row) + 0.5) * cellH
 
                 // 파편마다 창 톤 팔레트에서 색 선택 + 휘도 미세 변동
                 var color = paletteColor(seed: rng.range(0, 1))
@@ -225,7 +235,7 @@ public final class BlockBreakEffectView: NSView {
                 var block = DebrisBlock(
                     x: centerX,
                     y: centerY,
-                    size: cell - 3,
+                    size: blockSize,
                     vx: 0,
                     vy: 0,
                     spin: 0,
@@ -234,26 +244,20 @@ public final class BlockBreakEffectView: NSView {
                     delay: 0
                 )
 
-                // 위쪽(파괴 시작점)에 가까울수록 먼저 떨어진다
+                // 위쪽(파괴 시작점)에 가까울수록 먼저 떨어진다.
+                // 앞부분 0.06초는 모든 파편이 제자리에 있어 창이 블록 격자로 바뀐 모습이 보인다.
                 let depth = (winTopY - centerY) / win.height
-                block.delay = depth * 0.22 + rng.range(0, 0.05)
+                block.delay = 0.06 + depth * 0.22 + rng.range(0, 0.05)
 
                 // 창 중심에서 바깥으로 터진다
                 let dx = (centerX - midX) / max(win.width / 2, 1)
                 let dy = (centerY - win.midY) / max(win.height / 2, 1)
                 block.vx = dx * rng.range(120, 340) + rng.range(-40, 40)
                 block.vy = abs(dy) * rng.range(60, 180) + rng.range(40, 330)
-                block.spin = rng.range(-0.3, 0.3)
+                // 대기 중에는 축 정렬 상태로 창을 정확히 덮고, 떨어지기 시작하면 회전한다
+                block.spin = 0
                 debris.append(block)
             }
-        }
-        // 파편 수가 많으면 가볍게 줄인다 (매우 큰 창)
-        if debris.count > 2600 {
-            var kept: [DebrisBlock] = []
-            for (i, b) in debris.enumerated() where i % 2 == 0 {
-                kept.append(b)
-            }
-            debris = kept
         }
     }
 
@@ -455,9 +459,9 @@ public final class BlockBreakEffectView: NSView {
 
         for b in debris {
             let elapsed = t - b.delay
-            guard elapsed > 0 else { continue }
 
             // 사라지는 구간 알파 처리
+            // (아직 대기 중인 파편은 제자리에서 창을 덮은 채 유지 → 부서지기 전 모습과 정확히 일치)
             let alpha: CGFloat
             if elapsed <= BlockBreakEffectView.fadeStart {
                 alpha = 1
