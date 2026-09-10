@@ -61,19 +61,27 @@ public final class EndermanNode: SCNNode {
         blackMat.diffuse.contents = grainMat.diffuse.contents
         blackMat.diffuse.magnificationFilter = .nearest
         blackMat.diffuse.minificationFilter = .nearest
-        blackMat.lightingModel = .lambert
+        blackMat.lightingModel = .physicallyBased
+        blackMat.roughness.contents = 0.95
+        blackMat.metalness.contents = 0.0
 
         purpleEyeMat.diffuse.contents = NSColor(red: 0.85, green: 0.20, blue: 0.95, alpha: 1.0) // Glowing purple eyes
         purpleEyeMat.lightingModel = .constant
 
         redHurtMat.diffuse.contents = NSColor(red: 0.90, green: 0.15, blue: 0.15, alpha: 1.0)
-        redHurtMat.lightingModel = .lambert
+        redHurtMat.lightingModel = .physicallyBased
+        redHurtMat.roughness.contents = 0.85
+        redHurtMat.metalness.contents = 0.0
 
         dirtMat.diffuse.contents = NSColor(red: 0.48, green: 0.32, blue: 0.18, alpha: 1.0)
-        dirtMat.lightingModel = .lambert
+        dirtMat.lightingModel = .physicallyBased
+        dirtMat.roughness.contents = 1.0
+        dirtMat.metalness.contents = 0.0
 
         grassTopMat.diffuse.contents = NSColor(red: 0.32, green: 0.65, blue: 0.22, alpha: 1.0)
-        grassTopMat.lightingModel = .lambert
+        grassTopMat.lightingModel = .physicallyBased
+        grassTopMat.roughness.contents = 0.95
+        grassTopMat.metalness.contents = 0.0
     }
 
     private func setupHierarchy() {

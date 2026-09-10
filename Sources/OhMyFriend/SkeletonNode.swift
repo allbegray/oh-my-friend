@@ -61,7 +61,9 @@ public final class SkeletonNode: SCNNode {
         boneMat.diffuse.contents = boneGrain.diffuse.contents
         boneMat.diffuse.magnificationFilter = .nearest
         boneMat.diffuse.minificationFilter = .nearest
-        boneMat.lightingModel = .lambert
+        boneMat.lightingModel = .physicallyBased
+        boneMat.roughness.contents = 0.85
+        boneMat.metalness.contents = 0.0
 
         let darkGrain = MobTexture.material(width: 16, height: 16, seed: 22) { _, _, r in
             let base = NSColor(red: 0.65, green: 0.65, blue: 0.62, alpha: 1.0)
@@ -70,13 +72,19 @@ public final class SkeletonNode: SCNNode {
         darkBoneMat.diffuse.contents = darkGrain.diffuse.contents
         darkBoneMat.diffuse.magnificationFilter = .nearest
         darkBoneMat.diffuse.minificationFilter = .nearest
-        darkBoneMat.lightingModel = .lambert
+        darkBoneMat.lightingModel = .physicallyBased
+        darkBoneMat.roughness.contents = 0.85
+        darkBoneMat.metalness.contents = 0.0
 
         socketMat.diffuse.contents = NSColor(red: 0.12, green: 0.12, blue: 0.12, alpha: 1.0)
-        socketMat.lightingModel = .lambert
+        socketMat.lightingModel = .physicallyBased
+        socketMat.roughness.contents = 0.9
+        socketMat.metalness.contents = 0.0
 
         redHurtMat.diffuse.contents = NSColor(red: 0.90, green: 0.18, blue: 0.18, alpha: 1.0)
-        redHurtMat.lightingModel = .lambert
+        redHurtMat.lightingModel = .physicallyBased
+        redHurtMat.roughness.contents = 0.85
+        redHurtMat.metalness.contents = 0.0
 
         flameMat.diffuse.contents = NSColor(red: 0.95, green: 0.40, blue: 0.10, alpha: 0.9)
         flameMat.lightingModel = .constant

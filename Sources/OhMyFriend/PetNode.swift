@@ -616,7 +616,9 @@ public final class PetNode: SCNNode {
     private func makeLambert(color: NSColor) -> SCNMaterial {
         let mat = SCNMaterial()
         mat.diffuse.contents = color
-        mat.lightingModel = .lambert
+        mat.lightingModel = .physicallyBased
+        mat.roughness.contents = 0.9
+        mat.metalness.contents = 0.0
         return mat
     }
 
@@ -635,7 +637,9 @@ public final class PetNode: SCNNode {
         let mat = SCNMaterial()
         mat.diffuse.contents = img
         mat.diffuse.magnificationFilter = .nearest
-        mat.lightingModel = .lambert
+        mat.lightingModel = .physicallyBased
+        mat.roughness.contents = 1.0
+        mat.metalness.contents = 0.0
         return mat
     }
 

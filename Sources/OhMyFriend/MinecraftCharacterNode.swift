@@ -317,7 +317,9 @@ public final class MinecraftCharacterNode: SCNNode {
         let box = SCNBox(width: 0.8, height: 0.8, length: 0.8, chamferRadius: 0.02)
         let mat = SCNMaterial()
         mat.diffuse.contents = NSColor(red: 0.45, green: 0.28, blue: 0.15, alpha: 1.0) // dirt
-        mat.lightingModel = .lambert
+        mat.lightingModel = .physicallyBased
+        mat.roughness.contents = 1.0
+        mat.metalness.contents = 0.0
         box.materials = [mat]
 
         placedBlockNode.geometry = box
@@ -883,15 +885,21 @@ public final class MinecraftCharacterNode: SCNNode {
 
         let ironMat = SCNMaterial()
         ironMat.diffuse.contents = NSColor(red: 0.60, green: 0.62, blue: 0.65, alpha: 1.0)
-        ironMat.lightingModel = .lambert
+        ironMat.lightingModel = .physicallyBased
+        ironMat.roughness.contents = 0.35
+        ironMat.metalness.contents = 0.9
 
         let woodMat = SCNMaterial()
         woodMat.diffuse.contents = NSColor(red: 0.82, green: 0.72, blue: 0.52, alpha: 1.0) // Birch wood
-        woodMat.lightingModel = .lambert
+        woodMat.lightingModel = .physicallyBased
+        woodMat.roughness.contents = 0.9
+        woodMat.metalness.contents = 0.0
 
         let darkIronMat = SCNMaterial()
         darkIronMat.diffuse.contents = NSColor(red: 0.40, green: 0.42, blue: 0.45, alpha: 1.0)
-        darkIronMat.lightingModel = .lambert
+        darkIronMat.lightingModel = .physicallyBased
+        darkIronMat.roughness.contents = 0.4
+        darkIronMat.metalness.contents = 0.9
 
         let root = SCNNode()
         // Iron outer rim: W=0.72, H=1.05, L=0.08
@@ -921,10 +929,14 @@ public final class MinecraftCharacterNode: SCNNode {
         guard isTotemEquipped else { return }
         let goldMat = SCNMaterial()
         goldMat.diffuse.contents = NSColor(red: 0.95, green: 0.75, blue: 0.20, alpha: 1.0)
-        goldMat.lightingModel = .lambert
+        goldMat.lightingModel = .physicallyBased
+        goldMat.roughness.contents = 0.35
+        goldMat.metalness.contents = 1.0
         let gemMat = SCNMaterial()
         gemMat.diffuse.contents = NSColor(red: 0.30, green: 0.85, blue: 0.95, alpha: 1.0)
-        gemMat.lightingModel = .lambert
+        gemMat.lightingModel = .physicallyBased
+        gemMat.roughness.contents = 0.3
+        gemMat.metalness.contents = 0.9
         let root = SCNNode()
         let bodyBox = SCNBox(width: 0.22, height: 0.55, length: 0.12, chamferRadius: 0.01)
         bodyBox.materials = [goldMat]
@@ -950,7 +962,9 @@ public final class MinecraftCharacterNode: SCNNode {
 
         let wingMat = SCNMaterial()
         wingMat.diffuse.contents = NSColor(red: 0.22, green: 0.22, blue: 0.26, alpha: 1.0)
-        wingMat.lightingModel = .lambert
+        wingMat.lightingModel = .physicallyBased
+        wingMat.roughness.contents = 0.9
+        wingMat.metalness.contents = 0.0
 
         // Left wing: W=0.32, H=0.85, L=0.04
         let wingGeom = SCNBox(width: 0.32, height: 0.85, length: 0.04, chamferRadius: 0.01)

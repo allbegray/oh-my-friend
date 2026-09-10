@@ -5,8 +5,11 @@ import CoreGraphics
 /// 몹 복셀용 결정적 픽셀아트 텍스처 유틸리티.
 public enum MobTexture {
     /// 시드 고정 난수로 픽셀을 칠한 NSImage를 만든다.
-    /// - Example: `MobTexture.image(width: 16, height: 16, seed: 7) { _, _, r in r < 0.5 ? .green : .darkGreen }`
-    public static func image(width: Int, height: Int, seed: UInt32, paint: (Int, Int, Double) -> NSColor) -> NSImage {
+    /// 기본 캔버스는 32x32이며, paint 클로저는 0..<width, 0..<height 좌표를 받는다.
+    /// 기존 몹 클로저(Creeper/Enderman/Skeleton)는 x, y를 무시하고 난수 r와 기본색만 쓰므로
+    /// 해상도와 무관하게 동일한 통계적 패턴을 유지한다.
+    /// - Example: `MobTexture.material(seed: 7) { _, _, r in r < 0.5 ? .green : .darkGreen }`
+    public static func image(width: Int = 32, height: Int = 32, seed: UInt32, paint: (Int, Int, Double) -> NSColor) -> NSImage {
         let size = NSSize(width: width, height: height)
         let img = NSImage(size: size)
         var rng = Mulberry32(state: seed)
@@ -27,13 +30,16 @@ public enum MobTexture {
         let mat = SCNMaterial()
         mat.diffuse.contents = image
         mat.diffuse.magnificationFilter = .nearest
-        mat.diffuse.minificationFilter = .nearest
-        mat.lightingModel = .lambert
+        mat.diffuse.minificationFilter = .linear
+        mat.diffuse.mipFilter = .linear
+        mat.lightingModel = .physicallyBased
+        mat.roughness.contents = 1.0
+        mat.metalness.contents = 0.0
         return mat
     }
 
     /// 픽셀을 칠하고 바로 픽셀풍 SCNMaterial을 만든다.
-    public static func material(width: Int, height: Int, seed: UInt32, paint: (Int, Int, Double) -> NSColor) -> SCNMaterial {
+    public static func material(width: Int = 32, height: Int = 32, seed: UInt32, paint: (Int, Int, Double) -> NSColor) -> SCNMaterial {
         material(image: image(width: width, height: height, seed: seed, paint: paint))
     }
 

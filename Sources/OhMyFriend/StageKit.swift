@@ -11,6 +11,27 @@ public enum StageQuality {
     case smooth
 }
 
+/// 절차적 스튜디오 환경맵 64x32 (파일·네트워크 없음).
+private func makeStageEnvironmentImage() -> NSImage {
+    let size = NSSize(width: 64, height: 32)
+    let image = NSImage(size: size)
+    image.lockFocus()
+    if let gradient = NSGradient(colors: [NSColor(white: 1.0, alpha: 1.0),
+                                          NSColor(white: 0.45, alpha: 1.0),
+                                          NSColor(white: 0.12, alpha: 1.0)],
+                                 atLocations: [0.0, 0.55, 1.0],
+                                 colorSpace: .sRGB) {
+        gradient.draw(in: NSRect(origin: .zero, size: size), angle: 90)
+    } else {
+        NSColor(white: 0.5, alpha: 1.0).setFill()
+        NSRect(origin: .zero, size: size).fill()
+    }
+    NSColor(white: 1.0, alpha: 0.9).setFill()
+    NSRect(x: 20, y: 20, width: 24, height: 8).fill()
+    image.unlockFocus()
+    return image
+}
+
 /// 투명 배경 scene + 정면 카메라 + 3점 조명 + 그림자 캐처를 만든다.
 ///
 /// - Parameters:
@@ -27,6 +48,8 @@ public func makeStage(cameraY: CGFloat, cameraZ: CGFloat, fov: CGFloat = 36.0, p
     let cameraNode = SCNNode()
     let camera = SCNCamera()
     camera.fieldOfView = fov
+    camera.wantsHDR = true
+    camera.exposureOffset = -0.2
     cameraNode.camera = camera
     cameraNode.position = SCNVector3(0, Float(cameraY), Float(cameraZ))
     cameraNode.eulerAngles = SCNVector3(Float(pitch), 0, 0)
@@ -36,9 +59,14 @@ public func makeStage(cameraY: CGFloat, cameraZ: CGFloat, fov: CGFloat = 36.0, p
     let ambientNode = SCNNode()
     let ambient = SCNLight()
     ambient.type = .ambient
-    ambient.color = NSColor(white: 0.62, alpha: 1.0)
+    ambient.color = NSColor(white: 0.50, alpha: 1.0)
     ambientNode.light = ambient
     scene.rootNode.addChildNode(ambientNode)
+
+    // 이미지 기반 조명(IBL): 절차적 스튜디오 환경으로 PBR 반사 밑바탕 제공.
+    // 투명 배경 유지 (background는 위 clear 그대로).
+    scene.lightingEnvironment.contents = makeStageEnvironmentImage()
+    scene.lightingEnvironment.intensity = 0.6
 
     // 키 라이트: 우상단 전방 + 그림자
     let keyNode = SCNNode()
@@ -49,7 +77,7 @@ public func makeStage(cameraY: CGFloat, cameraZ: CGFloat, fov: CGFloat = 36.0, p
     key.shadowMode = .deferred
     key.shadowRadius = 8
     key.shadowColor = NSColor(white: 0, alpha: 0.35)
-    key.shadowMapSize = CGSize(width: 1024, height: 1024)
+    key.shadowMapSize = CGSize(width: 2048, height: 2048)
     keyNode.light = key
     keyNode.position = SCNVector3(3, 7, 5)
     scene.rootNode.addChildNode(keyNode)

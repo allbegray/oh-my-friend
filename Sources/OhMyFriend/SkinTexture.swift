@@ -73,10 +73,11 @@ public final class SkinTexture {
                 let subImage = NSImage(cgImage: subCG, size: NSSize(width: rect.width, height: rect.height))
                 mat.diffuse.contents = subImage
                 mat.diffuse.magnificationFilter = .nearest
-                mat.diffuse.minificationFilter = .nearest
-                mat.diffuse.mipFilter = .none
+                mat.diffuse.minificationFilter = .linear
+                mat.diffuse.mipFilter = .linear
                 mat.roughness.contents = 1.0
-                mat.lightingModel = .lambert
+                mat.metalness.contents = 0.0
+                mat.lightingModel = .physicallyBased
             }
             return mat
         }
@@ -111,10 +112,11 @@ public final class SkinTexture {
                 let subImage = NSImage(cgImage: subCG, size: NSSize(width: rect.width, height: rect.height))
                 mat.diffuse.contents = subImage
                 mat.diffuse.magnificationFilter = .nearest
-                mat.diffuse.minificationFilter = .nearest
-                mat.diffuse.mipFilter = .none
+                mat.diffuse.minificationFilter = .linear
+                mat.diffuse.mipFilter = .linear
                 mat.roughness.contents = 1.0
-                mat.lightingModel = .lambert
+                mat.metalness.contents = 0.0
+                mat.lightingModel = .physicallyBased
                 mat.isDoubleSided = true
                 mat.blendMode = .alpha
                 mat.writesToDepthBuffer = true

@@ -21,7 +21,9 @@ public func voxelMaterial(_ c: VoxelColor) -> SCNMaterial {
     switch c {
     case .rgb(let r, let g, let b):
         m.diffuse.contents = NSColor(red: r, green: g, blue: b, alpha: 1.0)
-        m.lightingModel = .lambert
+        m.lightingModel = .physicallyBased
+        m.roughness.contents = 0.9
+        m.metalness.contents = 0.0
     case .glow(let r, let g, let b):
         let col = NSColor(red: r, green: g, blue: b, alpha: 1.0)
         m.diffuse.contents = col
@@ -277,7 +279,9 @@ public final class CubeRig: SCNNode {
         let eyeBox = SCNBox(width: size * 0.12, height: size * 0.12, length: 0.02, chamferRadius: 0)
         let socket = SCNMaterial()
         socket.diffuse.contents = NSColor(red: 0.12, green: 0.12, blue: 0.12, alpha: 1.0)
-        socket.lightingModel = .lambert
+        socket.lightingModel = .physicallyBased
+        socket.roughness.contents = 0.9
+        socket.metalness.contents = 0.0
         eyeBox.materials = [socket]
         eyeL.geometry = eyeBox
         eyeR.geometry = eyeBox

@@ -56,7 +56,9 @@ public final class CreeperNode: SCNNode {
         greenMat.diffuse.contents = greenCamo.diffuse.contents
         greenMat.diffuse.magnificationFilter = .nearest
         greenMat.diffuse.minificationFilter = .nearest
-        greenMat.lightingModel = .lambert
+        greenMat.lightingModel = .physicallyBased
+        greenMat.roughness.contents = 0.9
+        greenMat.metalness.contents = 0.0
 
         let darkCamo = MobTexture.material(width: 16, height: 16, seed: 8) { _, _, r in
             let base = NSColor(red: 0.18, green: 0.48, blue: 0.16, alpha: 1.0)
@@ -67,16 +69,22 @@ public final class CreeperNode: SCNNode {
         darkGreenMat.diffuse.contents = darkCamo.diffuse.contents
         darkGreenMat.diffuse.magnificationFilter = .nearest
         darkGreenMat.diffuse.minificationFilter = .nearest
-        darkGreenMat.lightingModel = .lambert
+        darkGreenMat.lightingModel = .physicallyBased
+        darkGreenMat.roughness.contents = 0.9
+        darkGreenMat.metalness.contents = 0.0
 
         blackMat.diffuse.contents = NSColor(red: 0.10, green: 0.10, blue: 0.10, alpha: 1.0)
-        blackMat.lightingModel = .lambert
+        blackMat.lightingModel = .physicallyBased
+        blackMat.roughness.contents = 0.85
+        blackMat.metalness.contents = 0.0
 
         whiteFlashMat.diffuse.contents = NSColor.white
         whiteFlashMat.lightingModel = .constant
 
         redHurtMat.diffuse.contents = NSColor(red: 0.90, green: 0.20, blue: 0.20, alpha: 1.0)
-        redHurtMat.lightingModel = .lambert
+        redHurtMat.lightingModel = .physicallyBased
+        redHurtMat.roughness.contents = 0.85
+        redHurtMat.metalness.contents = 0.0
     }
 
     private func setupHierarchy() {
