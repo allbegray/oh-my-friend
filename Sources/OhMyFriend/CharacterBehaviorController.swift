@@ -79,6 +79,11 @@ public final class CharacterBehaviorController {
     private let ladderCooldownDuration: TimeInterval = 12.0
     private let ladderHalfWidth: CGFloat = 22.0
 
+    /// 드래그로 창문에 내려놓았을 때 자동 등반을 예약하는 플래그
+    private var pendingDropDescent = false
+    /// 이 속도 이하로 내려놓으면 '던지기'가 아니라 '놓기'로 보고 창문 위에 올려놓는다
+    public static let dropSnapSpeedLimit: CGFloat = 260.0
+
     public init() {}
 
     // MARK: - Direct Triggers (Called by View, Menu or Shortcuts)
@@ -217,6 +222,30 @@ public final class CharacterBehaviorController {
         return true
     }
 
+    /// 드래그로 내려놓은 자리가 창문 안이면 그 창문 위쪽 끝에 올려놓고 사다리 등반을 예약한다.
+    /// - Returns: 창문 위에 올려놓았으면 true (놓은 자리에 창문이 없으면 false)
+    @discardableResult
+    public func placeDropOnWindow(physics: PhysicsEngine, platforms: [Platform]) -> Bool {
+        let point = physics.position
+
+        // 놓은 지점을 담고 있는 창문 중 위쪽 끝이 가장 가까운(=앞에 보이는) 창문을 고른다
+        let window = platforms
+            .filter { platform in
+                guard case .window = platform.kind, let bottom = platform.yBottom else { return false }
+                return point.x >= platform.xMin && point.x <= platform.xMax
+                    && point.y >= bottom && point.y <= platform.yTop
+            }
+            .min { $0.yTop < $1.yTop }
+
+        guard let window = window else { return false }
+
+        // 창문 위쪽 끝(타이틀바)에 조용히 내려놓는다
+        physics.position.y = window.yTop
+        physics.velocity = .zero
+        pendingDropDescent = true
+        return true
+    }
+
     /// 등반 중단 (드래그/낙하로 상태가 덮어써질 때)
     private func cancelClimbIfActive() {
         guard isClimbing else { return }
@@ -310,6 +339,7 @@ public final class CharacterBehaviorController {
         if case .dragged = physics.state {
             interruptTNTIfActive()
             cancelClimbIfActive()
+            pendingDropDescent = false
             state = .dragged
             characterNode.isBeingDragged = true
             characterNode.isClimbing = false
@@ -744,6 +774,14 @@ public final class CharacterBehaviorController {
         guard let platform = physics.currentPlatform else {
             state = .idle(timeLeft: 1.5)
             return
+        }
+
+        // 드래그로 창문에 내려놓은 직후라면 사다리 등반을 자동으로 시작한다 (모드와 무관한 사용자 동작)
+        if pendingDropDescent {
+            pendingDropDescent = false
+            if startLadderDescent(physics: physics, characterNode: characterNode, from: platform) {
+                return
+            }
         }
 
         switch mode {

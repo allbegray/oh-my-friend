@@ -194,6 +194,12 @@ public final class AppController: NSObject, CharacterViewDelegate, NSMenuDelegat
 
     public func characterViewDidEndDrag(_ view: CharacterView, throwVelocity: CGPoint) {
         physics.releaseDrag(throwVelocity: throwVelocity)
+
+        // 약하게 내려놓았고 그 자리가 창문 안이면 창문 위에 얹고 사다리 등반을 예약한다.
+        // 세게 던진 경우(throwVelocity 큼)는 기존처럼 그대로 날아간다.
+        if hypot(throwVelocity.x, throwVelocity.y) <= CharacterBehaviorController.dropSnapSpeedLimit {
+            behavior.placeDropOnWindow(physics: physics, platforms: cachedPlatforms)
+        }
     }
 
     public func characterViewDidRequestMenu(_ view: CharacterView, at event: NSEvent) {

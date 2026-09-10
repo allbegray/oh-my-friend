@@ -2,6 +2,12 @@
 
 # 변경 이력
 
+## [v0.2.5] - 2026-09-10
+
+### 추가
+- 드래그 드롭 시 사다리 자동 등반: 캐릭터를 잡아 **창문 안**(창 아래 끝~위 끝 사이)에 내려놓으면 그 창문 위쪽 끝(타이틀바)에 얹고, 착지 모션 뒤 사다리를 걸어 자동으로 내려간다. 겹친 창문 구간에서는 위쪽 끝이 가장 가까운(앞에 보이는) 창문을 고르고, 창문이 없는 지점에 놓으면 아무 일도 일어나지 않는다. 세게 던진 경우(초기 속도가 `dropSnapSpeedLimit` 260pt/s 초과)는 기존처럼 그대로 날아간다.
+- `CharacterBehaviorController.placeDropOnWindow(physics:platforms:)` + `dropSnapSpeedLimit` 추가, `AppController.characterViewDidEndDrag`에서 호출.
+
 ## [v0.2.4] - 2026-09-10
 
 ### 수정
