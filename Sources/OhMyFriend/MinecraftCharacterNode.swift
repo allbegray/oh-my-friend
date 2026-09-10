@@ -25,6 +25,9 @@ public final class MinecraftCharacterNode: SCNNode {
     public let leftArmJoint = SCNNode()
     public let leftArmMesh = SCNNode()
 
+    // Pickaxe held in the right hand (only visible while mining)
+    public let pickaxeNode = SCNNode()
+
     public let rightLegJoint = SCNNode()
     public let rightLegMesh = SCNNode()
 
@@ -59,6 +62,7 @@ public final class MinecraftCharacterNode: SCNNode {
     public var isSitting: Bool = false
     public var isFalling: Bool = false
     public var isPoking: Bool = false
+    public var isMining: Bool = false
     public var isBeingDragged: Bool = false
 
     // New Interactive Animations
@@ -133,6 +137,34 @@ public final class MinecraftCharacterNode: SCNNode {
         leftLegMesh.position = SCNVector3(0, -0.6, 0)
         leftLegJoint.addChildNode(leftLegMesh)
         bodyAnchor.addChildNode(leftLegJoint)
+
+        // 7. Pickaxe (equipped in the right hand while mining)
+        buildPickaxe()
+        pickaxeNode.position = SCNVector3(0, -0.6, 0) // hand level
+        rightArmMesh.addChildNode(pickaxeNode)
+        pickaxeNode.isHidden = true
+    }
+
+    private func buildPickaxe() {
+        // Wooden handle extending downward from the hand
+        let handleNode = SCNNode()
+        handleNode.geometry = SCNBox(width: 0.09, height: 1.1, length: 0.09, chamferRadius: 0)
+        handleNode.position = SCNVector3(0, -0.55, 0)
+
+        // Stone head (crossbar at the far end)
+        let headNode = SCNNode()
+        headNode.geometry = SCNBox(width: 0.54, height: 0.15, length: 0.15, chamferRadius: 0)
+        headNode.position = SCNVector3(0, -1.0, 0)
+
+        let wood = SCNMaterial()
+        wood.diffuse.contents = NSColor(srgbRed: 0.45, green: 0.30, blue: 0.16, alpha: 1.0)
+        let stone = SCNMaterial()
+        stone.diffuse.contents = NSColor(srgbRed: 0.60, green: 0.60, blue: 0.62, alpha: 1.0)
+        handleNode.geometry?.materials = [wood]
+        headNode.geometry?.materials = [stone]
+
+        pickaxeNode.addChildNode(handleNode)
+        pickaxeNode.addChildNode(headNode)
     }
 
     private func setupPlacedBlock() {
@@ -314,6 +346,7 @@ public final class MinecraftCharacterNode: SCNNode {
     // MARK: - Update per frame (called by renderer loop)
     public func update(deltaTime dt: CGFloat) {
         animTime += dt
+        pickaxeNode.isHidden = !isMining
 
         // 1. Smooth Head LookAt Interpolation
         if !isSleeping && !isBackflipping {
@@ -460,6 +493,11 @@ public final class MinecraftCharacterNode: SCNNode {
                 let chomp = sin(animTime * 14.0) * 0.15
                 rightArmJoint.eulerAngles = SCNVector3(-CGFloat.pi / 1.7 + chomp, 0, -0.2)
                 leftArmJoint.eulerAngles = SCNVector3(0, 0, -0.05)
+            } else if isMining {
+                // Mining: raise the pickaxe overhead, then chop down repeatedly
+                let chop = (sin(animTime * 14.0) + 1.0) * 0.5 // 0...1
+                rightArmJoint.eulerAngles = SCNVector3(-2.5 + chop * 1.9, 0, 0.1)
+                leftArmJoint.eulerAngles = SCNVector3(-0.1, 0, -0.1)
             } else if isPoking {
                 // Minecraft punching animation: arm straight forward swinging up and down
                 let punch = sin(animTime * 14.0) * 0.7

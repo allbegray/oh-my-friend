@@ -44,6 +44,7 @@ Sources/OhMyFriend/
 ├── SkinTexture.swift                   # 64x64/64x32 텍스처 파서, 기본 내장 스킨 3종 픽셀아트 생성기
 ├── PhysicsAndEnvironment.swift         # CGWindowList 창문 감지, Dock 영역 분석, 중력/낙하 물리 엔진
 ├── CharacterBehaviorController.swift   # 자율 행동 FSM (배회, 시선 추적, 창문 걸터앉기, Dock 노크)
+├── BlockBreakOverlayWindow.swift       # 곡괭이 공격: 대상 창 크랙(10단계, 번개형 점진 확산)→블록 파편 연출 오버레이
 ├── SkinCatalogManager.swift            # 추천 스킨 카탈로그 데이터 및 로컬 보관함(~/Library/.../Skins) 관리자
 ├── SkinDownloaderService.swift         # Mojang/Minotar/Crafatar API 비동기 다운로더 및 URL 검증기
 ├── SkinGalleryView.swift               # SwiftUI 기반 4개 탭 스킨 갤러리 UI
@@ -55,6 +56,11 @@ Sources/OhMyFriend/
 - **스킨 파이프라인**: 로컬 파일, 기본 내장 픽셀아트 생성기, 온라인 다운로더(Mojang/Minotar)를 통해 64x64 PNG 데이터를 확보하고, 각 면(Front, Right, Back, Left, Top, Bottom)을 슬라이스하여 Nearest-neighbor 재질로 큐브에 매핑합니다.
 
 ## 실행 기록
+
+### 2026-09-10
+- **곡괭이 공격 크래시 수정**: 크랙 1단계 렌더 시 `drawBolt`에서 `pts[1...0]` 무효 슬라이스로 앱이 즉시 종료되던 SIGTRAP 크래시 수정(노출 길이가 첫 세그먼트보다 짧은 경우 가드). 1~10단계 전 구간 드라이버 렌더로 검증.
+- **화면 기록 권한 프롬프트 제거**: 파편 텍스처용 대상 창 실사 스냅샷(`CGWindowListCreateImage`) 캡처를 삭제하고 시스템 라이트/다크 톤 팔레트 전용으로 단순화. `ScreenEnvironment.windowSnapshotCGImage` API 제거.
+- **백색 플래시 이펙트 제거**: 파편 폭발 직전 하얀 창 화면이 노출되는 것처럼 보이던 연출 제거. '앱 창 부수기' 메뉴 단축키(Cmd+B)도 제거(오입력으로 사용 중 앱이 종료되는 것 방지, 메뉴 선택 시에만 발동).
 
 ### 2026-09-09
 - **초기 프로젝트 생성**: Swift Package Manager 프로젝트 구조 생성 및 `Package.swift` 구성.
@@ -72,3 +78,4 @@ Sources/OhMyFriend/
 - **graphify-out 디렉토리 git 추적 제외**: 로컬 지식 그래프 캐시 및 결과물인 `graphify-out/`을 `.gitignore`에 등록하고 git 추적에서 제외.
 - **화면 가장자리 도달 시 제자리걸음 방지 및 자연스러운 전이(쉬기/뒤돌기) FSM 개선**: 물리 엔진 좌표 클램프 마진과 행동 감지 마진을 35pt로 일치시켜 화면 끝 도착 즉시 걷기를 멈추고 45% 확률로 앉아서 쉬기(`.sit`), 40% 확률로 몸을 돌려 화면 안쪽으로 걸어가기, 15% 둘러보기로 상태 전환. 이동 정체(Stuck) 감지 안전장치 추가.
 - **인터랙션 대규모 확장 (v0.2.0)**: 3D 손 아이템(곡괭이/검/사과/횃불), 더블 클릭 360도 공중제비(Backflip), 마우스 근접 손흔들기(Wave), 클릭 하트(❤️), 마인크래프트 Shift 쉬프트 댄스, 블록 설치/채굴 모션, 45초 유휴 시 수면(Sleep & Zzz) 및 기상(❗), 레트로 사운드 매니저(`SoundAndEffectsManager`) 구현.
+- **곡괭이 앱 창 부수기 기능 추가**: 캐릭터가 서 있는 다른 앱의 창을 3D 복셀 곡괭이(나무 자루+돌 머리)로 내리치는 공격 상태(FSM `.attack`, 휘두르는 동안 오른팔 채굴 모션) 구현. 휘두르는 2.4초 동안 대상 창 위 투명 오버레이(`BlockBreakOverlayWindow.swift`)에 5단계 크랙이 진행되고, 마지막에 백색 플래시와 함께 창 전체가 복셀 블록 파편으로 부서지며 대상 앱이 정상 종료(`NSRunningApplication.terminate`)된다. 메뉴바/우클릭 메뉴 '⛏️ 앱 창 부수기'(Cmd+B)로 수동 발동, 캐릭터가 다른 앱 창 플랫폼 위에 있을 때만 활성화. 공격 중 드래그하면 연출 중단. 창 플랫폼에 소유 PID 기록 추가 및 `ScreenEnvironment.windowCocoaFrame(windowID:)` 조회 API 추가. **1차 리뷰 후 연출 개선**: 국소(공격 지점 아래) 균열을 버리고 창 중앙에서 번개 모양으로 바깥까지 점진 확산하는 크랙으로 교체(중점 변위법으로 생성한 크랙 트리, 10단계 destroy 스테이지, 고정 2초 경과 기반 progress에 따라 노출 길이 성장, 어두운 코어+밝은 테두리 2패스 드로잉). 파편 색을 단색 팔레트 대신 대상 창 실사 스냅샷 블록별 샘플링(화면 기록 권한 없으면 시스템 라이트/다크 톤 폴백)으로 교체.

@@ -21,6 +21,7 @@ public final class CharacterBehaviorController {
         case eating(timeLeft: TimeInterval)
         case sleep(duration: TimeInterval, zzzTimer: TimeInterval)
         case backflip(progress: CGFloat)
+        case attack(timeLeft: TimeInterval)
         case fall
         case dragged
         case landedCrouch(timeLeft: TimeInterval)
@@ -40,6 +41,11 @@ public final class CharacterBehaviorController {
 
     // Near Cursor Proximity Tracking for Wave
     private var cursorHoverTimer: TimeInterval = 0
+
+    // Pickaxe attack bookkeeping
+    private var attackDuration: TimeInterval = 0
+    private var attackTarget: Platform?
+    private var attackCompletion: ((Platform?) -> Void)?
 
     public init() {}
 
@@ -98,6 +104,34 @@ public final class CharacterBehaviorController {
         characterNode.showOverheadEmoji("❗", duration: 1.5)
         SoundAndEffectsManager.shared.play(.alert)
         state = .idle(timeLeft: 1.5)
+    }
+
+    // MARK: - Pickaxe Attack (앱 창 부수기)
+    public var isAttacking: Bool {
+        if case .attack = state { return true }
+        return false
+    }
+
+    /// Pickaxe attack progress 0...1 while attacking, nil otherwise
+    public var attackProgress: CGFloat? {
+        guard case let .attack(timeLeft) = state, attackDuration > 0 else { return nil }
+        return min(1, max(0, 1 - CGFloat(timeLeft / attackDuration)))
+    }
+
+    /// Start a pickaxe attack. `completion` fires once when the attack ends
+    /// naturally (with the target platform) or is interrupted (with nil).
+    @discardableResult
+    public func startPickaxeAttack(
+        on platform: Platform,
+        duration: TimeInterval = 2.0,
+        completion: @escaping (Platform?) -> Void
+    ) -> Bool {
+        guard !isAttacking else { return false }
+        attackDuration = duration
+        attackTarget = platform
+        attackCompletion = completion
+        state = .attack(timeLeft: duration)
+        return true
     }
 
     // MARK: - Main Update Loop
@@ -159,6 +193,7 @@ public final class CharacterBehaviorController {
 
         // 3. Physics Overrides (Dragged / Airborne)
         if case .dragged = physics.state {
+            interruptAttackIfActive()
             state = .dragged
             characterNode.isBeingDragged = true
             characterNode.isFalling = false
@@ -170,12 +205,15 @@ public final class CharacterBehaviorController {
             characterNode.isBackflipping = false
             characterNode.isEating = false
             characterNode.placedBlockNode.isHidden = true
+            characterNode.isMining = false
             characterNode.walkSpeed = 0
             wasAirborne = true
             return
         }
 
         if case .airborne = physics.state {
+            interruptAttackIfActive()
+
             if case .backflip(var progress) = state {
                 // Keep backflip rotating
                 progress += CGFloat(dt) * 4.2
@@ -186,7 +224,6 @@ public final class CharacterBehaviorController {
                 wasAirborne = true
                 return
             }
-
             state = .fall
             characterNode.isBeingDragged = false
             characterNode.isFalling = true
@@ -198,6 +235,7 @@ public final class CharacterBehaviorController {
             characterNode.isBackflipping = false
             characterNode.isEating = false
             characterNode.placedBlockNode.isHidden = true
+            characterNode.isMining = false
             characterNode.walkSpeed = 0
             wasAirborne = true
             return
@@ -209,6 +247,7 @@ public final class CharacterBehaviorController {
             state = .landedCrouch(timeLeft: 0.35)
             characterNode.isFalling = false
             characterNode.isBackflipping = false
+            characterNode.isMining = false
             characterNode.walkSpeed = 0
             SoundAndEffectsManager.shared.play(.land)
         }
@@ -216,6 +255,7 @@ public final class CharacterBehaviorController {
         // 4. Reset general flags
         characterNode.isBeingDragged = false
         characterNode.isFalling = false
+        characterNode.isMining = false
 
         // 5. Finite State Machine
         switch state {
@@ -455,9 +495,40 @@ public final class CharacterBehaviorController {
                 state = .poke(timeLeft: timeLeft, label: "")
             }
 
+        case .attack(var timeLeft):
+            timeLeft -= dt
+            characterNode.walkSpeed = 0
+            characterNode.isSitting = false
+            characterNode.isPoking = false
+            characterNode.isMining = true
+
+            if timeLeft <= 0 {
+                // Attack finished -> hand the target window over to the break effect
+                finishAttack(platform: attackTarget)
+                chooseNextState(physics: physics, platforms: platforms, screen: screen, cursorPos: cursorPos, characterNode: characterNode)
+            } else {
+                state = .attack(timeLeft: timeLeft)
+            }
+
         case .fall, .dragged:
             break
         }
+    }
+
+    private func interruptAttackIfActive() {
+        if case .attack = state {
+            finishAttack(platform: nil)
+        }
+    }
+
+    private func finishAttack(platform: Platform?) {
+        guard case .attack = state else { return }
+        state = .idle(timeLeft: 0.4)
+        attackDuration = 0
+        attackTarget = nil
+        let completion = attackCompletion
+        attackCompletion = nil
+        completion?(platform)
     }
 
     private func chooseNextState(

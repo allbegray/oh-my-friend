@@ -18,6 +18,12 @@ public final class AppController: NSObject, CharacterViewDelegate, NSMenuDelegat
     private var cachedPlatforms: [Platform] = []
     private var lastUpdateTime: TimeInterval = 0
 
+    // Pickaxe attack (앱 창 부수기)
+    private var attackMenuItem: NSMenuItem?
+    private var breakOverlay: BlockBreakOverlayWindow?
+    private var isBreakInProgress = false
+    private var lastCrackStage = 0
+
     public override init() {
         super.init()
     }
@@ -91,6 +97,9 @@ public final class AppController: NSObject, CharacterViewDelegate, NSMenuDelegat
             cursorPos: cursorPos
         )
 
+        // 1.5. Pickaxe attack: sync crack overlay with swing progress
+        syncBreakOverlay()
+
         // 2. Physics Update
         physics.update(
             deltaTime: CGFloat(dt),
@@ -147,6 +156,8 @@ public final class AppController: NSObject, CharacterViewDelegate, NSMenuDelegat
             desc = "쿨쿨 낮잠 자는 중... 💤"
         case .backflip:
             desc = "공중제비 도는 중! 🤸‍♂️"
+        case .attack:
+            desc = "⛏️ 앱 창 부수는 중! 💥"
         case .fall:
             desc = "으악! 떨어지는 중! 🪂"
         case .dragged:
@@ -185,6 +196,11 @@ public final class AppController: NSObject, CharacterViewDelegate, NSMenuDelegat
 
     public func characterViewDidDoubleClick(_ view: CharacterView) {
         behavior.triggerBackflip(physics: physics, characterNode: window.characterView.characterNode)
+    }
+
+    // MARK: - NSMenuDelegate
+    public func menuNeedsUpdate(_ menu: NSMenu) {
+        attackMenuItem?.isEnabled = canStartPickaxeAttack()
     }
     // MARK: - Status Bar & Menus
     private func setupStatusBar() {
@@ -412,6 +428,16 @@ public final class AppController: NSObject, CharacterViewDelegate, NSMenuDelegat
         soundItem.target = self
         soundItem.state = SoundAndEffectsManager.shared.isSoundEnabled ? .on : .off
         menu.addItem(soundItem)
+
+        let attackItem = NSMenuItem(
+            title: "⛏️ 앱 창 부수기 (곡괭이 공격)",
+            action: #selector(didSelectPickaxeAttack),
+            keyEquivalent: ""
+        )
+        attackItem.target = self
+        attackItem.isEnabled = canStartPickaxeAttack()
+        self.attackMenuItem = attackItem
+        menu.addItem(attackItem)
         menu.addItem(NSMenuItem.separator())
 
         // 6. Quit
@@ -515,6 +541,66 @@ public final class AppController: NSObject, CharacterViewDelegate, NSMenuDelegat
 
     @objc private func didSelectJump() {
         physics.jump(impulse: 500)
+    }
+
+    // MARK: - Pickaxe Attack (앱 창 부수기)
+    private func canStartPickaxeAttack() -> Bool {
+        guard !isBreakInProgress,
+              let platform = physics?.currentPlatform,
+              case .window(_, _, let ownerPid) = platform.kind,
+              ownerPid != getpid() else { return false }
+        return true
+    }
+
+    @objc private func didSelectPickaxeAttack() {
+        guard canStartPickaxeAttack(),
+              let platform = physics.currentPlatform,
+              case .window(let windowID, _, let ownerPid) = platform.kind,
+              let frame = ScreenEnvironment.shared.windowCocoaFrame(windowID: windowID) else { return }
+
+        // 1. 공격 대상 창 위에 크랙 오버레이 생성
+        let screen = ScreenEnvironment.shared.screen(for: physics.position)
+        let overlay = BlockBreakOverlayWindow(over: frame, on: screen)
+        overlay.onBreakFinished = { [weak self] in
+            self?.breakOverlay = nil
+            self?.isBreakInProgress = false
+        }
+        overlay.orderFrontRegardless()
+        self.breakOverlay = overlay
+        self.isBreakInProgress = true
+        self.lastCrackStage = 0
+
+        // 2. 곡괭이 휘두르기 시작 (고정 2초, 진행률에 맞춰 크랙 10단계 표시)
+        let started = behavior.startPickaxeAttack(on: platform, duration: 2.0) { [weak self] endedOn in
+            guard let self = self else { return }
+            if endedOn != nil {
+                // 3. 대상 앱 정상 종료 요청 후 화면이 블록 파편으로 부서진다
+                if let app = NSRunningApplication(processIdentifier: ownerPid) {
+                    app.terminate()
+                }
+                SoundAndEffectsManager.shared.play(.pop) // 블록 파괴음
+                overlay.shatter()
+            } else {
+                // 공격이 끊김(드래그/낙하) → 연출 중단
+                overlay.cancel()
+                self.breakOverlay = nil
+                self.isBreakInProgress = false
+            }
+        }
+        if !started {
+            overlay.cancel()
+            self.breakOverlay = nil
+            self.isBreakInProgress = false
+        }
+    }
+
+    private func syncBreakOverlay() {
+        guard let overlay = breakOverlay, let progress = behavior.attackProgress else { return }
+        let stage = min(10, max(1, Int(progress * 10) + 1))
+        if stage != lastCrackStage {
+            lastCrackStage = stage
+            overlay.showCrack(stage: stage)
+        }
     }
 
     @objc private func didSelectResetFloor() {

@@ -6,13 +6,13 @@ public struct Platform {
     public enum Kind: Equatable {
         case floor
         case dock
-        case window(id: CGWindowID, appName: String)
+        case window(id: CGWindowID, appName: String, pid: pid_t)
 
         public static func == (lhs: Kind, rhs: Kind) -> Bool {
             switch (lhs, rhs) {
             case (.floor, .floor): return true
             case (.dock, .dock): return true
-            case let (.window(id1, _), .window(id2, _)): return id1 == id2
+            case let (.window(id1, _, _), .window(id2, _, _)): return id1 == id2
             default: return false
             }
         }
@@ -85,7 +85,8 @@ public final class ScreenEnvironment {
             guard let layer = info[kCGWindowLayer as String] as? Int, layer == 0 else { continue }
 
             // Exclude our own app
-            if let pid = info[kCGWindowOwnerPID as String] as? pid_t, pid == excludingPID {
+            let ownerPid = (info[kCGWindowOwnerPID as String] as? pid_t) ?? -1
+            if ownerPid == excludingPID {
                 continue
             }
 
@@ -113,7 +114,7 @@ public final class ScreenEnvironment {
             let cocoaRect = CGRect(x: cgX, y: cocoaY, width: cgW, height: cgH)
             if screenFrame.intersects(cocoaRect) {
                 let p = Platform(
-                    kind: .window(id: windowId, appName: appName),
+                    kind: .window(id: windowId, appName: appName, pid: ownerPid),
                     xMin: max(screenFrame.minX, cgX),
                     xMax: min(screenFrame.maxX, cgX + cgW),
                     yTop: cocoaTopY,
@@ -124,6 +125,25 @@ public final class ScreenEnvironment {
         }
 
         return platforms
+    }
+
+    /// Current Cocoa-coordinate (bottom-left origin) frame of a window, by CGWindowID
+    public func windowCocoaFrame(windowID: CGWindowID) -> CGRect? {
+        let options: CGWindowListOption = [.optionOnScreenOnly, .excludeDesktopElements]
+        guard let windowInfoList = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[String: Any]] else {
+            return nil
+        }
+        guard let info = windowInfoList.first(where: { ($0[kCGWindowNumber as String] as? CGWindowID) == windowID }),
+              let boundsDict = info[kCGWindowBounds as String] as? [String: Any],
+              let cgX = boundsDict["X"] as? CGFloat,
+              let cgY = boundsDict["Y"] as? CGFloat,
+              let cgW = boundsDict["Width"] as? CGFloat,
+              let cgH = boundsDict["Height"] as? CGFloat else {
+            return nil
+        }
+        let primaryHeight = (NSScreen.screens.first?.frame.height) ?? 0
+        let cocoaY = primaryHeight - (cgY + cgH)
+        return CGRect(x: cgX, y: cocoaY, width: cgW, height: cgH)
     }
 
     /// Returns Dock rectangle if dock exists on screen
