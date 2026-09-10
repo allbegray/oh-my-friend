@@ -15,6 +15,12 @@
   - `LadderOverlayWindow`(레벨 `floating - 1`) 신규: 두 레일 + 16pt 간격 발판, 진행률만큼 발판 점진 노출, 완료 시 페이드아웃
   - `MinecraftCharacterNode.isClimbing` 등반 포즈(양팔 교차 오버헤드 리치 + 다리 교차), `CharacterBehaviorController.climbDown` 상태
   - 진입점: 메뉴 "🪜 사다리 타고 창문 내려가기"(Cmd+L) + 자율 모드 확률 밴드, 쿨다운 12초
+- [ ] [M4] 창 치우기(최소화) 인터랙션 — "🗜️ 창 압축해서 Dock으로 밀어넣기"
+  - 선행: 손쉬운 사용(Accessibility) 권한. `AXUIElementCreateApplication` → `kAXWindowsAttribute` → `kAXPositionAttribute`/`kAXSizeAttribute`로 CGWindowID 창 매칭(4pt 허용 오차) → `kAXMinimizedAttribute = true` (실패 시 `kAXMinimizeButtonAttribute` 프레스 폴백). 화면 기록 권한은 사용하지 않음.
+  - `WindowMinimizer.swift` 신규: 권한 확인(`AXIsProcessTrustedWithOptions`) + `minimize(windowID:pid:) -> Result`
+  - FSM: `CharacterBehaviorController.State.squash(timeLeft:)`, `startSquashMinimize(on:duration:completion:)`, `squashProgress` (`startPickaxeAttack` 패턴 복제)
+  - 연출: `WindowSquashOverlayWindow.swift` 신규(BlockBreakOverlayWindow 형제) — 상단에서 하강하는 압축 판, 압축률 눈금, 픽셀 먼지 → 마지막 프레임에 실제 최소화(지니 효과)가 이어받음. 캐릭터는 양팔 내려누르기 `isPressing` 포즈, 발판이 사라지면 기존 물리로 낙하 → `landedCrouch`
+  - 진입점: 메뉴 "🗜️ 이 창 치우기"(Cmd+M). 자율 발동은 기본 OFF(사용 중인 창 방해 방지), 메뉴 토글로만 허용
 
 ## 낮음 (L)
 - [ ] [L1] 화면 위에 여러 마리의 캐릭터를 동시에 소환하여 함께 놀게 하는 멀티 캐릭터 모드 지원

@@ -16,19 +16,21 @@ public final class BlockBreakOverlayWindow: NSPanel {
     public init(over windowRect: CGRect, on screen: NSScreen) {
         let visible = screen.visibleFrame
 
-        // 파편이 창 밖으로 튀고 떨어질 공간까지 패널을 확장한다
-        let side: CGFloat = 90
-        let topRoom = min(180, max(0, visible.maxY - windowRect.maxY))
-        let bottomRoom = min(340, max(70, windowRect.minY - visible.minY))
+        // 파편이 창 밖으로 멀리 날아갈 수 있도록 화면 경계까지 여백을 크게 잡는다.
+        // (오버레이 패널 프레임이 그대로 드로잉 클리핑 경계가 되기 때문에, 여백이 곧 비산 범위다)
+        let leftRoom = min(340, max(60, windowRect.minX - visible.minX))
+        let rightRoom = min(340, max(60, visible.maxX - windowRect.maxX))
+        let topRoom = min(420, max(60, visible.maxY - windowRect.maxY))
+        let bottomRoom = min(640, max(120, windowRect.minY - visible.minY))
         let frameRect = CGRect(
-            x: windowRect.minX - side,
+            x: windowRect.minX - leftRoom,
             y: windowRect.minY - bottomRoom,
-            width: windowRect.width + side * 2,
+            width: windowRect.width + leftRoom + rightRoom,
             height: windowRect.height + topRoom + bottomRoom
         )
 
         effectView = BlockBreakEffectView(
-            windowRectInLocal: CGRect(x: side, y: bottomRoom, width: windowRect.width, height: windowRect.height)
+            windowRectInLocal: CGRect(x: leftRoom, y: bottomRoom, width: windowRect.width, height: windowRect.height)
         )
 
         super.init(
@@ -121,8 +123,8 @@ public final class BlockBreakEffectView: NSView {
     private var hasShattered = false
 
     private static let gravity: CGFloat = 1500.0
-    private static let fadeStart: CGFloat = 1.05
-    private static let fadeEnd: CGFloat = 1.6
+    private static let fadeStart: CGFloat = 1.25
+    private static let fadeEnd: CGFloat = 1.85
 
     public init(windowRectInLocal: CGRect) {
         self.windowRectInLocal = windowRectInLocal
@@ -239,7 +241,7 @@ public final class BlockBreakEffectView: NSView {
                     vx: 0,
                     vy: 0,
                     spin: 0,
-                    spinV: rng.range(-6, 6),
+                    spinV: rng.range(-9, 9),
                     color: color,
                     delay: 0
                 )
@@ -249,11 +251,12 @@ public final class BlockBreakEffectView: NSView {
                 let depth = (winTopY - centerY) / win.height
                 block.delay = 0.06 + depth * 0.22 + rng.range(0, 0.05)
 
-                // 창 중심에서 바깥으로 터진다
+                // 창 중심에서 바깥으로 세게 터진다 (+ 모든 파편에 최소 수평 비산)
                 let dx = (centerX - midX) / max(win.width / 2, 1)
                 let dy = (centerY - win.midY) / max(win.height / 2, 1)
-                block.vx = dx * rng.range(120, 340) + rng.range(-40, 40)
-                block.vy = abs(dy) * rng.range(60, 180) + rng.range(40, 330)
+                let lateralSign: CGFloat = dx >= 0 ? 1 : -1
+                block.vx = lateralSign * (abs(dx) * rng.range(220, 560) + rng.range(40, 170)) + rng.range(-50, 50)
+                block.vy = abs(dy) * rng.range(140, 300) + rng.range(160, 720)
                 // 대기 중에는 축 정렬 상태로 창을 정확히 덮고, 떨어지기 시작하면 회전한다
                 block.spin = 0
                 debris.append(block)
@@ -274,7 +277,7 @@ public final class BlockBreakEffectView: NSView {
             debris[i].spin += debris[i].spinV * (1.0 / 60.0)
         }
 
-        if t >= 2.0 {
+        if t >= 2.2 {
             timer?.invalidate()
             timer = nil
             needsDisplay = true
