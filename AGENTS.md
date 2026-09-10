@@ -50,7 +50,26 @@ Sources/OhMyFriend/
 ├── SkinCatalogManager.swift            # 추천 스킨 카탈로그 데이터 및 로컬 보관함(~/Library/.../Skins) 관리자
 ├── SkinDownloaderService.swift         # Mojang/Minotar/Crafatar API 비동기 다운로더 및 URL 검증기
 ├── SkinGalleryView.swift               # SwiftUI 기반 4개 탭 스킨 갤러리 UI
-└── SkinGalleryWindowController.swift   # 스킨 갤러리 전용 NSWindow 컨트롤러
+├── SkinGalleryWindowController.swift   # 스킨 갤러리 전용 NSWindow 컨트롤러
+├── TridentEntityWindow.swift           # 삼지창 투척체: 포물선 비행→회전하며 손으로 복귀하는 충성 연출
+├── JukeboxEntityWindow.swift           # 바닥 설치형 픽셀아트 주크박스(8초 재생 후 자동 정리)
+├── ChestEntityWindow.swift             # 클릭 시 뚜껑 열림 + 전리품 텍스트 방출하는 1회용 보물 상자
+├── SlimeWindow.swift                   # 대/중/소 3단계 분열 슬라임(스쿼시 점프 이동, 클릭 타격 분열)
+├── NetherPortalOverlayWindow.swift     # 흑요석 틀 + 보라 소용돌이 지옥문 오버레이
+├── DayNightCycleManager.swift          # 실제 시간 기반 낮밤 판정(자동/낮고정/밤고정) 및 야간 스폰 가중치
+├── CropEntityWindow.swift              # 밀 농사: 4단계 성장 작물(25초/단계), 성숙 클릭 수확
+├── WeatherManager.swift                # 비·뇌우 랜덤 전환(150~300초) 및 번개 타이머
+├── RainOverlayWindow.swift             # 빗줄기 + 번개 섬광·볼트 오버레이
+├── BeeEntityWindow.swift               # 벌 3마리 추적 + 30초 꿀 생산 벌집
+├── BrewStandWindow.swift               # 양조기 + 3색 물약병(신속/투명/힘 양조)
+├── FoxWindow.swift                     # 밤 여우(급속 지그재그 이동, 아이템 낚아채기·14초 추격전)
+├── GoatWindow.swift                    # 염소(풀뜯기→조준→돌진 3단 AI, 빈 양동이 우유 짜기)
+├── Advancements.swift                  # 발전 과제 16종·해금 토스트·체크리스트 창(UserDefaults 영속)
+├── PhantomWindow.swift                 # 팬텀(선회→급강하 AI, 방패가드·2타 격퇴)
+├── SpiderWindow.swift                  # 거미(창문 수직 크롤링, 낮 중립·밤 격퇴)
+├── GhastWindow.swift                   # 가스트(부유+화염탄) + 화염탄 클릭 쳐내기
+├── ZombieWindow.swift                  # 아기 좀비 3마리 추적 공성전(횃불 2배)
+└── AxolotlWindow.swift                 # 어깨 아홀로틀(전투 +1 엄호)
 ```
 
 - **렌더링 & 애니메이션 파이프라인**: `CharacterView` 내부의 `SCNScene`에서 `MinecraftCharacterNode`가 관절 피벗(목, 어깨, 골반)을 기반으로 회전 및 위치를 실시간 보간합니다.
@@ -61,6 +80,30 @@ Sources/OhMyFriend/
 ## 실행 기록
 
 ### 2026-09-10
+- **[고증 4차] 팬텀·거미·가스트·좀비·아홀로틀 구축**: `PhantomWindow.swift`(자정 급강하·방패가드·막), `SpiderWindow.swift`(창문 수직 크롤링·낮중립), `GhastWindow.swift`(지옥문 부유·화염탄 클릭 테니스·눈물), `ZombieWindow.swift`(자정 3마리·횃불 2배·승리 보너스), `AxolotlWindow.swift`(빈양동이 어깨펫·전투 +1). 메뉴 5종 추가. 검증: `swift build` 통과, 번들 생성 및 4초 실행 스모크 테스트.
+- **[업적 시스템] 발전 과제 16종 도입**: `Advancements.swift`(과제 정의·해금·토스트 큐·체크리스트 창, UserDefaults 영속). 채굴·몹 4종·길들이기 2종·수확·낚시·양조·인챈트·거래·지옥문·승마·친구·밤스킵 16곳 훅 연결, 달성 시 우상단 토스트 + 차임. 메뉴 "🏆 발전 과제 (n/16)" 추가. 검증: `swift build` 통과, 번들 생성 및 4초 실행 스모크 테스트.
+- **[고증 추가 5종 3차] 양조·거래·여우·수레·염소 구축**: `BrewStandWindow.swift`(신속/투명/힘 물약 양조·시간제 효과), 에메랄드 재화 + NSAlert 주민 거래(검 3/사과 2/토템 5), `FoxWindow.swift`(밤 여우 낚아채기·14초 추격 회수전), Dock 광산 수레 10초 왕복 질주, `GoatWindow.swift`(3단 돌진 AI·빈 양동이 우유 짜기). 메뉴 5종 추가. 검증: `swift build` 통과, 번들 생성 및 4초 실행 스모크 테스트.
+- **[고증 추가 5종 2차] 말·인챈트·디펜스·풍선·멀티캐릭터 구축**: `PetKind.horse` + 3D 복셀 말(`buildHorseModel`) + 야생마 황금사과 길들이기 + 14초 260pt/s 승마 질주, `EnchantTableWindow.swift`(XP 10 날카로움/효율 강화·광택·데미지 반영, 크리퍼+5/스켈레톤+5/엔더맨+8/슬라임+3), 밤 웨이브 디펜스전(격퇴 카운트·클리어 보너스), `HeldItem.balloon` + `PhysicsEngine.isSlowFalling`(-60pt/s·퐁신 착지), **[L1] 멀티 캐릭터**(최대 2기 독립 FSM·물리·델리게이트 라우팅 `triple(for:)`). 메뉴 6종 추가. 검증: `swift build` 통과, 번들 생성 및 4초 실행 스모크 테스트. 백로그 전량 완료.
+- **[고증 추가 5종] 농사·길들이기·날씨·밤스킵·벌꿀 구축**: `CropEntityWindow.swift`(25초/단계 4단계 성장·클릭 수확), 야생 늑대 배회 + 뼈다귀 길들이기 펫 편입, `WeatherManager.swift`(150~300초 비·뇌우 전환) + `RainOverlayWindow.swift`(빗줄기·번개 섬광·볼트) + 뇌우 충전 크리퍼(폭발 1.6배), 밤 전원 6초 수면 시 15분 아침 스킵(`skipToMorning` + `wakeUpIfSleeping`), `BeeEntityWindow.swift`(벌 3마리 꽃 추적 + 30초 꿀 벌집). `HeldItem.flower` 추가, 메뉴 3종(밀 심기/야생 늑대/벌집) + "🌧️ 날씨 모드" 토글 추가. 검증: `swift build` 통과, 번들 생성 및 4초 실행 스모크 테스트.
+- **[H2/H3/H4/M1/M2/M3/M4/L2/L3] 백로그 9종(L1 제외) 일괄 구축**: `TridentEntityWindow.swift`, `JukeboxEntityWindow.swift`, `ChestEntityWindow.swift`, `SlimeWindow.swift`, `NetherPortalOverlayWindow.swift`, `DayNightCycleManager.swift` 신규 구현. 삼지창 충성 복귀 투척 + 웅크리기 급류 추진, 주크박스 8초 재생 + 캐릭터/펫 리듬 댄스, 실제 시간 낮밤(18시~06시 야간 횃불 자동 점등 + 몬스터 1.5배 출현), 클릭 오픈 보물 상자, 왼손 토템 폭발 부활, 3단계 분열 슬라임(최대 8마리), 밀 유혹 + 2회 먹이 아기 펫 탄생·60초 성장, 우유 60초 디버프 정화, 지옥문 왕복 연출 구현. `HeldItem` 4종(삼지창/밀/우유/빈양동이) 및 효과음 5종(`whoosh`/`splash`/`chime`/`gulp`/`portal`) 추가, 메뉴바 "✨ 재미있는 모션 실행"에 8종 액션 + "☀️/🌙 낮밤 모드" 서브메뉴 추가. 검증: `swift build` 통과, `scripts/build_app.sh` 번들 생성 및 4초 실행 스모크 테스트.
+- **[H1] 활 쏘는 스켈레톤(Skeleton Archer) 출현 및 방패 화살 튕겨내기 / 낮 햇빛 발화 고증 구축**: `SkeletonNode.swift`, `SkeletonBehaviorController.swift`, `SkeletonView.swift`, `SkeletonWindow.swift`, `ArrowEntityWindow.swift` 신규 구현. 해골 머리와 앙상한 갈비뼈/뼈다귀 팔다리, 3D 나무 활(`bowNode`) 조준/시위 당기기 모션. 포물선 궤적으로 날아가는 화살(`ArrowEntityWindow`) 발사 및 플레이어 방패 가드 시 `챙-!` 튕겨내기(`🛡️ 챙-! 화살 방어!`) 구현. 낮 시간대(06:00~18:00) 햇빛 노출 시 온몸 발화(`🔥 치이익! 햇빛이다!`) 및 창문 그늘 도주 AI 구현. 처치 시 뼈다귀(`🦴`), 화살(`➡️`), 활(`🏹`) 드롭. 메뉴바 "✨ 재미있는 모션 실행"에 "🏹 스켈레톤 소환" 및 "👾 가끔 스켈레톤 출현 모드" 토글 추가.
+- **.idea/ 디렉토리 git ignore 및 저장소 인덱스 추적 제외**: JetBrains/IDEA 설정 파일(`.idea/`)을 `.gitignore`에 등록하고 원격 저장소 추적에서 안전하게 분리.
+- **[M1-M4, L2-L4] 고급 원작 고증 7대 기능(창 압축, 모서리 낚시, 겉날개 활공, 늑대 꼬리, 스킨 필터, 인챈트 광택, 배터리 허기) 구축**:
+  - `[M1]` `WindowMinimizer.swift` 및 `WindowSquashOverlayWindow.swift`: 접근성 API/AppleScript 기반 유압 피스톤 창 압축 최소화 구현.
+  - `[M2]` `FishingLoot.swift`, 3D 낚싯대 모델 및 찌/입질 파티클, 6종 전리품(연어, 복어, 인챈트북, 네더라이트 등) 낚시 FSM 구현.
+  - `[M3]` 3D 겉날개(`elytraNode`) 펼침/접힘 및 수평 활공 물리, 비행 중 클릭 시 폭죽 로켓 추진(`🚀`) 부스트 구현.
+  - `[M4]` 늑대 꼬리 각도 체력 비례 고증(-35°~+45°) 및 3D 뼈다귀(`HeldItem.bone`) 급여 시 체력 100% 회복/하트 구현.
+  - `[L2]` CoreImage 기반 6종 스킨 색조(Hue)/채도/흑백 필터 실시간 변환 구현.
+  - `[L3]` `EnchantmentGlintShader.swift`: Metal 서피스 쉐이더 기반 마인크래프트 원작 보라색 일렁임 인챈트 광택 토글 구현.
+  - `[L4]` `BatteryStatusMonitor.swift`: IOKit 기반 맥북 배터리 20% 이하 허기 꼬르륵 및 충전기 연결 시 활력 회복 연동.
+- **[H1/H2/H3] 마인크래프트 원작 고증 3대 기능(고양이-크리퍼 상성, 왼손 방패 가드, 3D 엔더맨 눈싸움) 구축**:
+  - `[H1]` 고양이 펫 소환 시 크리퍼가 반경 220pt 근처에 오면 도화선 점화를 취소하고 패닉 도주(`fleeingFromCat`)하는 원작 상성 구현.
+  - `[H2]` 왼손 3D 방패 모델(`leftHandShieldAnchor`) 및 웅크리기(Shift) 시 방패를 앞으로 들어 올리는 가드 포즈 구현. 방패 가드 중 크리퍼 폭발 시 100% 피해 및 넉백 방어(`🛡️ 챙-! 완벽 방어!`).
+  - `[H3]` 3D 복셀 엔더맨(`EndermanNode.swift`, `EndermanBehaviorController.swift`, `EndermanWindow.swift`, `EndermanView.swift`) 구현: 슬렌더 칠흑 바디, 발광 보라색 눈, 들고 있는 잔디 블록, 마우스 커서 눈 마주침 시 하악 턱 쩍 벌림(`jawNode`) 및 분노 진동, 시선 끊김 시 블록 던지고 175pt/s 돌진 + 보라색 파티클 순간이동, 처치 시 `🔮 엔더 진주` 드롭. 메뉴바 "✨ 재미있는 모션 실행"에 "👁️ 엔더맨 소환 (Cmd+E)" 및 "👾 가끔 엔더맨 출현 모드" 토글 추가.
+- **마인크래프트 크리퍼(Creeper) 출현 및 무기/횃불 처치 전투 시스템 구축**: `CreeperNode.swift`, `CreeperBehaviorController.swift`, `CreeperView.swift`, `CreeperWindow.swift` 신규 구현. 3D 복셀 크리퍼(초록 위장 무늬, 찡그린 얼굴, 4개 다리 셔플 보행 사이클) 및 도화선 점화 시 부풀어 오름(Swell)과 흰색 고속 점멸 연출 구현. 2.8초 내 처치 실패 시 대폭발(플레이어 넉백 날리기 및 연기) 발동. 무기별 차별화된 피격 연출(다이아몬드 검 3데미지 원킬+화약 획득, 곡괭이 2데미지+넉백+경험치, 횃불 불붙어 패닉 도주, 맨손 1데미지 펀치). 플레이어 무기 휘두르기 공격 모션(`isAttackingWeapon`) 및 마우스 클릭 공격/드래그 지원. 크리퍼 출현 시 살기 감지 경계 대사("등골이 서늘한데...? 살기가 느껴져! 😨", "살기 감지! 무기 들 준비 해! ⚔️" 등) 및 펫 경계 반응(늑대 으르렁, 고양이 하악질) 연동. 크리퍼 처치 시 무기별 맞춤형 승리 대사 말풍선("칼날 끝에 자비란 없다! ⚔️", "곡괭이 맛이 어떠냐! ⛏️", "불장난은 위험하다고 했잖아? 🔥" 등) 출력 및 기쁨의 점프 모션 연동. 메뉴바 "✨ 재미있는 모션 실행"에 "💥 크리퍼 소환 (Cmd+K)" 및 설정에 "👾 가끔 크리퍼 출현 모드" On/Off 토글 추가.
+- **3D 캐릭터 오른쪽 팔(화면 좌측) 누락 버그 수정**: `MinecraftCharacterNode.setupHierarchy`에서 2차 레이어(오버레이 소매) 구현 시 누락되었던 `bodyAnchor.addChildNode(rightArmJoint)` 코드를 복구하여 오른쪽 팔(메쉬, 오버레이 소매, 손 아이템)이 3D 씬에 정상적으로 렌더링되도록 수정.
+- **마인크래프트 펫 동반자 시스템(Pet Companion System) 구축**: `PetKind.swift`, `PetNode.swift`, `PetBehaviorController.swift`, `PetView.swift`, `PetWindow.swift` 신규 구현. 4종 3D 복셀 펫(늑대, 고양이, 앵무새, 돼지) 모델링 및 애니메이션(걷기/뛰기 보행 사이클, 꼬리 살랑살랑 흔들기, 앵무새 날개 펄럭임, 얌전히 앉기, 침대 발치 수면) 구현. 플레이어와의 거리(750pt 초과 또는 모니터 이동)에 따른 자동 순간이동(파티클 연출), 플레이어 걸터앉기 및 수면 동기화, 펫 클릭 시 앉아/일어서 토글 및 먹이/하트 반응, 마우스 드래그 물리 지원. 메뉴바 "🐾 펫 동반자" 서브메뉴에서 펫 소환 및 소환 해제 연동.
+- **방치된 macOS 알림창 감지 및 3D 삿대질/잔소리 구박 모션(Nag) 구현**: `NotificationCenterMonitor.swift` 신규 구현. Window Server의 `NotificationCenter` 알림 배너 창을 실시간 스캔하여 배너가 2개 이상 누적되었거나 5초 이상 방치된 경우 자동으로 구박 FSM(`.nag`) 트리거. 우측 상단 알림 배너를 향해 고개를 홱 돌려 째려보며, 오른팔로 삿대질하고 왼손은 허리에 올린 채 발을 쿵쿵 구르는 3D 구박 애니메이션(`isNagging`) 구현. 머리 위 팩폭 잔소리 말풍선("알림 좀 확인해! 💢", "완전 읽씹 장인이네! 😤" 등 5종) 출력. 메뉴바 "✨ 재미있는 모션 실행"에 "💢 알림 안 읽는다고 구박하기 (Cmd+N)" 즉시 실행 및 설정 메뉴에 "🔔 쌓인 알림 잔소리/구박 모드" On/Off 토글 추가.
 - **TNT 폭파 연출 렉 최적화**: 파편 그리기에서 테두리 `stroke`를 제거하고(1980개 기준 12.2ms → 5.7ms, 스트로크가 그리기 비용의 절반), 색 변환을 프레임 루프 밖으로 옮겨 `CGContext.setAlpha`로 일괄 적용하며, 패널 밖 파편은 건너뛴다. 창 하나의 파편 상한을 3200 → 900(2x 기준)으로 낮추고 **동시 폭발하는 모든 창이 예산을 나눠 쓰도록** 했다(`BlockBreakOverlayWindow.debrisBudgetTotal=900`, `minimumDebrisPerWindow=60`, `AppController.didSelectTNTBreak`에서 `windows.count`로 분배). 이전에는 창마다 최대 3200개라 12창 동시 폭파 시 24,000개를 그렸다. 상한은 화면 배율에 따라 4배까지 늘어난다(1x는 같은 면적의 픽셀이 1/4). 도화선 점멸은 매 프레임 창 전체(1200x800)를 알파 블렌딩으로 다시 칠하던 것을 **불투명 흰 사각형 1회 그리기 + 창 `alphaValue` 점멸**로 교체했다(6.3ms/프레임 → 0.3ms 1회, 이후 재그리기 없음). 폭발 섬광 반지름은 760/664/460 → 290/300/190으로 줄이고 파편 위에 그리도록 순서를 바꿨으며(파편이 창을 덮는 동안 뒤에 그린 섬광은 보이지 않는다), 연기·불똥 개수도 파편 예산에 비례해 줄인다. 검증: 오프스크린 드라이버 min/avg 프레임 측정(단일 창 12.2~14.2ms → 4.2ms, 창 4개 2.4ms×4, 창 12개 1.7ms×12, 섬광 평균 13.6ms·최악 41ms → 2.9ms·최악 5.5ms, 도화선 0.3ms), 실제 `BlockBreakOverlayWindow` 창 수명주기 드라이버(도화선 alpha 0 ↔ 0.45~0.80 점멸 → 폭발 시 alpha 1.0 복귀 → 2.2초 뒤 `onBreakFinished` 호출), `screencapture -l` 프레임 캡처로 섬광·파편 비산 육안 확인, `scripts/build_app.sh`(swiftc Fallback) 빌드 및 3초 실행 스모크 테스트.
 - **3D 마인크래프트 빨간 침대(Red Bed) 및 아이소메트릭 수면 모션 개선**: 기존의 단순 평면 눕기 모션이 화면상에서 잘 드러나지 않던 문제를 해결하기 위해, 원목 모서리 다리 4개, 베이스 프레임, 하얀색 베개, 빨간 양모 이불/매트리스로 구성된 3D 침대 모델(`bedNode`)을 추가. 수면 시 침대를 바닥에 배치하고 캐릭터와 침대를 입체 사각 시점(Pitch 0.25, Yaw 0.60)으로 회전하여 매트리스 위에 반듯하게 누워 베개에 머리를 얹고 호흡하는 실감 나는 수면 연출 구현.
 - **[M1] 상단 메뉴바 발판(.menuBar) 인식, 걸터앉기 및 메뉴 인터랙션 구현**: `ScreenEnvironment.scanPlatforms`에서 상단 메뉴바(`visibleFrame.maxY`)를 독립 플랫폼 종류(`.menuBar`)로 자동 수집. 메뉴바 라인 위 보행 및 다리를 아래로 살랑살랑 흔드는 걸터앉기(`.sit`), 아래 화면을 내려다보는 모션(`.poke`) 지원. 캐릭터를 메뉴바 근처(상단 140pt 이내)에 놓으면 사다리를 설치하고 메뉴바로 상승 등반하거나 메뉴바 위에 즉시 착지. 메뉴바 "✨ 재미있는 모션 실행"에 "🪑 상단 메뉴바에 걸터앉기 (Cmd+M)" 즉시 호출 액션 추가.

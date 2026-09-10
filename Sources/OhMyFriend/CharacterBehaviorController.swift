@@ -27,6 +27,12 @@ public final class CharacterBehaviorController {
         case dragged
         case landedCrouch(timeLeft: TimeInterval)
         case cheer(wpm: Double, timeLeft: TimeInterval, cheerCooldown: TimeInterval)
+        case nag(timeLeft: TimeInterval, phraseTimer: TimeInterval, phraseIndex: Int)
+        case squash(timeLeft: TimeInterval, windowPlatform: Platform)
+        case fishing(timeLeft: TimeInterval, biteTime: TimeInterval, hasBitten: Bool)
+        case throwTrident(timeLeft: TimeInterval)
+        case jukebox(timeLeft: TimeInterval, beatTimer: TimeInterval)
+        case drinkMilk(timeLeft: TimeInterval)
     }
 
     public private(set) var state: State = .idle(timeLeft: 2.0)
@@ -126,6 +132,7 @@ public final class CharacterBehaviorController {
 
     public func triggerPlaceAndMine(characterNode: MinecraftCharacterNode) {
         guard !isClimbing, !isTNTActive else { return }
+        AdvancementManager.shared.unlock(.firstMine)
         characterNode.showOverheadEmoji("⛏️", duration: 2.5)
         characterNode.placedBlockNode.isHidden = false
         SoundAndEffectsManager.shared.play(.pop)
@@ -152,6 +159,16 @@ public final class CharacterBehaviorController {
         state = .sit(timeLeft: Double.random(in: 6.0...12.0))
     }
 
+    public func triggerFishing(characterNode: MinecraftCharacterNode) {
+        guard !isClimbing, !isTNTActive else { return }
+        characterNode.currentHeldItem = .fishingRod
+        characterNode.isFishing = true
+        characterNode.isSitting = true
+        characterNode.showOverheadEmoji("🎣 낚싯대 투척!", duration: 1.8)
+        SoundAndEffectsManager.shared.play(.pop)
+        state = .fishing(timeLeft: 4.5, biteTime: 1.8, hasBitten: false)
+    }
+
     public func triggerCheer(characterNode: MinecraftCharacterNode) {
         guard !isClimbing, !isTNTActive else { return }
         characterNode.isCheering = true
@@ -159,6 +176,22 @@ public final class CharacterBehaviorController {
         SoundAndEffectsManager.shared.play(.heart)
         TypingActivityMonitor.shared.simulateKeystrokes(count: 15)
         state = .cheer(wpm: 65.0, timeLeft: 3.5, cheerCooldown: 1.0)
+    }
+
+    public func triggerNag(characterNode: MinecraftCharacterNode) {
+        guard !isClimbing, !isTNTActive else { return }
+        NotificationCenterMonitor.shared.triggerSimulatedNag()
+        characterNode.isNagging = true
+        SoundAndEffectsManager.shared.play(.alert)
+        let phrases = [
+            "알림 좀 확인해! 💢",
+            "알림 쌓인 것 좀 봐... 📢",
+            "안 읽을 거면 지우기라도 해! 🧹",
+            "완전 읽씹 장인이네! 😤",
+            "언제 읽을 거야?! 🔔"
+        ]
+        characterNode.showOverheadEmoji(phrases[0], duration: 2.0)
+        state = .nag(timeLeft: 6.0, phraseTimer: 2.0, phraseIndex: 1)
     }
     public func handleCharacterClicked(physics: PhysicsEngine, characterNode: MinecraftCharacterNode) {
         SoundAndEffectsManager.shared.play(.heart)
@@ -182,6 +215,50 @@ public final class CharacterBehaviorController {
         characterNode.showOverheadEmoji("❗", duration: 1.5)
         SoundAndEffectsManager.shared.play(.alert)
         state = .idle(timeLeft: 1.5)
+    }
+
+    public func wakeUpIfSleeping(characterNode: MinecraftCharacterNode, withEmoji emoji: String = "❗") {
+        if case .sleep = state {
+            characterNode.isSleeping = false
+            characterNode.bedNode.isHidden = true
+            characterNode.showOverheadEmoji(emoji, duration: 2.2)
+            SoundAndEffectsManager.shared.play(.alert)
+            state = .idle(timeLeft: 1.5)
+        }
+    }
+
+    // MARK: - Window Squash & Minimize (창 압축 최소화)
+    public func triggerThrowTrident(characterNode: MinecraftCharacterNode, isRiptide: Bool) {
+        guard !isClimbing, !isTNTActive else { return }
+        characterNode.currentHeldItem = .trident
+        characterNode.showOverheadEmoji(isRiptide ? "🌊 급류 돌진-!" : "🔱 충성 삼지창! 돌아와-!", duration: 2.0)
+        SoundAndEffectsManager.shared.play(.whoosh)
+        state = .throwTrident(timeLeft: 1.6)
+    }
+
+    public func triggerJukeboxDance(characterNode: MinecraftCharacterNode) {
+        guard !isClimbing, !isTNTActive else { return }
+        characterNode.showOverheadEmoji("🎶 리듬 타는 중~", duration: 2.0)
+        state = .jukebox(timeLeft: 8.0, beatTimer: 0.0)
+    }
+
+    public func triggerDrinkMilk(characterNode: MinecraftCharacterNode) {
+        guard !isClimbing, !isTNTActive else { return }
+        characterNode.currentHeldItem = .milkBucket
+        characterNode.showOverheadEmoji("🥛 꿀꺽꿀꺽...", duration: 1.6)
+        SoundAndEffectsManager.shared.play(.gulp)
+        state = .drinkMilk(timeLeft: 1.8)
+    }
+    public func startSquashMinimize(
+        on platform: Platform,
+        duration: TimeInterval = 2.0,
+        characterNode: MinecraftCharacterNode
+    ) {
+        guard !isClimbing, !isTNTActive else { return }
+        characterNode.isPressingDown = true
+        characterNode.showOverheadEmoji("🗜️ 압축 중...!", duration: duration)
+        SoundAndEffectsManager.shared.play(.ignite)
+        state = .squash(timeLeft: duration, windowPlatform: platform)
     }
 
     // MARK: - TNT (앱 창 폭파)
@@ -454,12 +531,20 @@ public final class CharacterBehaviorController {
             characterNode.isPlacingTNT = false
             characterNode.walkSpeed = 0
             wasAirborne = true
+            characterNode.isGliding = false
+            physics.isGliding = false
             return
         }
 
         if case .airborne = physics.state {
             interruptTNTIfActive()
             cancelClimbIfActive()
+
+            // 겉날개 활공: 겉날개 착용 중이고 낙하 중이면 활공 모드 돌입!
+            if characterNode.isElytraEquipped && physics.velocity.y < -80 {
+                characterNode.isGliding = true
+                physics.isGliding = true
+            }
 
             if case .backflip(var progress) = state {
                 // Keep backflip rotating
@@ -492,6 +577,8 @@ public final class CharacterBehaviorController {
 
         // Just landed!
         if wasAirborne {
+            characterNode.isGliding = false
+            physics.isGliding = false
             wasAirborne = false
             state = .landedCrouch(timeLeft: 0.35)
             characterNode.isFalling = false
@@ -532,10 +619,152 @@ public final class CharacterBehaviorController {
                 break
             }
         }
+
+        // 4.6. Notification Nag Check
+        let nagStatus = NotificationCenterMonitor.shared.checkNagStatus(screen: screen)
+        if nagStatus.shouldNag && !isClimbing && !isTNTActive {
+            switch state {
+            case .idle, .walk, .sit, .lookAround:
+                characterNode.isNagging = true
+                SoundAndEffectsManager.shared.play(.alert)
+                let phrases = [
+                    "알림 좀 확인해! 💢",
+                    "알림 쌓인 것 좀 봐... 📢",
+                    "안 읽을 거면 지우기라도 해! 🧹",
+                    "완전 읽씹 장인이네! 😤",
+                    "언제 읽을 거야?! 🔔"
+                ]
+                characterNode.showOverheadEmoji(phrases[0], duration: 2.0)
+                state = .nag(timeLeft: 6.0, phraseTimer: 2.0, phraseIndex: 1)
+            default:
+                break
+            }
+        }
         // 5. Finite State Machine
         // TNT 진행 중 상태가 폭발/중단 콜백 없이 다른 상태로 덮어써졌는지 감시한다.
         let wasTNTActive = isTNTActive
         switch state {
+        case .squash(var timeLeft, let platform):
+            timeLeft -= dt
+            characterNode.walkSpeed = 0
+            characterNode.isPressingDown = true
+            characterNode.isSitting = false
+            characterNode.isSleeping = false
+            characterNode.isNagging = false
+            characterNode.isCheering = false
+            characterNode.isWaving = false
+
+            if timeLeft <= 0 {
+                characterNode.isPressingDown = false
+                physics.releaseClimb()
+                state = .fall
+            } else {
+                state = .squash(timeLeft: timeLeft, windowPlatform: platform)
+            }
+
+        case .fishing(var timeLeft, let biteTime, var hasBitten):
+            timeLeft -= dt
+            characterNode.walkSpeed = 0
+            characterNode.isSitting = true
+            characterNode.isFishing = true
+            characterNode.isPressingDown = false
+            characterNode.isSleeping = false
+
+            if !hasBitten && timeLeft <= biteTime {
+                hasBitten = true
+                characterNode.showOverheadEmoji("💦 퐁당! 입질 왔다!", duration: 1.5)
+                SoundAndEffectsManager.shared.play(.pop)
+            }
+
+            if timeLeft <= 0 {
+                characterNode.isFishing = false
+                let loot = FishingLoot.roll()
+                AdvancementManager.shared.unlock(.fishingLoot)
+                characterNode.showOverheadEmoji("\(loot.emoji) \(loot.name)", duration: 2.8)
+                SoundAndEffectsManager.shared.play(.heart)
+                state = .sit(timeLeft: 4.0)
+            } else {
+                state = .fishing(timeLeft: timeLeft, biteTime: biteTime, hasBitten: hasBitten)
+            }
+
+        case .throwTrident(var timeLeft):
+            timeLeft -= dt
+            characterNode.walkSpeed = 0
+            characterNode.isThrowingTrident = true
+            characterNode.isAttackingWeapon = true
+            if timeLeft <= 0 {
+                characterNode.isThrowingTrident = false
+                characterNode.isAttackingWeapon = false
+                chooseNextState(physics: physics, platforms: platforms, screen: screen, cursorPos: cursorPos, characterNode: characterNode)
+            } else {
+                state = .throwTrident(timeLeft: timeLeft)
+            }
+
+        case .jukebox(var timeLeft, var beatTimer):
+            timeLeft -= dt
+            beatTimer -= dt
+            characterNode.walkSpeed = 0
+            characterNode.isJukeboxDancing = true
+            if beatTimer <= 0 {
+                beatTimer = 0.45
+                SoundAndEffectsManager.shared.play(.chime)
+            }
+            if timeLeft <= 0 {
+                characterNode.isJukeboxDancing = false
+                chooseNextState(physics: physics, platforms: platforms, screen: screen, cursorPos: cursorPos, characterNode: characterNode)
+            } else {
+                state = .jukebox(timeLeft: timeLeft, beatTimer: beatTimer)
+            }
+
+        case .drinkMilk(var timeLeft):
+            timeLeft -= dt
+            characterNode.walkSpeed = 0
+            characterNode.isEating = true
+            if timeLeft <= 0 {
+                characterNode.isEating = false
+                characterNode.currentHeldItem = .emptyBucket
+                characterNode.showOverheadEmoji("🥛✨ 깔끔하게 정화!", duration: 2.2)
+                SoundAndEffectsManager.shared.play(.gulp)
+                chooseNextState(physics: physics, platforms: platforms, screen: screen, cursorPos: cursorPos, characterNode: characterNode)
+            } else {
+                state = .drinkMilk(timeLeft: timeLeft)
+            }
+
+        case .nag(var timeLeft, var phraseTimer, var phraseIndex):
+            timeLeft -= dt
+            phraseTimer -= dt
+            characterNode.walkSpeed = 0
+            characterNode.isNagging = true
+            characterNode.isCheering = false
+            characterNode.isSitting = false
+            characterNode.isSleeping = false
+            characterNode.isWaving = false
+            characterNode.isEating = false
+            characterNode.isPoking = false
+
+            if phraseTimer <= 0 {
+                phraseTimer = 2.0
+                let phrases = [
+                    "알림 좀 확인해! 💢",
+                    "알림 쌓인 것 좀 봐... 📢",
+                    "안 읽을 거면 지우기라도 해! 🧹",
+                    "완전 읽씹 장인이네! 😤",
+                    "언제 읽을 거야?! 🔔"
+                ]
+                let text = phrases[phraseIndex % phrases.count]
+                phraseIndex += 1
+                characterNode.showOverheadEmoji(text, duration: 1.8)
+                SoundAndEffectsManager.shared.play(.pop)
+            }
+
+            if timeLeft <= 0 {
+                characterNode.isNagging = false
+                NotificationCenterMonitor.shared.resetNagTrigger()
+                chooseNextState(physics: physics, platforms: platforms, screen: screen, cursorPos: cursorPos, characterNode: characterNode)
+            } else {
+                state = .nag(timeLeft: timeLeft, phraseTimer: phraseTimer, phraseIndex: phraseIndex)
+            }
+
         case .cheer(let currentWpm, var timeLeft, let cooldown):
             timeLeft -= dt
             characterNode.walkSpeed = 0

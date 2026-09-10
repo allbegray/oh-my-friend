@@ -8,3 +8,4 @@ DerivedData/
 .swiftpm/
 /.omo/
 /graphify-out/
+.idea/

@@ -300,6 +300,8 @@ public final class PhysicsEngine {
         if case let .onGround(p) = state { return p }
         return nil
     }
+    public var isGliding: Bool = false
+    public var isSlowFalling: Bool = false
 
     private var previousPosition: CGPoint
 
@@ -349,6 +351,13 @@ public final class PhysicsEngine {
         position.y = platform.yTop
         velocity = .zero
         state = .onGround(platform: platform)
+    }
+
+    /// 겉날개 폭죽 로켓 추진
+    public func fireworkRocketBoost(facingDir: CGFloat) {
+        velocity.y = max(velocity.y, 240.0)
+        let fDir: CGFloat = facingDir >= 0 ? 1.0 : -1.0
+        velocity.x = fDir * max(abs(velocity.x) * 1.5, 280.0)
     }
     public func releaseClimb() {
         velocity = .zero
@@ -414,10 +423,18 @@ public final class PhysicsEngine {
             }
 
         case .airborne:
-            // Apply gravity
-            velocity.y += gravity * dt
-            // Air friction
-            velocity.x *= 0.98
+            if isGliding {
+                // 겉날개 활공: 하강 속도 제한 (-140 pt/s 완만한 활공) 및 양력
+                velocity.y = max(-140.0, velocity.y + 1300.0 * dt)
+                velocity.x *= 0.995 // 수평 활공 속도 유지
+            } else if isSlowFalling {
+                // 풍선 저속낙하: 아주 느리게 두둥실 (-60 pt/s)
+                velocity.y = max(-60.0, velocity.y + 700.0 * dt)
+                velocity.x *= 0.99
+            } else {
+                velocity.y += gravity * dt
+                velocity.x *= 0.98
+            }
 
             let nextY = position.y + velocity.y * dt
             let nextX = position.x + velocity.x * dt
