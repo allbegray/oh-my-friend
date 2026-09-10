@@ -3,7 +3,7 @@ import CoreGraphics
 import SceneKit
 import UniformTypeIdentifiers
 
-public final class AppController: NSObject, CharacterViewDelegate, NSMenuDelegate {
+public final class AppController: NSObject, CharacterViewDelegate, PetViewDelegate, NSMenuDelegate {
     private var window: CharacterWindow!
     private var physics: PhysicsEngine!
     private var behavior = CharacterBehaviorController()
@@ -28,6 +28,12 @@ public final class AppController: NSObject, CharacterViewDelegate, NSMenuDelegat
     // Ladder descent (사다리 타고 창문 내려가기)
     private var ladderMenuItem: NSMenuItem?
     private var ladderOverlay: LadderOverlayWindow?
+
+    // Pet Companion (펫 동반자 시스템)
+    private var petWindow: PetWindow?
+    private var petPhysics: PhysicsEngine?
+    private var petBehavior: PetBehaviorController?
+    public private(set) var currentPetKind: PetKind? = nil
 
     public override init() {
         super.init()
@@ -121,6 +127,27 @@ public final class AppController: NSObject, CharacterViewDelegate, NSMenuDelegat
         // 4. Sync Window Position with Feet
         window.setFeetPosition(x: physics.position.x, y: physics.position.y)
 
+
+        // 4.5. Update Pet Companion
+        if let pw = petWindow, let pPhys = petPhysics, let pBehav = petBehavior {
+            let playerDir = window.characterView.characterNode.modelRoot.eulerAngles.y
+            let playerSitting = window.characterView.characterNode.isSitting
+            let playerSleeping = window.characterView.characterNode.isSleeping
+            pBehav.update(
+                deltaTime: CGFloat(dt),
+                petPhysics: pPhys,
+                petNode: pw.petView.petNode,
+                playerPos: physics.position,
+                playerIsSitting: playerSitting,
+                playerIsSleeping: playerSleeping,
+                playerDirection: playerDir,
+                screen: screen,
+                platforms: cachedPlatforms
+            )
+            pPhys.update(deltaTime: CGFloat(dt), platforms: cachedPlatforms, screen: screen)
+            pw.petView.petNode.update(deltaTime: CGFloat(dt))
+            pw.setFeetPosition(x: pPhys.position.x, y: pPhys.position.y)
+        }
         // 5. Update Status Menu Text
         updateStatusMenuItemText()
     }
@@ -347,6 +374,37 @@ public final class AppController: NSObject, CharacterViewDelegate, NSMenuDelegat
         let itemSubmenuItem = NSMenuItem(title: "🗡️ 손에 아이템 들기", action: nil, keyEquivalent: "")
         itemSubmenuItem.submenu = itemMenu
         menu.addItem(itemSubmenuItem)
+
+        // Pet Companion Submenu
+        let petMenu = NSMenu()
+        for kind in PetKind.allCases {
+            let item = NSMenuItem(
+                title: kind.displayName,
+                action: #selector(didSelectPetKind(_:)),
+                keyEquivalent: ""
+            )
+            item.target = self
+            item.representedObject = kind
+            if currentPetKind == kind {
+                item.state = .on
+            }
+            petMenu.addItem(item)
+        }
+        petMenu.addItem(NSMenuItem.separator())
+        let dismissItem = NSMenuItem(
+            title: "❌ 펫 소환 해제 (Dismiss)",
+            action: #selector(didSelectDismissPet),
+            keyEquivalent: ""
+        )
+        dismissItem.target = self
+        if currentPetKind == nil {
+            dismissItem.state = .on
+        }
+        petMenu.addItem(dismissItem)
+
+        let petSubmenuItem = NSMenuItem(title: "🐾 펫 동반자 (Pet Companion)", action: nil, keyEquivalent: "")
+        petSubmenuItem.submenu = petMenu
+        menu.addItem(petSubmenuItem)
 
         // 5. Fun Interactions Submenu
         let actMenu = NSMenu()
@@ -882,6 +940,63 @@ public final class AppController: NSObject, CharacterViewDelegate, NSMenuDelegat
         statusItem?.menu = buildContextMenu()
     }
 
+
+    // MARK: - Pet Companion (펫 동반자 시스템)
+    public func summonPet(kind: PetKind) {
+        self.currentPetKind = kind
+        if petWindow == nil {
+            let pw = PetWindow(kind: kind)
+            pw.petView.petDelegate = self
+            self.petWindow = pw
+            let spawnX = physics.position.x - 70
+            let pPhys = PhysicsEngine(initialPosition: CGPoint(x: spawnX, y: physics.position.y))
+            self.petPhysics = pPhys
+            self.petBehavior = PetBehaviorController()
+            pw.setFeetPosition(x: spawnX, y: physics.position.y)
+            pw.orderFrontRegardless()
+        } else {
+            petWindow?.petView.petNode.setKind(kind)
+        }
+        petWindow?.petView.petNode.showOverheadEmoji("✨", duration: 1.8)
+        SoundAndEffectsManager.shared.play(.heart)
+    }
+
+    public func dismissPet() {
+        self.currentPetKind = nil
+        petWindow?.orderOut(nil)
+        petWindow = nil
+        petPhysics = nil
+        petBehavior = nil
+        SoundAndEffectsManager.shared.play(.pop)
+    }
+
+    @objc private func didSelectPetKind(_ sender: NSMenuItem) {
+        guard let kind = sender.representedObject as? PetKind else { return }
+        summonPet(kind: kind)
+        statusItem?.menu = buildContextMenu()
+    }
+
+    @objc private func didSelectDismissPet() {
+        dismissPet()
+        statusItem?.menu = buildContextMenu()
+    }
+
+    // MARK: - PetViewDelegate
+    public func petViewDidClick(_ view: PetView) {
+        petBehavior?.handlePetClicked(petNode: view.petNode)
+    }
+
+    public func petViewDidStartDrag(_ view: PetView, at screenPoint: CGPoint) {
+        petPhysics?.setDragged(at: screenPoint)
+    }
+
+    public func petViewDidDrag(_ view: PetView, to screenPoint: CGPoint) {
+        petPhysics?.setDragged(at: screenPoint)
+    }
+
+    public func petViewDidEndDrag(_ view: PetView, throwVelocity: CGPoint) {
+        petPhysics?.releaseDrag(throwVelocity: throwVelocity)
+    }
     // MARK: - Ladder Descent (사다리 타고 창문 내려가기)
     private func canStartLadderDescent() -> Bool {
         guard !behavior.isClimbing,
