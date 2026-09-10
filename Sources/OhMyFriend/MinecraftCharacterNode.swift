@@ -86,6 +86,7 @@ public final class MinecraftCharacterNode: SCNNode {
     public var isEating: Bool = false
     public var isCheering: Bool = false
     public var isNagging: Bool = false
+    public var isAttackingWeapon: Bool = false
 
     // Ladder climbing (사다리 등반)
     public var isClimbing: Bool = false {
@@ -677,6 +678,10 @@ public final class MinecraftCharacterNode: SCNNode {
                 let wave = sin(animTime * 12.0) * 0.4
                 rightArmJoint.eulerAngles = SCNVector3(-CGFloat.pi + 0.4, 0, wave)
                 leftArmJoint.eulerAngles = SCNVector3(stride, 0, 0)
+            } else if isAttackingWeapon {
+                let slash = sin(animTime * 24.0) * 0.95
+                rightArmJoint.eulerAngles = SCNVector3(-CGFloat.pi / 2.2 + slash, 0.25, -0.15)
+                leftArmJoint.eulerAngles = SCNVector3(stride, 0, 0)
             } else if isPoking {
                 let punch = sin(animTime * 15.0) * 0.8
                 rightArmJoint.eulerAngles = SCNVector3(-CGFloat.pi / 2.0 + punch, 0, 0)
@@ -726,6 +731,10 @@ public final class MinecraftCharacterNode: SCNNode {
                 let punch = sin(animTime * 14.0) * 0.7
                 rightArmJoint.eulerAngles = SCNVector3(-CGFloat.pi / 2.2 + punch, 0, -0.1)
                 leftArmJoint.eulerAngles = SCNVector3(0, 0, -0.1)
+            } else if isAttackingWeapon {
+                let slash = sin(animTime * 24.0) * 0.95
+                rightArmJoint.eulerAngles = SCNVector3(-CGFloat.pi / 2.2 + slash, 0.25, -0.15)
+                leftArmJoint.eulerAngles = SCNVector3(0.2, 0, -0.2)
             } else {
                 rightArmJoint.eulerAngles = SCNVector3(breath * 2.0, 0, 0.05)
                 leftArmJoint.eulerAngles = SCNVector3(breath * 2.0, 0, -0.05)

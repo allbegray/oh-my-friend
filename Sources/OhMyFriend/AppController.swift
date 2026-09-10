@@ -3,7 +3,7 @@ import CoreGraphics
 import SceneKit
 import UniformTypeIdentifiers
 
-public final class AppController: NSObject, CharacterViewDelegate, PetViewDelegate, NSMenuDelegate {
+public final class AppController: NSObject, CharacterViewDelegate, PetViewDelegate, CreeperViewDelegate, NSMenuDelegate {
     private var window: CharacterWindow!
     private var physics: PhysicsEngine!
     private var behavior = CharacterBehaviorController()
@@ -34,6 +34,15 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
     private var petPhysics: PhysicsEngine?
     private var petBehavior: PetBehaviorController?
     public private(set) var currentPetKind: PetKind? = nil
+
+    // Creeper Entity (크리퍼 출현 & 퇴치)
+    private var creeperWindow: CreeperWindow?
+    private var creeperPhysics: PhysicsEngine?
+    private var creeperBehavior: CreeperBehaviorController?
+    private var isCreeperSpawnEnabled: Bool = true
+    private var creeperSpawnTimer: TimeInterval = 0
+    private var creeperSpawnInterval: TimeInterval = 120.0 // Occasional spawn every ~2 min
+    private var playerAttackTimer: TimeInterval = 0
 
     public override init() {
         super.init()
@@ -147,6 +156,48 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
             pPhys.update(deltaTime: CGFloat(dt), platforms: cachedPlatforms, screen: screen)
             pw.petView.petNode.update(deltaTime: CGFloat(dt))
             pw.setFeetPosition(x: pPhys.position.x, y: pPhys.position.y)
+        }
+
+        // 4.6. Update Creeper Entity
+        if let cw = creeperWindow, let cPhys = creeperPhysics, let cBehav = creeperBehavior {
+            cBehav.update(
+                deltaTime: CGFloat(dt),
+                creeperPhysics: cPhys,
+                creeperNode: cw.creeperView.creeperNode,
+                playerPos: physics.position,
+                onExplode: { [weak self] blastPos in
+                    self?.handleCreeperExploded(at: blastPos)
+                },
+                onDefeated: { [weak self] in
+                    self?.handleCreeperDefeated()
+                }
+            )
+            cPhys.update(deltaTime: CGFloat(dt), platforms: cachedPlatforms, screen: screen)
+            cw.creeperView.creeperNode.update(deltaTime: CGFloat(dt))
+            cw.setFeetPosition(x: cPhys.position.x, y: cPhys.position.y)
+
+            // Auto-attack if player has weapon equipped and Creeper gets dangerously close (< 100pt)
+            let dist = hypot(cPhys.position.x - physics.position.x, cPhys.position.y - physics.position.y)
+            if dist < 100.0 && !cBehav.isDespawned && playerAttackTimer <= 0 {
+                attackCreeperWithCurrentWeapon()
+            }
+        }
+
+        // Player attack animation timer
+        if playerAttackTimer > 0 {
+            playerAttackTimer -= dt
+            if playerAttackTimer <= 0 {
+                window.characterView.characterNode.isAttackingWeapon = false
+            }
+        }
+
+        // Autonomous Creeper Spawning
+        if isCreeperSpawnEnabled && creeperWindow == nil {
+            creeperSpawnTimer += dt
+            if creeperSpawnTimer >= creeperSpawnInterval {
+                creeperSpawnTimer = 0
+                spawnCreeper()
+            }
         }
         // 5. Update Status Menu Text
         updateStatusMenuItemText()
@@ -442,6 +493,10 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
         menuBarSitItem.target = self
         actMenu.addItem(menuBarSitItem)
 
+        let creeperItem = NSMenuItem(title: "💥 크리퍼 소환 (Spawn Creeper)", action: #selector(didSelectSpawnCreeper), keyEquivalent: "k")
+        creeperItem.target = self
+        actMenu.addItem(creeperItem)
+
         let cheerItem = NSMenuItem(title: "🎉 코딩 신나게 응원하기 (Cheer)", action: #selector(didSelectCheer), keyEquivalent: "c")
         cheerItem.target = self
         actMenu.addItem(cheerItem)
@@ -566,6 +621,16 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
         nagToggleItem.target = self
         nagToggleItem.state = NotificationCenterMonitor.shared.isEnabled ? .on : .off
         menu.addItem(nagToggleItem)
+
+        // Creeper Spawning Toggle
+        let creeperToggleItem = NSMenuItem(
+            title: "👾 가끔 크리퍼 출현 모드",
+            action: #selector(didToggleCreeperSpawn(_:)),
+            keyEquivalent: ""
+        )
+        creeperToggleItem.target = self
+        creeperToggleItem.state = isCreeperSpawnEnabled ? .on : .off
+        menu.addItem(creeperToggleItem)
 
         let attackItem = NSMenuItem(
             title: "🧨 TNT로 창 부수기",
@@ -996,6 +1061,126 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
 
     public func petViewDidEndDrag(_ view: PetView, throwVelocity: CGPoint) {
         petPhysics?.releaseDrag(throwVelocity: throwVelocity)
+    }
+
+    // MARK: - Creeper Combat & Spawning (크리퍼 전투 및 소환)
+    public func spawnCreeper() {
+        guard creeperWindow == nil else { return }
+        let cw = CreeperWindow()
+        cw.creeperView.creeperDelegate = self
+        self.creeperWindow = cw
+
+        // Spawn on the current platform or ~260pt away
+        let spawnDir: CGFloat = Bool.random() ? 1.0 : -1.0
+        let spawnX = physics.position.x + (spawnDir * 260.0)
+        let cPhys = PhysicsEngine(initialPosition: CGPoint(x: spawnX, y: physics.position.y))
+        self.creeperPhysics = cPhys
+        self.creeperBehavior = CreeperBehaviorController()
+
+        cw.setFeetPosition(x: spawnX, y: physics.position.y)
+        cw.orderFrontRegardless()
+        cw.creeperView.creeperNode.showOverheadEmoji("👾 나타났다!", duration: 1.8)
+        SoundAndEffectsManager.shared.play(.alert)
+    }
+
+    public func despawnCreeper() {
+        creeperWindow?.orderOut(nil)
+        creeperWindow = nil
+        creeperPhysics = nil
+        creeperBehavior = nil
+    }
+
+    public func attackCreeperWithCurrentWeapon() {
+        guard let cw = creeperWindow,
+              let cPhys = creeperPhysics,
+              let cBehav = creeperBehavior,
+              !cBehav.isDespawned else { return }
+
+        // Face towards Creeper
+        let dx = cPhys.position.x - physics.position.x
+        window.characterView.characterNode.modelRoot.eulerAngles.y = dx >= 0 ? (CGFloat.pi / 2.0) : (-CGFloat.pi / 2.0)
+
+        // Trigger attack animation on player
+        window.characterView.characterNode.isAttackingWeapon = true
+        playerAttackTimer = 0.35
+
+        let weapon = window.characterView.characterNode.currentHeldItem
+        let damage: Int
+        let playerEmoji: String
+
+        switch weapon {
+        case .diamondSword:
+            damage = 3 // 1-hit kill!
+            playerEmoji = "⚔️ 슬래시!"
+        case .diamondPickaxe:
+            damage = 2
+            playerEmoji = "⛏️ 강타!"
+        case .torch:
+            damage = 1
+            playerEmoji = "🕯️ 횃불 지지기!"
+        case .goldenApple:
+            damage = 1
+            playerEmoji = "🍎 사과 쿵!"
+        case .none:
+            damage = 1
+            playerEmoji = "👊 펀치!"
+        }
+
+        window.characterView.characterNode.showOverheadEmoji(playerEmoji, duration: 1.2)
+
+        cBehav.applyDamage(
+            damage,
+            fromPlayerAt: physics.position,
+            weapon: weapon,
+            creeperPhysics: cPhys,
+            creeperNode: cw.creeperView.creeperNode,
+            onDefeated: { [weak self] in
+                self?.handleCreeperDefeated()
+            }
+        )
+    }
+
+    private func handleCreeperExploded(at blastPos: CGPoint) {
+        let dx = physics.position.x - blastPos.x
+        let blastDir: CGFloat = dx >= 0 ? 1.0 : -1.0
+        physics.launch(vx: blastDir * 550.0, vy: 420.0)
+        window.characterView.characterNode.showOverheadEmoji("💥 으악!", duration: 2.0)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+            self?.despawnCreeper()
+        }
+    }
+
+    private func handleCreeperDefeated() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
+            self?.despawnCreeper()
+        }
+    }
+
+    @objc private func didSelectSpawnCreeper() {
+        spawnCreeper()
+    }
+
+    @objc private func didToggleCreeperSpawn(_ sender: NSMenuItem) {
+        isCreeperSpawnEnabled.toggle()
+        sender.state = isCreeperSpawnEnabled ? .on : .off
+        statusItem?.menu = buildContextMenu()
+    }
+
+    // MARK: - CreeperViewDelegate
+    public func creeperViewDidClick(_ view: CreeperView) {
+        attackCreeperWithCurrentWeapon()
+    }
+
+    public func creeperViewDidStartDrag(_ view: CreeperView, at screenPoint: CGPoint) {
+        creeperPhysics?.setDragged(at: screenPoint)
+    }
+
+    public func creeperViewDidDrag(_ view: CreeperView, to screenPoint: CGPoint) {
+        creeperPhysics?.setDragged(at: screenPoint)
+    }
+
+    public func creeperViewDidEndDrag(_ view: CreeperView, throwVelocity: CGPoint) {
+        creeperPhysics?.releaseDrag(throwVelocity: throwVelocity)
     }
     // MARK: - Ladder Descent (사다리 타고 창문 내려가기)
     private func canStartLadderDescent() -> Bool {
