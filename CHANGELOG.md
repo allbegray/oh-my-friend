@@ -2,6 +2,14 @@
 
 # 변경 이력
 
+## [v0.2.7] - 2026-09-10
+
+### 추가
+- GitHub Actions CI/CD 릴리스 워크플로(`.github/workflows/release.yml`) 구축:
+  - `main` 브랜치 push 및 PR 시 `macos-14`(Apple Silicon) 러너에서 자동 빌드 및 아티팩트(`OhMyFriend-macOS-arm64.zip`) 생성.
+  - 버전 태그(`v*`) push 시 GitHub Releases에 바이너리 압축 파일 자동 배포 및 릴리스 노트 생성.
+  - README에 릴리스 바이너리 다운로드 및 macOS Gatekeeper 격리 해제(`xattr -cr`) 안내 추가.
+
 ## [v0.2.6] - 2026-09-10
 
 ### 개선

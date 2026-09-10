@@ -16,7 +16,17 @@
     xcode-select --install
     ```
 
-### 2. 저장소 클론 및 빠른 실행
+### 2. 빌드된 앱 다운로드 (GitHub Releases)
+소스 코드를 직접 빌드하지 않고 바로 실행하려면 [GitHub Releases](https://github.com/allbegray/oh-my-friend/releases)에서 최신 버전의 `OhMyFriend-macOS-arm64.zip`을 다운로드할 수 있습니다:
+
+1. 압축을 해제하고 `OhMyFriend.app`을 `/Applications`(응용 프로그램) 폴더로 이동합니다.
+2. 개발자 인증서 미서명 앱이므로 최초 1회 터미널에서 Gatekeeper 격리 속성을 해제합니다:
+   ```bash
+   xattr -cr /Applications/OhMyFriend.app
+   ```
+3. `OhMyFriend.app`을 실행합니다.
+
+### 3. 저장소 클론 및 소스에서 실행
 ```bash
 git clone https://github.com/allbegray/oh-my-friend.git
 cd oh-my-friend
@@ -25,7 +35,7 @@ cd oh-my-friend
 ./scripts/run.sh
 ```
 
-### 3. macOS 시스템에 설치하기
+### 4. macOS 시스템에 설치하기
 맥의 응용 프로그램 폴더(`/Applications`)에 정식 앱으로 등록하여 Spotlight(`Cmd + Space`)로 실행할 수 있습니다:
 ```bash
 ./scripts/install.sh
