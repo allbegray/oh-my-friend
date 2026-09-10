@@ -313,10 +313,10 @@ struct MenuBuilder {
             findActItem(in: actSubmenuItem.submenu, matching: { $0.hasPrefix("🏹 디펜스전 모드") })?.state = .on
         }
 
-        let extraSubmenuItem = makeSearchableMenu(title: "🎉 추가 모션 9~17차", groups: app.extraGroups())
+        let extraSubmenuItem = makeSearchableMenu(title: "🎉 추가 모션", groups: app.extraGroups())
         menu.addItem(extraSubmenuItem)
 
-        let extra2SubmenuItem = makeSearchableMenu(title: "✨ 신규 100선 (A~J)", groups: app.extraGroups2())
+        let extra2SubmenuItem = makeSearchableMenu(title: "✨ 신규 100선", groups: app.extraGroups2())
         menu.addItem(extra2SubmenuItem)
         // 4. Scale Submenu
         let scaleMenu = NSMenu()
