@@ -1,6 +1,7 @@
 import AppKit
 import CoreGraphics
 import Foundation
+import SceneKit
 
 // J분야 10종: 좀비치료·전직소·명찰·제도대·결투장·경마·하드코어·콘테스트·통계실·낚시왕 + MetaJManager.
 // AppController "🎉 추가 모션" 서브메뉴에서 MetaJManager.shared.entries()로 호출한다.
@@ -353,7 +354,8 @@ public final class JZombieCureWindow: EntityWindow {
     private var phase: TimeInterval = 0
     private var curingLeft: TimeInterval = 0
     private var cured = false
-    private var drawView: JZombieCureView?
+    private var rig: BipedRig?
+    private var sceneView: MobSceneView?
     private let panelW: CGFloat = 64
     private let panelH: CGFloat = 64
 
@@ -363,8 +365,25 @@ public final class JZombieCureWindow: EntityWindow {
         self.position = startPos
         self.onTap = onTap
         super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
-        let view = JZombieCureView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
-        self.drawView = view
+        let view = MobSceneView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
+        let rig = BipedRig(
+            headColor: .rgb(0.95, 0.80, 0.65),
+            torsoColor: .rgb(0.35, 0.65, 0.40),
+            limbColor: .rgb(0.28, 0.55, 0.33)
+        )
+        for ex in [-0.10, 0.10] as [CGFloat] {
+            let eye = vbox(0.08, 0.10, 0.02, .rgb(0.15, 0.45, 0.20))
+            eye.position = SCNVector3(ex, 0.08, 0.26)
+            rig.head.addChildNode(eye)
+        }
+        let nose = vbox(0.10, 0.14, 0.08, .rgb(0.85, 0.68, 0.52))
+        nose.position = SCNVector3(0, -0.05, 0.28)
+        rig.head.addChildNode(nose)
+        rig.scale = SCNVector3(0.55, 0.55, 0.55)
+        view.setSubject(rig)
+        self.rig = rig
+        self.sceneView = view
+        view.onTap = { [weak self] in guard let self = self else { return }; self.onTap(self) }
         contentView = view
     }
 
@@ -376,16 +395,22 @@ public final class JZombieCureWindow: EntityWindow {
             self.phase += 1.0 / 60.0
             if self.curingLeft > 0 {
                 self.curingLeft -= 1.0 / 60.0
-                if self.curingLeft <= 0 { self.cured = true }
+                if self.curingLeft <= 0 {
+                    self.cured = true
+                    self.syncCuredColors()
+                }
             }
             let shake: CGFloat = self.curingLeft > 0 ? CGFloat.random(in: -3...3) : 0
             self.setFrameOrigin(NSPoint(x: self.position.x - self.panelW / 2 + shake, y: self.position.y))
-            self.drawView?.cured = self.cured
-            self.drawView?.curing = self.curingLeft > 0
-            self.drawView?.bob = sin(self.phase * 3.0)
-            self.drawView?.needsDisplay = true
+            self.rig?.walk(1.0 / 60.0)
+            self.rig?.position.y = CGFloat(sin(self.phase * 3.0)) * 0.05
         }
         RunLoop.main.add(tick!, forMode: .common)
+    }
+
+    private func syncCuredColors() {
+        rig?.torso.geometry?.materials = [voxelMaterial(.rgb(0.55, 0.38, 0.25))]
+        rig?.head.geometry?.materials = [voxelMaterial(.rgb(0.95, 0.80, 0.65))]
     }
 
     public func cure() {
@@ -676,15 +701,34 @@ public final class JArenaWindow: EntityWindow {
     private var hp = [HitCounter(maxHits: 3), HitCounter(maxHits: 3)]
     private var finished = false
     private var clashLeft: TimeInterval = 0
-    private var drawView: JArenaView?
+    private var rigs: [BipedRig] = []
+    private var sceneView: MobSceneView?
     private let names = ["🔴 붉은 검투사", "🔵 푸른 검투사"]
 
     public init(floorPos: CGPoint, onWinner: @escaping (String) -> Void) {
         self.onWinner = onWinner
         let size = NSSize(width: 140, height: 80)
         super.init(contentRect: NSRect(x: floorPos.x - size.width / 2, y: floorPos.y, width: size.width, height: size.height), ignoresMouse: false)
-        let view = JArenaView(frame: NSRect(origin: .zero, size: size))
-        self.drawView = view
+        let view = MobSceneView(frame: NSRect(origin: .zero, size: size))
+        let coats: [(VoxelColor, VoxelColor)] = [
+            (.rgb(0.85, 0.25, 0.25), .rgb(0.55, 0.38, 0.25)),
+            (.rgb(0.25, 0.45, 0.85), .rgb(0.55, 0.38, 0.25)),
+        ]
+        let root = SCNNode()
+        for (i, coat) in coats.enumerated() {
+            let rig = BipedRig(headColor: .rgb(0.95, 0.80, 0.65), torsoColor: coat.0, limbColor: coat.1)
+            let blade = vbox(0.08, 0.55, 0.08, .rgb(0.75, 0.75, 0.78))
+            blade.position = SCNVector3(0, -0.62, 0.06)
+            rig.armR.addChildNode(blade)
+            rig.position = SCNVector3(i == 0 ? -0.75 : 0.75, 0, 0)
+            rig.scale = SCNVector3(0.55, 0.55, 0.55)
+            rig.eulerAngles.y = i == 0 ? CGFloat.pi / 2.0 : -CGFloat.pi / 2.0
+            root.addChildNode(rig)
+            rigs.append(rig)
+        }
+        view.setSubject(root)
+        self.sceneView = view
+        view.onTap = { [weak self] in self?.tapFight() }
         contentView = view
         refresh()
     }
@@ -699,15 +743,21 @@ public final class JArenaWindow: EntityWindow {
                 self.clashLeft -= 1.0 / 60.0
                 self.refresh()
             }
+            for rig in self.rigs { rig.walk(1.0 / 60.0) }
         }
         RunLoop.main.add(tick!, forMode: .common)
     }
 
     public override func mouseDown(with event: NSEvent) {
+        tapFight()
+    }
+
+    private func tapFight() {
         guard !finished else { return }
         let loser = Bool.random() ? 0 : 1
         let downed = hp[loser].hit()
         clashLeft = 0.4
+        rigs[loser == 0 ? 1 : 0].attack()
         SoundAndEffectsManager.shared.play(.pop)
         refresh()
         if downed {
@@ -719,11 +769,9 @@ public final class JArenaWindow: EntityWindow {
     }
 
     private func refresh() {
-        drawView?.hp = hp.map { 3 - $0.hits }
-        drawView?.finished = finished
-        drawView?.clash = clashLeft > 0
-        drawView?.bob = sin(phase * 5.0)
-        drawView?.needsDisplay = true
+        for (i, rig) in rigs.enumerated() {
+            rig.isHidden = hp[i].hits >= hp[i].maxHits
+        }
     }
 
     public override func close() {
@@ -780,7 +828,8 @@ public final class JRaceWindow: EntityWindow {
     private var progress: [CGFloat] = [0, 0, 0]
     private var speeds: [CGFloat] = [22, 22, 22]
     private var finished = false
-    private var drawView: JRaceView?
+    private var rigs: [QuadRig] = []
+    private var sceneView: MobSceneView?
     private let names = ["백마", "흑마", "적토마"]
     private let duration: TimeInterval = 10
 
@@ -789,8 +838,26 @@ public final class JRaceWindow: EntityWindow {
         self.onFinish = onFinish
         let size = NSSize(width: 220, height: 84)
         super.init(contentRect: NSRect(x: floorPos.x - size.width / 2, y: floorPos.y, width: size.width, height: size.height), ignoresMouse: true)
-        let view = JRaceView(frame: NSRect(origin: .zero, size: size))
-        self.drawView = view
+        let view = MobSceneView(frame: NSRect(origin: .zero, size: size))
+        let coats: [(VoxelColor, VoxelColor)] = [
+            (.rgb(0.95, 0.95, 0.95), .rgb(0.85, 0.85, 0.86)),
+            (.rgb(0.20, 0.20, 0.22), .rgb(0.15, 0.15, 0.17)),
+            (.rgb(0.65, 0.35, 0.20), .rgb(0.50, 0.27, 0.15)),
+        ]
+        let root = SCNNode()
+        for (i, coat) in coats.enumerated() {
+            let rig = QuadRig(bodyColor: coat.0, headColor: coat.0, legColor: coat.1, tailColor: coat.1)
+            let mane = vbox(0.12, 0.30, 0.40, coat.1)
+            mane.position = SCNVector3(0, 0.30, -0.05)
+            rig.body.addChildNode(mane)
+            rig.position = SCNVector3(-1.2, -0.3, CGFloat(i - 1) * 0.55)
+            rig.scale = SCNVector3(0.55, 0.55, 0.55)
+            rig.eulerAngles.y = CGFloat.pi / 2.0
+            root.addChildNode(rig)
+            rigs.append(rig)
+        }
+        view.setSubject(root)
+        self.sceneView = view
         contentView = view
     }
 
@@ -804,9 +871,10 @@ public final class JRaceWindow: EntityWindow {
             for i in 0..<3 {
                 self.speeds[i] = CGFloat.random(in: 12...30)
                 self.progress[i] += self.speeds[i] * CGFloat(dt) / (200.0 / self.duration * 10.0)
+                let rig = self.rigs[i]
+                rig.walk(dt)
+                rig.position.x = -1.2 + min(self.progress[i], 1.0) * 2.4
             }
-            self.drawView?.progress = self.progress
-            self.drawView?.needsDisplay = true
             if self.elapsed >= self.duration && !self.finished {
                 self.finished = true
                 t.invalidate()
@@ -814,8 +882,6 @@ public final class JRaceWindow: EntityWindow {
                 for i in 1..<3 {
                     if self.progress[i] > self.progress[winner] { winner = i }
                 }
-                self.drawView?.winner = winner
-                self.drawView?.needsDisplay = true
                 self.onFinish(winner == self.bet, self.names[winner])
             }
         }

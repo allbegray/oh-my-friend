@@ -1,6 +1,7 @@
 import AppKit
 import CoreGraphics
 import Foundation
+import SceneKit
 
 // 10차 백로그: 다크 네더 5종(위더스켈레톤·블레이즈·익사자·브리즈·실버피시).
 // GhastWindow 화염탄 미니 패널 패턴을 투사체 3종에 재사용한다.
@@ -56,7 +57,7 @@ public final class WitherSkeletonWindow: EntityWindow {
     private var walkTimer: Timer?
     private let onDefeat: () -> Void
     private let onProximity: () -> Void
-    private var drawView: WitherSkeletonDrawView?
+    private var rig: BipedRig?
     private var isGone = false
 
     public init(startPos: CGPoint, onDefeat: @escaping () -> Void, onProximity: @escaping () -> Void) {
@@ -65,8 +66,39 @@ public final class WitherSkeletonWindow: EntityWindow {
         self.onProximity = onProximity
         let size = NSSize(width: 64, height: 84)
         super.init(contentRect: NSRect(x: startPos.x - 32, y: startPos.y, width: size.width, height: size.height), ignoresMouse: false)
-        let view = WitherSkeletonDrawView(frame: NSRect(origin: .zero, size: size))
-        self.drawView = view
+        let view = MobSceneView(frame: NSRect(origin: .zero, size: size))
+        let rig = BipedRig(headColor: .rgb(0.15, 0.15, 0.16), torsoColor: .rgb(0.12, 0.12, 0.14), limbColor: .rgb(0.10, 0.10, 0.11))
+        let trim = vbox(0.38, 0.08, 0.24, .rgb(0.35, 0.35, 0.38))
+        trim.position = SCNVector3(0, 0.28, 0)
+        rig.torso.addChildNode(trim)
+        for sx in [-0.32, 0.32] as [CGFloat] {
+            let skull = vbox(0.30, 0.30, 0.30, .rgb(0.15, 0.15, 0.16))
+            skull.position = SCNVector3(sx, 0.10, 0)
+            rig.head.addChildNode(skull)
+            for ex in [-0.07, 0.07] as [CGFloat] {
+                let eye = vbox(0.06, 0.07, 0.02, .glow(1.0, 1.0, 1.0))
+                eye.position = SCNVector3(sx + ex, 0.12, 0.16)
+                rig.head.addChildNode(eye)
+            }
+        }
+        for ex in [-0.10, 0.10] as [CGFloat] {
+            let eye = vbox(0.08, 0.09, 0.02, .glow(1.0, 1.0, 1.0))
+            eye.position = SCNVector3(ex, 0.05, 0.26)
+            rig.head.addChildNode(eye)
+        }
+        let blade = vbox(0.09, 0.70, 0.04, .rgb(0.55, 0.55, 0.58))
+        blade.position = SCNVector3(0, -0.75, 0)
+        rig.armR.addChildNode(blade)
+        let grip = vbox(0.16, 0.07, 0.07, .rgb(0.30, 0.20, 0.12))
+        grip.position = SCNVector3(0, -0.42, 0)
+        rig.armR.addChildNode(grip)
+        rig.scale = SCNVector3(0.6, 0.6, 0.6)
+        view.setSubject(rig)
+        self.rig = rig
+        view.onTap = { [weak self] in
+            guard let self = self else { return }
+            self.handleTap()
+        }
         contentView = view
     }
 
@@ -85,14 +117,18 @@ public final class WitherSkeletonWindow: EntityWindow {
                 self.debuffGate.trigger(20.0)
                 self.onProximity()
             }
-            self.drawView?.facingRight = self.wander.direction > 0
-            self.drawView?.bob = sin(self.phase * 5.0)
-            self.drawView?.needsDisplay = true
+            self.rig?.walk(dt)
+            self.rig?.eulerAngles.y = self.wander.direction > 0 ? 0 : CGFloat.pi
+            self.rig?.position.y = sin(self.phase * 5.0) * 0.03
         }
         RunLoop.main.add(walkTimer!, forMode: .common)
     }
 
     public override func mouseDown(with event: NSEvent) {
+        handleTap()
+    }
+
+    private func handleTap() {
         if hits.hit() {
             disappear(defeated: true)
         } else {
@@ -164,7 +200,8 @@ public final class BlazeWindow: EntityWindow {
     private var flyTimer: Timer?
     private let onShoot: (CGPoint) -> Void
     private let onDefeat: () -> Void
-    private var drawView: BlazeDrawView?
+    private var rig: FlyerRig?
+    private var rodsNode: SCNNode?
     private var isGone = false
 
     public init(startPos: CGPoint, onShoot: @escaping (CGPoint) -> Void, onDefeat: @escaping () -> Void) {
@@ -173,8 +210,28 @@ public final class BlazeWindow: EntityWindow {
         self.onDefeat = onDefeat
         let size = NSSize(width: 72, height: 72)
         super.init(contentRect: NSRect(x: startPos.x - 36, y: startPos.y, width: size.width, height: size.height), ignoresMouse: false)
-        let view = BlazeDrawView(frame: NSRect(origin: .zero, size: size))
-        self.drawView = view
+        let view = MobSceneView(frame: NSRect(origin: .zero, size: size))
+        let rig = FlyerRig(bodyColor: .rgb(1.0, 0.85, 0.20), wingColor: .rgb(1.0, 0.75, 0.15))
+        let rods = SCNNode()
+        for i in 0..<4 {
+            let a = CGFloat(i) * .pi / 2
+            let rod = vbox(0.10, 0.42, 0.10, .rgb(1.0, 0.75, 0.15))
+            rod.position = SCNVector3(Float(cos(a) * 0.42), -0.05, Float(sin(a) * 0.42))
+            rods.addChildNode(rod)
+        }
+        rig.body.addChildNode(rods)
+        self.rodsNode = rods
+        for ex in [-0.08, 0.08] as [CGFloat] {
+            let eye = vbox(0.07, 0.08, 0.02, .rgb(0.15, 0.10, 0.05))
+            eye.position = SCNVector3(ex, 0.08, 0.17)
+            rig.body.addChildNode(eye)
+        }
+        view.setSubject(rig)
+        self.rig = rig
+        view.onTap = { [weak self] in
+            guard let self = self else { return }
+            self.handleTap()
+        }
         contentView = view
     }
 
@@ -190,8 +247,8 @@ public final class BlazeWindow: EntityWindow {
             let cx = self.anchor.x + sin(self.phase * 0.8) * 70.0
             let cy = self.anchor.y + 90 + sin(self.phase * 1.3) * 18.0
             self.setFrameOrigin(NSPoint(x: cx - 36, y: cy))
-            self.drawView?.spin = self.phase * 2.4
-            self.drawView?.needsDisplay = true
+            self.rig?.flap(dt)
+            self.rodsNode?.eulerAngles.y = self.phase * 2.4
             if self.shootGate.ready {
                 self.shootGate.trigger(Double.random(in: 4.0...6.0))
                 self.onShoot(CGPoint(x: cx, y: cy))
@@ -203,6 +260,10 @@ public final class BlazeWindow: EntityWindow {
     public var centerPos: CGPoint { CGPoint(x: frame.midX, y: frame.midY) }
 
     public override func mouseDown(with event: NSEvent) {
+        handleTap()
+    }
+
+    private func handleTap() {
         if hits.hit() {
             disappear(defeated: true)
         } else {
@@ -326,7 +387,7 @@ public final class DrownedWindow: EntityWindow {
     private var walkTimer: Timer?
     private let onThrow: (CGPoint) -> Void
     private let onDefeat: () -> Void
-    private var drawView: DrownedDrawView?
+    private var rig: BipedRig?
     private var isGone = false
 
     public init(startPos: CGPoint, onThrow: @escaping (CGPoint) -> Void, onDefeat: @escaping () -> Void) {
@@ -335,8 +396,31 @@ public final class DrownedWindow: EntityWindow {
         self.onDefeat = onDefeat
         let size = NSSize(width: 60, height: 72)
         super.init(contentRect: NSRect(x: startPos.x - 30, y: startPos.y, width: size.width, height: size.height), ignoresMouse: false)
-        let view = DrownedDrawView(frame: NSRect(origin: .zero, size: size))
-        self.drawView = view
+        let view = MobSceneView(frame: NSRect(origin: .zero, size: size))
+        let rig = BipedRig(headColor: .rgb(0.35, 0.70, 0.65), torsoColor: .rgb(0.20, 0.55, 0.55), limbColor: .rgb(0.18, 0.45, 0.48))
+        for ex in [-0.10, 0.10] as [CGFloat] {
+            let eye = vbox(0.08, 0.09, 0.02, .rgb(0.05, 0.10, 0.12))
+            eye.position = SCNVector3(ex, 0.05, 0.26)
+            rig.head.addChildNode(eye)
+        }
+        let shaft = vbox(0.05, 0.85, 0.05, .rgb(0.55, 0.75, 0.80))
+        shaft.position = SCNVector3(0, -0.80, 0)
+        rig.armR.addChildNode(shaft)
+        let bar = vbox(0.24, 0.05, 0.05, .rgb(0.55, 0.75, 0.80))
+        bar.position = SCNVector3(0, -0.40, 0)
+        rig.armR.addChildNode(bar)
+        for sx in [-0.10, 0, 0.10] as [CGFloat] {
+            let prong = vbox(0.05, 0.18, 0.05, .rgb(0.55, 0.80, 0.85))
+            prong.position = SCNVector3(sx, -0.28, 0)
+            rig.armR.addChildNode(prong)
+        }
+        rig.scale = SCNVector3(0.6, 0.6, 0.6)
+        view.setSubject(rig)
+        self.rig = rig
+        view.onTap = { [weak self] in
+            guard let self = self else { return }
+            self.handleTap()
+        }
         contentView = view
     }
 
@@ -351,9 +435,9 @@ public final class DrownedWindow: EntityWindow {
             self.throwGate.tick(dt)
             self.position.x += self.wander.tick(dt)
             self.setFrameOrigin(NSPoint(x: self.position.x - 30, y: self.position.y))
-            self.drawView?.facingRight = self.wander.direction > 0
-            self.drawView?.bob = sin(self.phase * 4.0)
-            self.drawView?.needsDisplay = true
+            self.rig?.walk(dt)
+            self.rig?.eulerAngles.y = self.wander.direction > 0 ? 0 : CGFloat.pi
+            self.rig?.position.y = sin(self.phase * 4.0) * 0.03
             if self.throwGate.ready {
                 self.throwGate.trigger(3.0)
                 self.onThrow(CGPoint(x: self.position.x, y: self.position.y + 44))
@@ -363,6 +447,10 @@ public final class DrownedWindow: EntityWindow {
     }
 
     public override func mouseDown(with event: NSEvent) {
+        handleTap()
+    }
+
+    private func handleTap() {
         if hits.hit() {
             disappear(defeated: true)
         } else {
@@ -493,7 +581,8 @@ public final class BreezeWindow: EntityWindow {
     private var flyTimer: Timer?
     private let onShoot: (CGPoint) -> Void
     private let onLeave: () -> Void
-    private var drawView: BreezeDrawView?
+    private var rig: FlyerRig?
+    private var swirlNode: SCNNode?
     private var isGone = false
 
     public init(startPos: CGPoint, onShoot: @escaping (CGPoint) -> Void, onLeave: @escaping () -> Void) {
@@ -502,8 +591,29 @@ public final class BreezeWindow: EntityWindow {
         self.onLeave = onLeave
         let size = NSSize(width: 64, height: 64)
         super.init(contentRect: NSRect(x: startPos.x - 32, y: startPos.y, width: size.width, height: size.height), ignoresMouse: false)
-        let view = BreezeDrawView(frame: NSRect(origin: .zero, size: size))
-        self.drawView = view
+        let view = MobSceneView(frame: NSRect(origin: .zero, size: size))
+        let rig = FlyerRig(bodyColor: .rgb(0.90, 0.97, 1.0), wingColor: .rgb(0.65, 0.85, 0.95))
+        let swirl = SCNNode()
+        for i in 0..<3 {
+            let a = CGFloat(i) * 2.1
+            let seg = vbox(0.10, 0.30, 0.10, .rgb(0.65, 0.85, 0.95))
+            seg.position = SCNVector3(Float(cos(a) * 0.38), 0, Float(sin(a) * 0.38))
+            seg.eulerAngles.y = a
+            swirl.addChildNode(seg)
+        }
+        rig.body.addChildNode(swirl)
+        self.swirlNode = swirl
+        for ex in [-0.08, 0.08] as [CGFloat] {
+            let eye = vbox(0.06, 0.08, 0.02, .rgb(0.20, 0.30, 0.45))
+            eye.position = SCNVector3(ex, 0.05, 0.17)
+            rig.body.addChildNode(eye)
+        }
+        view.setSubject(rig)
+        self.rig = rig
+        view.onTap = { [weak self] in
+            guard let self = self else { return }
+            self.handleTap()
+        }
         contentView = view
     }
 
@@ -519,8 +629,8 @@ public final class BreezeWindow: EntityWindow {
             let cx = self.anchor.x + sin(self.phase * 1.7) * 110.0
             let cy = self.anchor.y + 100 + abs(sin(self.phase * 2.3)) * 50.0
             self.setFrameOrigin(NSPoint(x: cx - 32, y: cy))
-            self.drawView?.spin = self.phase * 3.0
-            self.drawView?.needsDisplay = true
+            self.rig?.flap(dt)
+            self.swirlNode?.eulerAngles.y = CGFloat(self.phase * 3.0)
             if self.shootGate.ready {
                 self.shootGate.trigger(Double.random(in: 3.5...5.0))
                 self.onShoot(CGPoint(x: cx, y: cy))
@@ -532,6 +642,10 @@ public final class BreezeWindow: EntityWindow {
     public var centerPos: CGPoint { CGPoint(x: frame.midX, y: frame.midY) }
 
     public override func mouseDown(with event: NSEvent) {
+        handleTap()
+    }
+
+    private func handleTap() {
         SoundAndEffectsManager.shared.play(.pop)
         RewardCenter.say("🌀 바람이라 안 맞아!")
     }
@@ -652,7 +766,8 @@ public final class SilverfishWindow: EntityWindow {
     private var emergeGate = Cooldown()
     private var crawlTimer: Timer?
     private let onDefeat: () -> Void
-    private var drawView: SilverfishDrawView?
+    private var rig: QuadRig?
+    private var moundNode: SCNNode?
     private var isGone = false
 
     public init(startPos: CGPoint, onDefeat: @escaping () -> Void) {
@@ -660,8 +775,30 @@ public final class SilverfishWindow: EntityWindow {
         self.onDefeat = onDefeat
         let size = NSSize(width: 48, height: 32)
         super.init(contentRect: NSRect(x: startPos.x - 24, y: startPos.y, width: size.width, height: size.height), ignoresMouse: false)
-        let view = SilverfishDrawView(frame: NSRect(origin: .zero, size: size))
-        self.drawView = view
+        let view = MobSceneView(frame: NSRect(origin: .zero, size: size))
+        let rig = QuadRig(bodyColor: .rgb(0.70, 0.70, 0.72), headColor: .rgb(0.70, 0.70, 0.72), legColor: .rgb(0.55, 0.55, 0.58), tailColor: nil)
+        for sx in [-0.12, 0, 0.12] as [CGFloat] {
+            let stripe = vbox(0.05, 0.52, 0.60, .rgb(0.55, 0.55, 0.58))
+            stripe.position = SCNVector3(sx, 0.02, -0.05)
+            rig.body.addChildNode(stripe)
+        }
+        let eye = vbox(0.06, 0.06, 0.02, .rgb(0.10, 0.10, 0.10))
+        eye.position = SCNVector3(0.12, 0.05, 0.25)
+        rig.head.addChildNode(eye)
+        rig.scale = SCNVector3(0.7, 0.7, 0.7)
+        let mound = vbox(0.95, 0.32, 0.70, .rgb(0.45, 0.33, 0.22))
+        mound.position = SCNVector3(0, 0.16, 0)
+        mound.isHidden = true
+        self.moundNode = mound
+        let subject = SCNNode()
+        subject.addChildNode(rig)
+        subject.addChildNode(mound)
+        view.setSubject(subject)
+        self.rig = rig
+        view.onTap = { [weak self] in
+            guard let self = self else { return }
+            self.handleTap()
+        }
         contentView = view
     }
 
@@ -677,20 +814,24 @@ public final class SilverfishWindow: EntityWindow {
             if self.emerged {
                 self.position.x += sin(self.phase * 6.0) * 24.0 / 60.0
                 self.setFrameOrigin(NSPoint(x: self.position.x - 24, y: self.position.y))
+                self.rig?.walk(dt)
             }
             if self.emergeGate.ready {
                 self.emerged.toggle()
                 self.emergeGate.trigger(Double.random(in: 3.0...6.0))
                 SoundAndEffectsManager.shared.play(.pop)
             }
-            self.drawView?.emerged = self.emerged
-            self.drawView?.wiggle = sin(self.phase * 10.0)
-            self.drawView?.needsDisplay = true
+            self.rig?.isHidden = !self.emerged
+            self.moundNode?.isHidden = self.emerged
         }
         RunLoop.main.add(crawlTimer!, forMode: .common)
     }
 
     public override func mouseDown(with event: NSEvent) {
+        handleTap()
+    }
+
+    private func handleTap() {
         guard emerged else { return }
         disappear(defeated: true)
     }

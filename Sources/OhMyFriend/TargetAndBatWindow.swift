@@ -1,5 +1,6 @@
 import AppKit
 import CoreGraphics
+import SceneKit
 
 public final class TargetWindow: EntityWindow {
     public var centerPos: CGPoint = .zero
@@ -47,15 +48,31 @@ public final class BatWindow: EntityWindow {
     private var phase: TimeInterval = 0
     private var squeakTimer: TimeInterval = 6.0
     private let anchorProvider: () -> CGPoint
-    private var drawView: BatDrawView?
+    private var rig: FlyerRig?
 
     public init(anchorProvider: @escaping () -> CGPoint) {
         self.anchorProvider = anchorProvider
         self.anchor = anchorProvider()
         let size = NSSize(width: 40, height: 30)
         super.init(contentRect: NSRect(x: anchor.x, y: anchor.y + 120, width: size.width, height: size.height), ignoresMouse: true)
-        let view = BatDrawView(frame: NSRect(origin: .zero, size: size))
-        self.drawView = view
+        let view = MobSceneView(frame: NSRect(origin: .zero, size: size))
+        let rig = FlyerRig(
+            bodyColor: .rgb(0.25, 0.20, 0.28),
+            wingColor: .rgb(0.25, 0.20, 0.28)
+        )
+        for x in [-0.10, 0.10] as [CGFloat] {
+            let ear = vbox(0.10, 0.18, 0.06, .rgb(0.25, 0.20, 0.28))
+            ear.position = SCNVector3(x, 0.30, 0)
+            rig.body.addChildNode(ear)
+        }
+        for x in [-0.08, 0.08] as [CGFloat] {
+            let eye = vbox(0.06, 0.08, 0.02, .glow(0.95, 0.20, 0.30))
+            eye.position = SCNVector3(x, 0.05, 0.17)
+            rig.body.addChildNode(eye)
+        }
+        rig.addTo(view.scene!, scale: 0.9)
+        view.setSubject(rig)
+        self.rig = rig
         contentView = view
     }
 
@@ -69,8 +86,7 @@ public final class BatWindow: EntityWindow {
             let cx = self.anchor.x + cos(self.phase * 1.4) * 90.0
             let cy = self.anchor.y + 130 + sin(self.phase * 2.3) * 30.0
             self.setFrameOrigin(NSPoint(x: cx - 20, y: cy))
-            self.drawView?.flap = sin(self.phase * 18.0)
-            self.drawView?.needsDisplay = true
+            self.rig?.flap(1.0 / 60.0)
             self.squeakTimer -= 1.0 / 60.0
             if self.squeakTimer <= 0 {
                 self.squeakTimer = Double.random(in: 8.0...15.0)
@@ -84,35 +100,5 @@ public final class BatWindow: EntityWindow {
         flyTimer?.invalidate()
         flyTimer = nil
         super.close()
-    }
-}
-
-private final class BatDrawView: NSView {
-    var flap: CGFloat = 0
-
-    override func draw(_ dirtyRect: NSRect) {
-        guard let ctx = NSGraphicsContext.current?.cgContext else { return }
-        let w = bounds.width
-        let h = bounds.height
-        let wingY = h / 2 + flap * 6
-        ctx.setFillColor(red: 0.25, green: 0.20, blue: 0.28, alpha: 1.0)
-        ctx.fillEllipse(in: CGRect(x: 2, y: wingY - 4, width: 14, height: 12))
-        ctx.fillEllipse(in: CGRect(x: w - 16, y: wingY - 4, width: 14, height: 12))
-        ctx.fillEllipse(in: CGRect(x: w / 2.0 - 8, y: h / 2.0 - 8, width: 16, height: 16))
-        ctx.beginPath()
-        ctx.move(to: CGPoint(x: w / 2.0 - 6, y: h / 2.0 + 8))
-        ctx.addLine(to: CGPoint(x: w / 2.0 - 3, y: h / 2.0 + 14))
-        ctx.addLine(to: CGPoint(x: w / 2.0, y: h / 2.0 + 8))
-        ctx.closePath()
-        ctx.fillPath()
-        ctx.beginPath()
-        ctx.move(to: CGPoint(x: w / 2.0, y: h / 2.0 + 8))
-        ctx.addLine(to: CGPoint(x: w / 2.0 + 3, y: h / 2.0 + 14))
-        ctx.addLine(to: CGPoint(x: w / 2.0 + 6, y: h / 2.0 + 8))
-        ctx.closePath()
-        ctx.fillPath()
-        ctx.setFillColor(red: 0.95, green: 0.20, blue: 0.30, alpha: 1.0)
-        ctx.fillEllipse(in: CGRect(x: w / 2.0 - 5, y: h / 2.0, width: 3, height: 4))
-        ctx.fillEllipse(in: CGRect(x: w / 2.0 + 2, y: h / 2.0, width: 3, height: 4))
     }
 }

@@ -1,5 +1,6 @@
 import AppKit
 import CoreGraphics
+import SceneKit
 
 public protocol GhastWindowDelegate: AnyObject {
     func ghastDidDefeat(_ window: GhastWindow)
@@ -15,7 +16,9 @@ public final class GhastWindow: EntityWindow {
     private var phase: TimeInterval = 0
     private var shootTimer: TimeInterval = 5.0
     private let onShoot: (CGPoint) -> Void
-    private var drawView: GhastDrawView?
+    private var sceneView: MobSceneView?
+    private var rig: FlyerRig?
+    private var mouthNode: SCNNode?
     private var isGone = false
 
     public init(startPos: CGPoint, delegate: GhastWindowDelegate, onShoot: @escaping (CGPoint) -> Void) {
@@ -24,8 +27,37 @@ public final class GhastWindow: EntityWindow {
         self.onShoot = onShoot
         let size = NSSize(width: 110, height: 90)
         super.init(contentRect: NSRect(x: startPos.x - 55, y: startPos.y, width: size.width, height: size.height), ignoresMouse: false)
-        let view = GhastDrawView(frame: NSRect(origin: .zero, size: size))
-        self.drawView = view
+        let view = MobSceneView(frame: NSRect(origin: .zero, size: size))
+        let rig = FlyerRig(bodyColor: .rgb(0.94, 0.94, 0.94), wingColor: .rgb(0.94, 0.94, 0.94))
+        // 대형 흰 몸통 (기존 2D 흰 사각 몸통 유지)
+        let bulk = vbox(1.15, 0.95, 0.95, .rgb(0.94, 0.94, 0.94))
+        rig.body.addChildNode(bulk)
+        // 촉수 느낌 아래 박스 4개
+        for i in 0..<4 {
+            let t = vbox(0.14, 0.50, 0.14, .rgb(0.94, 0.94, 0.94))
+            t.position = SCNVector3(-0.42 + CGFloat(i) * 0.28, -0.65, 0)
+            rig.body.addChildNode(t)
+        }
+        // 검은 눈 + 눈물 자국
+        for sx in [-0.28, 0.28] as [CGFloat] {
+            let eye = vbox(0.14, 0.18, 0.05, .rgb(0.10, 0.10, 0.12))
+            eye.position = SCNVector3(sx, 0.18, 0.50)
+            rig.body.addChildNode(eye)
+            let tear = vbox(0.07, 0.30, 0.04, .rgb(0.10, 0.10, 0.12))
+            tear.position = SCNVector3(sx, -0.08, 0.50)
+            rig.body.addChildNode(tear)
+        }
+        // 입 (발사 직전 벌어짐)
+        let mouth = vbox(0.30, 0.26, 0.05, .rgb(0.75, 0.10, 0.10))
+        mouth.position = SCNVector3(0, -0.22, 0.50)
+        mouth.isHidden = true
+        rig.body.addChildNode(mouth)
+        self.mouthNode = mouth
+        rig.scale = SCNVector3(0.85, 0.85, 0.85)
+        view.setSubject(rig)
+        self.rig = rig
+        self.sceneView = view
+        view.onTap = { [weak self] in self?.registerHit() }
         contentView = view
     }
 
@@ -39,8 +71,8 @@ public final class GhastWindow: EntityWindow {
             let cx = self.anchor.x + sin(self.phase * 0.7) * 90.0
             let cy = self.anchor.y + 130 + sin(self.phase * 1.1) * 20.0
             self.setFrameOrigin(NSPoint(x: cx - 55, y: cy))
-            self.drawView?.mouthOpen = self.shootTimer < 0.8
-            self.drawView?.needsDisplay = true
+            self.rig?.flap(1.0 / 60.0)
+            self.mouthNode?.isHidden = self.shootTimer >= 0.8
             if self.shootTimer <= 0 {
                 self.shootTimer = Double.random(in: 4.0...6.5)
                 self.onShoot(CGPoint(x: cx, y: cy))
@@ -54,6 +86,10 @@ public final class GhastWindow: EntityWindow {
     }
 
     public override func mouseDown(with event: NSEvent) {
+        registerHit()
+    }
+
+    private func registerHit() {
         hp -= 1
         if hp <= 0 {
             disappear(defeated: true)
@@ -79,37 +115,6 @@ public final class GhastWindow: EntityWindow {
         flyTimer?.invalidate()
         flyTimer = nil
         super.close()
-    }
-}
-
-private final class GhastDrawView: NSView {
-    var mouthOpen = false
-
-    override func draw(_ dirtyRect: NSRect) {
-        guard let ctx = NSGraphicsContext.current?.cgContext else { return }
-        let w = bounds.width
-        let h = bounds.height
-        ctx.setFillColor(red: 0.94, green: 0.94, blue: 0.94, alpha: 0.95)
-        ctx.fill(CGRect(x: 22, y: 22, width: w - 44, height: h - 32))
-        for x in [8, w - 20] as [CGFloat] {
-            ctx.fill(CGRect(x: x, y: 40, width: 12, height: 22))
-        }
-        ctx.setFillColor(red: 0.10, green: 0.10, blue: 0.12, alpha: 1.0)
-        ctx.fillEllipse(in: CGRect(x: 34, y: 52, width: 8, height: 10))
-        ctx.fillEllipse(in: CGRect(x: w - 42, y: 52, width: 8, height: 10))
-        if mouthOpen {
-            ctx.setFillColor(red: 0.75, green: 0.10, blue: 0.10, alpha: 1.0)
-            ctx.fill(CGRect(x: w / 2.0 - 9, y: 28, width: 18, height: 16))
-            ctx.setFillColor(red: 1.0, green: 0.85, blue: 0.20, alpha: 1.0)
-            ctx.fillEllipse(in: CGRect(x: w / 2.0 - 5, y: 32, width: 10, height: 8))
-        } else {
-            ctx.fill(CGRect(x: w / 2.0 - 6, y: 34, width: 12, height: 4))
-        }
-        for i in 0..<4 {
-            let x = 30 + CGFloat(i) * 13
-            ctx.setFillColor(red: 0.94, green: 0.94, blue: 0.94, alpha: 0.9)
-            ctx.fill(CGRect(x: x, y: 8 + CGFloat(i % 2) * 4, width: 8, height: 14))
-        }
     }
 }
 

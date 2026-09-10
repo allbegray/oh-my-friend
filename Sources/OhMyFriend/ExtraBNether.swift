@@ -1,6 +1,7 @@
 import AppKit
 import CoreGraphics
 import Foundation
+import SceneKit
 
 // B분야 네더 10종: 피글린·호글린·위더·비콘·마그마큐브·스트라이더·요새·영혼모래·현무암·고대잔해 + NetherBManager.
 // "🎉 추가 모션" 서브메뉴에서 NetherBManager.shared.entries()로 호출한다.
@@ -355,7 +356,9 @@ public final class BPiglinWindow: EntityWindow {
     private var phase: TimeInterval = 0
     private var mood: TimeInterval = 0
     private var wander = WanderState(speed: 20.0)
-    private var drawView: BPiglinDrawView?
+    private var sceneView: MobSceneView?
+    private var rig: BipedRig?
+    private var gift: SCNNode?
     private let panelW: CGFloat = 64
     private let panelH: CGFloat = 56
 
@@ -363,8 +366,29 @@ public final class BPiglinWindow: EntityWindow {
         self.position = startPos
         self.onTap = onTap
         super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
-        let view = BPiglinDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
-        self.drawView = view
+        let view = MobSceneView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
+        let skin = VoxelColor.rgb(0.95, 0.72, 0.62)
+        let r = BipedRig(headColor: skin, torsoColor: skin, limbColor: .rgb(0.88, 0.62, 0.52))
+        let band = vbox(0.52, 0.08, 0.52, .rgb(0.98, 0.82, 0.20))
+        band.position = SCNVector3(0, 0.22, 0)
+        r.head.addChildNode(band)
+        for sx in [-0.10, 0.10] as [CGFloat] {
+            let eye = vbox(0.07, 0.07, 0.02, VoxelColor.rgb(0.12, 0.12, 0.12))
+            eye.position = SCNVector3(sx, 0.02, 0.26)
+            r.head.addChildNode(eye)
+        }
+        let snout = vbox(0.20, 0.12, 0.06, .rgb(0.88, 0.62, 0.52))
+        snout.position = SCNVector3(0, -0.12, 0.26)
+        r.head.addChildNode(snout)
+        let gift = vbox(0.12, 0.12, 0.12, .glow(1.0, 0.85, 0.30))
+        gift.position = SCNVector3(0.32, -0.55, 0.05)
+        gift.isHidden = true
+        r.torso.addChildNode(gift)
+        self.gift = gift
+        view.setSubject(r)
+        self.rig = r
+        self.sceneView = view
+        view.onTap = { [weak self] in guard let self = self else { return }; self.onTap(self) }
         contentView = view
     }
 
@@ -377,10 +401,10 @@ public final class BPiglinWindow: EntityWindow {
             if self.mood > 0 { self.mood -= 1.0 / 60.0 }
             self.position.x += self.wander.tick(1.0 / 60.0)
             self.setFrameOrigin(NSPoint(x: self.position.x - self.panelW / 2, y: self.position.y))
-            self.drawView?.facingRight = self.wander.direction > 0
-            self.drawView?.happy = self.mood > 0
-            self.drawView?.bob = sin(self.phase * 3.0)
-            self.drawView?.needsDisplay = true
+            self.rig?.walk(1.0 / 60.0)
+            self.rig?.eulerAngles.y = self.wander.direction > 0 ? CGFloat(Double.pi / 2.0) : CGFloat(-Double.pi / 2.0)
+            self.rig?.position.y = CGFloat(sin(self.phase * 3.0)) * 0.03
+            self.gift?.isHidden = self.mood <= 0
         }
         RunLoop.main.add(tick!, forMode: .common)
     }
@@ -399,37 +423,6 @@ public final class BPiglinWindow: EntityWindow {
     }
 }
 
-private final class BPiglinDrawView: NSView {
-    var facingRight = true
-    var happy = false
-    var bob: CGFloat = 0
-
-    override func draw(_ dirtyRect: NSRect) {
-        guard let ctx = NSGraphicsContext.current?.cgContext else { return }
-        ctx.saveGState()
-        if !facingRight {
-            ctx.translateBy(x: bounds.width, y: 0)
-            ctx.scaleBy(x: -1.0, y: 1.0)
-        }
-        ctx.setFillColor(red: 0.95, green: 0.72, blue: 0.62, alpha: 1.0)
-        ctx.fill(CGRect(x: 18, y: 10 + bob, width: 30, height: 30))
-        ctx.fillEllipse(in: CGRect(x: 20, y: 36 + bob, width: 26, height: 14))
-        ctx.setFillColor(red: 0.98, green: 0.82, blue: 0.20, alpha: 1.0)
-        ctx.fill(CGRect(x: 22, y: 44 + bob, width: 22, height: 5))
-        ctx.setFillColor(red: 0.12, green: 0.12, blue: 0.12, alpha: 1.0)
-        ctx.fillEllipse(in: CGRect(x: 27, y: 30 + bob, width: 4, height: 4))
-        ctx.fillEllipse(in: CGRect(x: 37, y: 30 + bob, width: 4, height: 4))
-        if happy {
-            ctx.setFillColor(red: 1.0, green: 0.85, blue: 0.30, alpha: 1.0)
-            ctx.fillEllipse(in: CGRect(x: 50, y: 12, width: 8, height: 8))
-        }
-        ctx.setFillColor(red: 0.88, green: 0.62, blue: 0.52, alpha: 1.0)
-        ctx.fill(CGRect(x: 12, y: 2, width: 8, height: 12))
-        ctx.fill(CGRect(x: 46, y: 2, width: 8, height: 12))
-        ctx.restoreGState()
-    }
-}
-
 // MARK: - 🐗 호글린
 
 public final class BHoglinWindow: EntityWindow {
@@ -439,7 +432,9 @@ public final class BHoglinWindow: EntityWindow {
     private let onTap: (BHoglinWindow) -> Void
     private var tick: Timer?
     private var phase: TimeInterval = 0
-    private var drawView: BHoglinDrawView?
+    private var sceneView: MobSceneView?
+    private var rig: QuadRig?
+    private var wound: SCNNode?
     private var wander = WanderState(speed: 34.0)
     private let panelW: CGFloat = 84
     private let panelH: CGFloat = 56
@@ -448,8 +443,31 @@ public final class BHoglinWindow: EntityWindow {
         self.position = startPos
         self.onTap = onTap
         super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
-        let view = BHoglinDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
-        self.drawView = view
+        let view = MobSceneView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
+        let hide = VoxelColor.rgb(0.80, 0.45, 0.40)
+        let r = QuadRig(bodyColor: hide, headColor: hide, legColor: .rgb(0.55, 0.30, 0.28), tailColor: nil)
+        for sx in [-0.08, 0.08] as [CGFloat] {
+            let tusk = vbox(0.07, 0.18, 0.07, .rgb(0.95, 0.90, 0.85))
+            tusk.position = SCNVector3(sx, -0.20, 0.26)
+            r.head.addChildNode(tusk)
+        }
+        let eye = vbox(0.07, 0.07, 0.02, VoxelColor.rgb(0.12, 0.12, 0.12))
+        eye.position = SCNVector3(0.12, 0.05, 0.25)
+        r.head.addChildNode(eye)
+        let wound = vbox(0.08, 0.14, 0.02, .glow(1.0, 0.25, 0.20))
+        wound.position = SCNVector3(0, 0.10, 0.44)
+        wound.isHidden = true
+        r.body.addChildNode(wound)
+        self.wound = wound
+        for i in 0..<3 {
+            let mote = vbox(0.08, 0.08, 0.08, .glow(0.65, 0.30, 0.85))
+            mote.position = SCNVector3(-0.35 + CGFloat(i) * 0.35, -0.35, -0.20)
+            r.body.addChildNode(mote)
+        }
+        view.setSubject(r)
+        self.rig = r
+        self.sceneView = view
+        view.onTap = { [weak self] in guard let self = self else { return }; self.onTap(self) }
         contentView = view
     }
 
@@ -461,10 +479,9 @@ public final class BHoglinWindow: EntityWindow {
             self.phase += 1.0 / 60.0
             self.position.x += self.wander.tick(1.0 / 60.0)
             self.setFrameOrigin(NSPoint(x: self.position.x - self.panelW / 2, y: self.position.y))
-            self.drawView?.facingRight = self.wander.direction > 0
-            self.drawView?.phase = self.phase
-            self.drawView?.hits = self.hits
-            self.drawView?.needsDisplay = true
+            self.rig?.walk(1.0 / 60.0)
+            self.rig?.eulerAngles.y = self.wander.direction > 0 ? CGFloat(Double.pi / 2.0) : CGFloat(-Double.pi / 2.0)
+            self.wound?.isHidden = self.hits <= 0
         }
         RunLoop.main.add(tick!, forMode: .common)
     }
@@ -472,7 +489,7 @@ public final class BHoglinWindow: EntityWindow {
     public func strike() -> Int {
         _ = counter.hit()
         hits = counter.hits
-        drawView?.needsDisplay = true
+        wound?.isHidden = hits <= 0
         return hits
     }
 
@@ -487,44 +504,6 @@ public final class BHoglinWindow: EntityWindow {
     }
 }
 
-private final class BHoglinDrawView: NSView {
-    var facingRight = true
-    var phase: TimeInterval = 0
-    var hits = 0
-
-    override func draw(_ dirtyRect: NSRect) {
-        guard let ctx = NSGraphicsContext.current?.cgContext else { return }
-        ctx.saveGState()
-        if !facingRight {
-            ctx.translateBy(x: bounds.width, y: 0)
-            ctx.scaleBy(x: -1.0, y: 1.0)
-        }
-        let bob = sin(phase * 4.0)
-        ctx.setFillColor(red: 0.80, green: 0.45, blue: 0.40, alpha: 1.0)
-        ctx.fillEllipse(in: CGRect(x: 10, y: 12 + bob, width: 52, height: 28))
-        ctx.fillEllipse(in: CGRect(x: 54, y: 20 + bob, width: 18, height: 16))
-        ctx.setFillColor(red: 0.95, green: 0.90, blue: 0.85, alpha: 1.0)
-        ctx.fill(CGRect(x: 62, y: 14 + bob, width: 4, height: 10))
-        ctx.fill(CGRect(x: 68, y: 14 + bob, width: 4, height: 10))
-        ctx.setFillColor(red: 0.12, green: 0.12, blue: 0.12, alpha: 1.0)
-        ctx.fillEllipse(in: CGRect(x: 61, y: 27 + bob, width: 3, height: 3))
-        ctx.setFillColor(red: 0.55, green: 0.30, blue: 0.28, alpha: 1.0)
-        for x in [16, 28, 44, 54] as [CGFloat] {
-            ctx.fill(CGRect(x: x, y: 2, width: 8, height: 12))
-        }
-        if hits > 0 {
-            ctx.setFillColor(red: 1.0, green: 0.25, blue: 0.20, alpha: 0.9)
-            ctx.fill(CGRect(x: 30, y: 44, width: 4, height: 8))
-        }
-        ctx.setFillColor(red: 0.65, green: 0.30, blue: 0.85, alpha: 0.55)
-        for i in 0..<5 {
-            let px = 6 + CGFloat(i) * 16 + CGFloat(sin(phase * 3.0 + Double(i))) * 4
-            ctx.fillEllipse(in: CGRect(x: px, y: 46, width: 5, height: 5))
-        }
-        ctx.restoreGState()
-    }
-}
-
 // MARK: - 🟥 위더
 
 public final class BWitherWindow: EntityWindow {
@@ -536,7 +515,11 @@ public final class BWitherWindow: EntityWindow {
     private var phase: TimeInterval = 0
     private var combineLeft: TimeInterval = 2.0
     private var burst: TimeInterval = 0
-    private var drawView: BWitherDrawView?
+    private var sceneView: MobSceneView?
+    private var rig: BipedRig?
+    private var sideHeads: [SCNNode] = []
+    private var pips: [SCNNode] = []
+    private var flash: SCNNode?
     private let panelW: CGFloat = 96
     private let panelH: CGFloat = 72
 
@@ -544,8 +527,42 @@ public final class BWitherWindow: EntityWindow {
         self.position = startPos
         self.onTap = onTap
         super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
-        let view = BWitherDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
-        self.drawView = view
+        let view = MobSceneView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
+        let dark = VoxelColor.rgb(0.18, 0.18, 0.20)
+        let skull = VoxelColor.rgb(0.93, 0.93, 0.93)
+        let r = BipedRig(headColor: skull, torsoColor: dark, limbColor: .rgb(0.25, 0.25, 0.27))
+        let socket = VoxelColor.rgb(0.1, 0.1, 0.1)
+        for sx in [-0.10, 0.10] as [CGFloat] {
+            let eye = vbox(0.07, 0.08, 0.02, socket)
+            eye.position = SCNVector3(sx, 0.05, 0.26)
+            r.head.addChildNode(eye)
+        }
+        for sx in [-0.34, 0.34] as [CGFloat] {
+            let side = vbox(0.30, 0.30, 0.30, skull)
+            side.position = SCNVector3(sx, 0.0, 0)
+            r.torso.addChildNode(side)
+            for ex in [-0.06, 0.06] as [CGFloat] {
+                let eye = vbox(0.05, 0.06, 0.02, socket)
+                eye.position = SCNVector3(ex, 0.02, 0.16)
+                side.addChildNode(eye)
+            }
+            sideHeads.append(side)
+        }
+        for i in 0..<5 {
+            let pip = vbox(0.10, 0.08, 0.05, .glow(1.0, 0.25, 0.25))
+            pip.position = SCNVector3(-0.28 + CGFloat(i) * 0.14, 0.95, 0)
+            r.torso.addChildNode(pip)
+            pips.append(pip)
+        }
+        let flash = vbox(0.80, 0.80, 0.60, .glow(1.0, 0.7, 0.2))
+        flash.position = SCNVector3(0, 0.10, 0)
+        flash.isHidden = true
+        r.torso.addChildNode(flash)
+        self.flash = flash
+        view.setSubject(r)
+        self.rig = r
+        self.sceneView = view
+        view.onTap = { [weak self] in guard let self = self else { return }; self.onTap(self) }
         contentView = view
     }
 
@@ -566,12 +583,17 @@ public final class BWitherWindow: EntityWindow {
                 self.position.y += sin(self.phase * 2.0) * 8.0 / 60.0
                 self.setFrameOrigin(NSPoint(x: self.position.x - self.panelW / 2, y: self.position.y))
             }
-            self.drawView?.phase = self.phase
-            self.drawView?.awake = self.isAwake
-            self.drawView?.hp = self.hp
-            self.drawView?.burst = self.burst > 0
-            self.drawView?.combine = max(0, self.combineLeft)
-            self.drawView?.needsDisplay = true
+            self.rig?.walk(1.0 / 60.0)
+            self.rig?.position.y = CGFloat(sin(self.phase * 2.0)) * 0.04
+            let spread = self.isAwake ? 0 : CGFloat(max(0, self.combineLeft)) * 0.25
+            if self.sideHeads.count == 2 {
+                self.sideHeads[0].position.x = -0.34 - spread
+                self.sideHeads[1].position.x = 0.34 + spread
+            }
+            for (i, pip) in self.pips.enumerated() {
+                pip.isHidden = i >= self.hp
+            }
+            self.flash?.isHidden = self.burst <= 0
         }
         RunLoop.main.add(tick!, forMode: .common)
     }
@@ -591,49 +613,6 @@ public final class BWitherWindow: EntityWindow {
         tick?.invalidate()
         tick = nil
         super.close()
-    }
-}
-
-private final class BWitherDrawView: NSView {
-    var phase: TimeInterval = 0
-    var awake = false
-    var hp = 5
-    var burst = false
-    var combine: TimeInterval = 0
-
-    override func draw(_ dirtyRect: NSRect) {
-        guard let ctx = NSGraphicsContext.current?.cgContext else { return }
-        let floatY = sin(phase * 2.0) * 3.0
-        if !awake {
-            ctx.setFillColor(red: 0.30, green: 0.22, blue: 0.18, alpha: 1.0)
-            ctx.fill(CGRect(x: 28, y: 4, width: 40, height: 12))
-            ctx.setFillColor(red: 0.92, green: 0.92, blue: 0.92, alpha: 1.0)
-            let spread = CGFloat(combine) * 10.0
-            for i in 0..<3 {
-                ctx.fillEllipse(in: CGRect(x: 30 + CGFloat(i) * 16, y: 20 + spread, width: 12, height: 12))
-            }
-            return
-        }
-        ctx.setFillColor(red: 0.18, green: 0.18, blue: 0.20, alpha: 1.0)
-        ctx.fillEllipse(in: CGRect(x: 28, y: 22 + floatY, width: 40, height: 34))
-        ctx.setFillColor(red: 0.93, green: 0.93, blue: 0.93, alpha: 1.0)
-        ctx.fillEllipse(in: CGRect(x: 32, y: 40 + floatY, width: 12, height: 12))
-        ctx.fillEllipse(in: CGRect(x: 52, y: 40 + floatY, width: 12, height: 12))
-        ctx.fillEllipse(in: CGRect(x: 42, y: 34 + floatY, width: 12, height: 12))
-        ctx.setFillColor(red: 0.1, green: 0.1, blue: 0.1, alpha: 1.0)
-        for x in [35, 55, 45] as [CGFloat] {
-            ctx.fillEllipse(in: CGRect(x: x, y: 43 + floatY, width: 4, height: 5))
-        }
-        ctx.setFillColor(red: 0.25, green: 0.25, blue: 0.27, alpha: 1.0)
-        ctx.fill(CGRect(x: 44, y: 4, width: 8, height: 22))
-        for i in 0..<hp {
-            ctx.setFillColor(red: 1.0, green: 0.25, blue: 0.25, alpha: 1.0)
-            ctx.fill(CGRect(x: 24 + CGFloat(i) * 10, y: 62, width: 8, height: 6))
-        }
-        if burst {
-            ctx.setFillColor(red: 1.0, green: 0.7, blue: 0.2, alpha: 0.8)
-            ctx.fillEllipse(in: CGRect(x: 20, y: 14, width: 56, height: 44))
-        }
     }
 }
 
@@ -705,7 +684,8 @@ public final class BMagmaCubeWindow: EntityWindow {
     private let onTap: (BMagmaCubeWindow) -> Void
     private var tick: Timer?
     private var phase: TimeInterval = 0
-    private var drawView: BMagmaCubeDrawView?
+    private var sceneView: MobSceneView?
+    private var rig: CubeRig?
     private let panelW: CGFloat
     private let panelH: CGFloat
 
@@ -719,8 +699,23 @@ public final class BMagmaCubeWindow: EntityWindow {
         case .small: panelW = 34; panelH = 30
         }
         super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
-        let view = BMagmaCubeDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)), size: size)
-        self.drawView = view
+        let view = MobSceneView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
+        let cubeSize: CGFloat
+        switch size {
+        case .large: cubeSize = 1.0
+        case .medium: cubeSize = 0.7
+        case .small: cubeSize = 0.45
+        }
+        let r = CubeRig(color: .rgb(0.85, 0.35, 0.10), size: cubeSize, alpha: 1.0)
+        for sx in [-0.15, 0.15] as [CGFloat] {
+            let core = vbox(0.16, 0.16, 0.05, .glow(1.0, 0.75, 0.20))
+            core.position = SCNVector3(sx * cubeSize, 0.05 * cubeSize, cubeSize / 2.0 + 0.01)
+            r.cube.addChildNode(core)
+        }
+        view.setSubject(r)
+        self.rig = r
+        self.sceneView = view
+        view.onTap = { [weak self] in guard let self = self else { return }; self.onTap(self) }
         contentView = view
     }
 
@@ -732,8 +727,7 @@ public final class BMagmaCubeWindow: EntityWindow {
             self.phase += 1.0 / 60.0
             let hop = abs(sin(self.phase * 5.0)) * 14.0
             self.setFrameOrigin(NSPoint(x: self.position.x - self.panelW / 2, y: self.position.y + hop))
-            self.drawView?.hop = hop
-            self.drawView?.needsDisplay = true
+            self.rig?.squash(hop > 2 ? 0.0 : 0.35)
         }
         RunLoop.main.add(tick!, forMode: .common)
     }
@@ -746,34 +740,6 @@ public final class BMagmaCubeWindow: EntityWindow {
         tick?.invalidate()
         tick = nil
         super.close()
-    }
-}
-
-private final class BMagmaCubeDrawView: NSView {
-    var hop: CGFloat = 0
-    private let size: BMagmaSize
-
-    init(frame: NSRect, size: BMagmaSize) {
-        self.size = size
-        super.init(frame: frame)
-    }
-
-    required init?(coder: NSCoder) { nil }
-
-    override func draw(_ dirtyRect: NSRect) {
-        guard let ctx = NSGraphicsContext.current?.cgContext else { return }
-        let squash: CGFloat = hop > 2 ? 1.0 : 0.82
-        let w = bounds.width
-        let h = bounds.height
-        ctx.setFillColor(red: 0.85, green: 0.35, blue: 0.10, alpha: 1.0)
-        ctx.fill(CGRect(x: 2, y: 2, width: w - 4, height: (h - 4) * squash))
-        ctx.setFillColor(red: 1.0, green: 0.75, blue: 0.20, alpha: 1.0)
-        ctx.fillEllipse(in: CGRect(x: w * 0.2, y: h * 0.3, width: w * 0.25, height: h * 0.25))
-        ctx.fillEllipse(in: CGRect(x: w * 0.55, y: h * 0.35, width: w * 0.25, height: h * 0.25))
-        ctx.setFillColor(red: 0.15, green: 0.10, blue: 0.08, alpha: 1.0)
-        ctx.fillEllipse(in: CGRect(x: w * 0.28, y: h * 0.38, width: 4, height: 5))
-        ctx.fillEllipse(in: CGRect(x: w * 0.63, y: h * 0.43, width: 4, height: 5))
-        _ = size
     }
 }
 
@@ -786,7 +752,9 @@ public final class BStriderWindow: EntityWindow {
     private var tick: Timer?
     private var phase: TimeInterval = 0
     private var wander = WanderState(speed: 22.0)
-    private var drawView: BStriderDrawView?
+    private var sceneView: MobSceneView?
+    private var rig: QuadRig?
+    private var saddle: SCNNode?
     private let panelW: CGFloat = 76
     private let panelH: CGFloat = 52
 
@@ -794,8 +762,24 @@ public final class BStriderWindow: EntityWindow {
         self.position = startPos
         self.onTap = onTap
         super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
-        let view = BStriderDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
-        self.drawView = view
+        let view = MobSceneView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
+        let lava = VoxelColor.rgb(0.75, 0.20, 0.18)
+        let r = QuadRig(bodyColor: lava, headColor: lava, legColor: .rgb(0.55, 0.12, 0.12), tailColor: nil)
+        let pool = vbox(0.90, 0.06, 0.90, .glow(1.0, 0.35, 0.15))
+        pool.position = SCNVector3(0, -0.52, 0)
+        r.body.addChildNode(pool)
+        let eye = vbox(0.08, 0.08, 0.02, .glow(1.0, 0.85, 0.40))
+        eye.position = SCNVector3(0.10, 0.05, 0.25)
+        r.head.addChildNode(eye)
+        let saddle = vbox(0.22, 0.14, 0.30, .rgb(0.30, 0.55, 0.95))
+        saddle.position = SCNVector3(0, 0.36, -0.05)
+        saddle.isHidden = true
+        r.body.addChildNode(saddle)
+        self.saddle = saddle
+        view.setSubject(r)
+        self.rig = r
+        self.sceneView = view
+        view.onTap = { [weak self] in guard let self = self else { return }; self.onTap(self) }
         contentView = view
     }
 
@@ -808,16 +792,16 @@ public final class BStriderWindow: EntityWindow {
             self.wander.speed = self.isRidden ? 52 : 22
             self.position.x += self.wander.tick(1.0 / 60.0)
             self.setFrameOrigin(NSPoint(x: self.position.x - self.panelW / 2, y: self.position.y))
-            self.drawView?.facingRight = self.wander.direction > 0
-            self.drawView?.phase = self.phase
-            self.drawView?.ridden = self.isRidden
-            self.drawView?.needsDisplay = true
+            self.rig?.walk(1.0 / 60.0)
+            self.rig?.eulerAngles.y = self.wander.direction > 0 ? CGFloat(Double.pi / 2.0) : CGFloat(-Double.pi / 2.0)
+            self.saddle?.isHidden = !self.isRidden
         }
         RunLoop.main.add(tick!, forMode: .common)
     }
 
     public func toggleRide() -> Bool {
         isRidden.toggle()
+        saddle?.isHidden = !isRidden
         return isRidden
     }
 
@@ -829,38 +813,6 @@ public final class BStriderWindow: EntityWindow {
         tick?.invalidate()
         tick = nil
         super.close()
-    }
-}
-
-private final class BStriderDrawView: NSView {
-    var facingRight = true
-    var phase: TimeInterval = 0
-    var ridden = false
-
-    override func draw(_ dirtyRect: NSRect) {
-        guard let ctx = NSGraphicsContext.current?.cgContext else { return }
-        ctx.saveGState()
-        if !facingRight {
-            ctx.translateBy(x: bounds.width, y: 0)
-            ctx.scaleBy(x: -1.0, y: 1.0)
-        }
-        let step = sin(phase * 6.0) * 2.0
-        ctx.setFillColor(red: 1.0, green: 0.35, blue: 0.15, alpha: 0.55)
-        ctx.fillEllipse(in: CGRect(x: 2, y: 0, width: 72, height: 10))
-        ctx.setFillColor(red: 0.75, green: 0.20, blue: 0.18, alpha: 1.0)
-        ctx.fillEllipse(in: CGRect(x: 14, y: 12, width: 44, height: 24))
-        ctx.fillEllipse(in: CGRect(x: 52, y: 20, width: 16, height: 14))
-        ctx.setFillColor(red: 1.0, green: 0.85, blue: 0.40, alpha: 1.0)
-        ctx.fillEllipse(in: CGRect(x: 57, y: 25, width: 4, height: 4))
-        ctx.setFillColor(red: 0.55, green: 0.12, blue: 0.12, alpha: 1.0)
-        for x in [20, 32, 44] as [CGFloat] {
-            ctx.fill(CGRect(x: x, y: 2 + (step > 0 ? step : 0), width: 6, height: 12))
-        }
-        if ridden {
-            ctx.setFillColor(red: 0.30, green: 0.55, blue: 0.95, alpha: 1.0)
-            ctx.fill(CGRect(x: 30, y: 34, width: 14, height: 10))
-        }
-        ctx.restoreGState()
     }
 }
 

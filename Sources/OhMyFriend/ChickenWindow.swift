@@ -1,5 +1,6 @@
 import AppKit
 import CoreGraphics
+import SceneKit
 
 public protocol ChickenWindowDelegate: AnyObject {
     func chickenWindowDidClick(_ window: ChickenWindow)
@@ -24,7 +25,8 @@ public final class ChickenWindow: EntityWindow {
     private let maxEggs = 3
     private var eggs: [EggWindow] = []
     private var chicks: [ChickenWindow] = []
-    private var drawView: ChickenDrawView?
+    private var sceneView: MobSceneView?
+    private var rig: BipedRig?
     private var panelW: CGFloat = 60
     private var panelH: CGFloat = 48
 
@@ -37,8 +39,42 @@ public final class ChickenWindow: EntityWindow {
         self.panelW = w
         self.panelH = h
         super.init(contentRect: NSRect(x: startPos.x - w / 2.0, y: startPos.y, width: w, height: h), ignoresMouse: false)
-        let view = ChickenDrawView(frame: NSRect(origin: .zero, size: NSSize(width: w, height: h)))
-        self.drawView = view
+        let view = MobSceneView(frame: NSRect(origin: .zero, size: NSSize(width: w, height: h)))
+        let white = VoxelColor.rgb(0.96, 0.96, 0.96)
+        let wingGray = VoxelColor.rgb(0.85, 0.85, 0.87)
+        let orange = VoxelColor.rgb(0.95, 0.55, 0.15)
+        let r = BipedRig(headColor: white, torsoColor: white, limbColor: orange)
+        for arm in [r.armL, r.armR] {
+            for mesh in arm.childNodes {
+                mesh.geometry?.materials = [voxelMaterial(wingGray)]
+            }
+        }
+        let comb = VoxelColor.rgb(0.90, 0.12, 0.15)
+        for (i, dx) in ([-0.10, 0.0, 0.10] as [CGFloat]).enumerated() {
+            let c = vbox(0.09, i == 1 ? 0.16 : 0.12, 0.09, comb)
+            c.position = SCNVector3(dx, 0.32, 0)
+            r.head.addChildNode(c)
+        }
+        let beak = vbox(0.14, 0.09, 0.10, VoxelColor.rgb(1.0, 0.65, 0.10))
+        beak.position = SCNVector3(0, -0.02, 0.29)
+        r.head.addChildNode(beak)
+        let socket = VoxelColor.rgb(0.08, 0.08, 0.08)
+        let eyeL = vbox(0.06, 0.08, 0.02, socket)
+        eyeL.position = SCNVector3(-0.13, 0.06, 0.26)
+        r.head.addChildNode(eyeL)
+        let eyeR = vbox(0.06, 0.08, 0.02, socket)
+        eyeR.position = SCNVector3(0.13, 0.06, 0.26)
+        r.head.addChildNode(eyeR)
+        if let scn = view.scene {
+            r.addTo(scn, scale: scale)
+        }
+        view.setSubject(r)
+        self.rig = r
+        self.sceneView = view
+        view.onTap = { [weak self] in
+            guard let self = self else { return }
+            self.chickenDelegate?.chickenWindowDidClick(self)
+        }
         contentView = view
     }
 
@@ -64,9 +100,9 @@ public final class ChickenWindow: EntityWindow {
                     self.layEgg()
                 }
             }
-            self.drawView?.facingRight = self.dir > 0
-            self.drawView?.bob = sin(self.phase * 6.0)
-            self.drawView?.needsDisplay = true
+            self.rig?.walk(1.0 / 60.0)
+            self.rig?.eulerAngles.y = CGFloat(self.dir > 0 ? Double.pi / 2.0 : -Double.pi / 2.0)
+            self.rig?.position.y = CGFloat(sin(self.phase * 6.0)) * 0.03
         }
         RunLoop.main.add(wanderTimer!, forMode: .common)
     }
@@ -142,54 +178,6 @@ public final class EggWindow: EntityWindow {
 
     public override func close() {
         super.close()
-    }
-}
-
-private final class ChickenDrawView: NSView {
-    var facingRight = true
-    var bob: CGFloat = 0
-
-    override func draw(_ dirtyRect: NSRect) {
-        guard let ctx = NSGraphicsContext.current?.cgContext else { return }
-        let w = bounds.width
-        let h = bounds.height
-        let sx = w / 60.0
-        let sy = h / 48.0
-        ctx.saveGState()
-        ctx.scaleBy(x: sx, y: sy)
-        if !facingRight {
-            ctx.translateBy(x: 60, y: 0)
-            ctx.scaleBy(x: -1.0, y: 1.0)
-        }
-        let lift = bob * 1.5
-        // 다리 2개 (주황)
-        ctx.setFillColor(red: 0.95, green: 0.55, blue: 0.15, alpha: 1.0)
-        ctx.fill(CGRect(x: 24, y: 2, width: 3, height: 10))
-        ctx.fill(CGRect(x: 34, y: 2, width: 3, height: 10))
-        // 몸통 (흰색 타원)
-        ctx.setFillColor(red: 0.96, green: 0.96, blue: 0.96, alpha: 1.0)
-        ctx.fillEllipse(in: CGRect(x: 12, y: 10 + lift, width: 32, height: 22))
-        // 날개 (연회색)
-        ctx.setFillColor(red: 0.85, green: 0.85, blue: 0.87, alpha: 1.0)
-        ctx.fillEllipse(in: CGRect(x: 18, y: 14 + lift + bob, width: 16, height: 12))
-        // 꼬리 (흰색 깃)
-        ctx.setFillColor(red: 0.93, green: 0.93, blue: 0.93, alpha: 1.0)
-        ctx.fill(CGRect(x: 8, y: 22 + lift, width: 8, height: 8))
-        // 머리 (흰색)
-        ctx.setFillColor(red: 0.98, green: 0.98, blue: 0.98, alpha: 1.0)
-        ctx.fillEllipse(in: CGRect(x: 38, y: 26 + lift, width: 16, height: 14))
-        // 볏 (빨강 3칸)
-        ctx.setFillColor(red: 0.90, green: 0.12, blue: 0.15, alpha: 1.0)
-        ctx.fill(CGRect(x: 41, y: 40 + lift, width: 4, height: 5))
-        ctx.fill(CGRect(x: 45, y: 41 + lift, width: 4, height: 6))
-        ctx.fill(CGRect(x: 49, y: 40 + lift, width: 4, height: 5))
-        // 부리 (주황 삼각 대신 사각 2단)
-        ctx.setFillColor(red: 1.0, green: 0.65, blue: 0.10, alpha: 1.0)
-        ctx.fill(CGRect(x: 52, y: 31 + lift, width: 6, height: 4))
-        // 눈 (검정)
-        ctx.setFillColor(red: 0.08, green: 0.08, blue: 0.08, alpha: 1.0)
-        ctx.fillEllipse(in: CGRect(x: 47, y: 33 + lift, width: 3, height: 4))
-        ctx.restoreGState()
     }
 }
 

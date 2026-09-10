@@ -1,6 +1,7 @@
 import AppKit
 import CoreGraphics
 import Foundation
+import SceneKit
 
 // A분야 몹 10종: 워든·알레이·스니퍼·철골렘·스트레이·허스크·보고드·크리킹·엔더마이트·해골마 + MobsAManager.
 // MobsAManager.shared.entries()로 중앙 메뉴에 연결한다. 스폰/해제 토글.
@@ -340,7 +341,9 @@ public final class AWardenWindow: EntityWindow {
     private let onTap: (AWardenWindow) -> Void
     private var tick: Timer?
     private var phase: TimeInterval = 0
-    private var drawView: AWardenDrawView?
+    private var sceneView: MobSceneView?
+    private var rig: BipedRig?
+    private var heart: SCNNode?
     private let panelW: CGFloat = 84
     private let panelH: CGFloat = 64
 
@@ -348,8 +351,33 @@ public final class AWardenWindow: EntityWindow {
         self.position = startPos
         self.onTap = onTap
         super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
-        let view = AWardenDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
-        self.drawView = view
+        let view = MobSceneView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
+        let r = BipedRig(headColor: .rgb(0.15, 0.20, 0.24), torsoColor: .rgb(0.18, 0.24, 0.28), limbColor: .rgb(0.10, 0.13, 0.15))
+        r.scale = SCNVector3(0.75, 0.75, 0.75)
+        let heart = vbox(0.12, 0.16, 0.06, .glow(0.2, 0.8, 0.75))
+        heart.position = SCNVector3(0, -0.05, 0.14)
+        r.torso.addChildNode(heart)
+        self.heart = heart
+        let eyeMat = VoxelColor.rgb(0.9, 0.98, 1.0)
+        for sx in [-0.12, 0.12] as [CGFloat] {
+            let eye = vbox(0.07, 0.06, 0.02, eyeMat)
+            eye.position = SCNVector3(sx, 0.08, 0.26)
+            r.head.addChildNode(eye)
+        }
+        for sx in [-0.28, 0.28] as [CGFloat] {
+            let horn = vbox(0.10, 0.22, 0.10, .rgb(0.10, 0.13, 0.15))
+            horn.position = SCNVector3(sx, 0.30, 0)
+            r.head.addChildNode(horn)
+        }
+        for sx in [-0.18, 0.18] as [CGFloat] {
+            let tendril = vbox(0.06, 0.30, 0.06, .rgb(0.25, 0.85, 0.80))
+            tendril.position = SCNVector3(sx, -0.15, 0.24)
+            r.head.addChildNode(tendril)
+        }
+        view.setSubject(r)
+        self.rig = r
+        self.sceneView = view
+        view.onTap = { [weak self] in guard let self = self else { return }; self.onTap(self) }
         contentView = view
     }
 
@@ -359,9 +387,12 @@ public final class AWardenWindow: EntityWindow {
         tick = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] t in
             guard let self = self else { t.invalidate(); return }
             self.phase += 1.0 / 60.0
-            self.drawView?.phase = self.phase
-            self.drawView?.hits = self.hits
-            self.drawView?.needsDisplay = true
+            self.rig?.walk(1.0 / 60.0)
+            let glow = 0.5 + 0.5 * CGFloat(sin(self.phase * 6.0))
+            self.heart?.opacity = 0.6 + 0.4 * glow
+            if self.hits > 0 {
+                self.rig?.position.x = CGFloat(sin(self.phase * 30.0)) * CGFloat(self.hits) * 0.01
+            }
         }
         RunLoop.main.add(tick!, forMode: .common)
     }
@@ -369,8 +400,7 @@ public final class AWardenWindow: EntityWindow {
     @discardableResult
     public func hit() -> Bool {
         let defeated = counter.hit()
-        drawView?.hits = counter.hits
-        drawView?.needsDisplay = true
+        rig?.attack()
         return defeated
     }
 
@@ -385,42 +415,6 @@ public final class AWardenWindow: EntityWindow {
     }
 }
 
-private final class AWardenDrawView: NSView {
-    var phase: TimeInterval = 0
-    var hits: Int = 0
-
-    override func draw(_ dirtyRect: NSRect) {
-        guard let ctx = NSGraphicsContext.current?.cgContext else { return }
-        let shake = hits > 0 ? CGFloat(hits) * 1.5 : 0
-        let ox = sin(phase * 30.0) * shake * 0.3
-        // 몸통 (짙은 청회색)
-        ctx.setFillColor(red: 0.18, green: 0.24, blue: 0.28, alpha: 1.0)
-        ctx.fill(CGRect(x: 22 + ox, y: 8, width: 40, height: 40))
-        // 머리
-        ctx.setFillColor(red: 0.15, green: 0.20, blue: 0.24, alpha: 1.0)
-        ctx.fill(CGRect(x: 26 + ox, y: 44, width: 32, height: 16))
-        // 가슴 스컬크 심장 (청록 점멸)
-        let glow = 0.5 + 0.5 * sin(phase * 6.0)
-        ctx.setFillColor(red: 0.2, green: 0.9 - glow * 0.2, blue: 0.85, alpha: 1.0)
-        ctx.fillEllipse(in: CGRect(x: 37 + ox, y: 26, width: 10, height: 12))
-        // 눈 (흰 점)
-        ctx.setFillColor(red: 0.9, green: 0.98, blue: 1.0, alpha: 1.0)
-        ctx.fillEllipse(in: CGRect(x: 30 + ox, y: 50, width: 4, height: 3))
-        ctx.fillEllipse(in: CGRect(x: 50 + ox, y: 50, width: 4, height: 3))
-        // 스컬크 파티클 3개
-        ctx.setFillColor(red: 0.25, green: 0.85, blue: 0.8, alpha: 0.8)
-        for i in 0..<3 {
-            let px = 14 + CGFloat(i) * 24 + sin(phase * 3.0 + Double(i) * 2.0) * 4
-            let py = 4 + (CGFloat(i) * 5).truncatingRemainder(dividingBy: 10)
-            ctx.fillEllipse(in: CGRect(x: px, y: py, width: 5, height: 5))
-        }
-        // 뿔
-        ctx.setFillColor(red: 0.10, green: 0.13, blue: 0.15, alpha: 1.0)
-        ctx.fill(CGRect(x: 22 + ox, y: 54, width: 6, height: 8))
-        ctx.fill(CGRect(x: 56 + ox, y: 54, width: 6, height: 8))
-    }
-}
-
 // MARK: - 알레이: 주인 추적 + 전리품 배달 + 춤
 
 public final class AAllayWindow: EntityWindow {
@@ -430,7 +424,8 @@ public final class AAllayWindow: EntityWindow {
     private var phase: TimeInterval = 0
     private var deliverLeft: TimeInterval = 8.0
     private var danceLeft: TimeInterval = 0
-    private var drawView: AAllayDrawView?
+    private var sceneView: MobSceneView?
+    private var rig: FlyerRig?
     private let panelW: CGFloat = 56
     private let panelH: CGFloat = 48
     private let loots = ["💎", "🍪", "🌸", "🧵"]
@@ -439,8 +434,18 @@ public final class AAllayWindow: EntityWindow {
         self.position = startPos
         self.onTap = onTap
         super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
-        let view = AAllayDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
-        self.drawView = view
+        let view = MobSceneView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
+        let r = FlyerRig(bodyColor: .rgb(0.55, 0.85, 1.0), wingColor: .rgb(1.0, 1.0, 1.0))
+        let eyeMat = VoxelColor.rgb(0.1, 0.1, 0.15)
+        for sx in [-0.07, 0.07] as [CGFloat] {
+            let eye = vbox(0.06, 0.06, 0.02, eyeMat)
+            eye.position = SCNVector3(sx, 0.10, 0.17)
+            r.body.addChildNode(eye)
+        }
+        view.setSubject(r)
+        self.rig = r
+        self.sceneView = view
+        view.onTap = { [weak self] in guard let self = self else { return }; self.onTap(self) }
         contentView = view
     }
 
@@ -468,16 +473,18 @@ public final class AAllayWindow: EntityWindow {
                 RewardCenter.say(self.loots.randomElement() ?? "💎")
                 SoundAndEffectsManager.shared.play(.heart)
             }
-            self.drawView?.dancing = self.danceLeft > 0
-            self.drawView?.phase = self.phase
-            self.drawView?.needsDisplay = true
+            self.rig?.flap(1.0 / 60.0)
+            if self.danceLeft > 0 {
+                self.rig?.eulerAngles.z = CGFloat(sin(self.phase * 12.0)) * 0.2
+            } else {
+                self.rig?.eulerAngles.z = 0
+            }
         }
         RunLoop.main.add(tick!, forMode: .common)
     }
 
     public func dance() {
         danceLeft = 1.5
-        drawView?.needsDisplay = true
     }
 
     public override func mouseDown(with event: NSEvent) {
@@ -491,29 +498,6 @@ public final class AAllayWindow: EntityWindow {
     }
 }
 
-private final class AAllayDrawView: NSView {
-    var phase: TimeInterval = 0
-    var dancing = false
-
-    override func draw(_ dirtyRect: NSRect) {
-        guard let ctx = NSGraphicsContext.current?.cgContext else { return }
-        let tilt: CGFloat = dancing ? sin(phase * 12.0) * 4.0 : 0
-        // 몸 (하늘색 요정)
-        ctx.setFillColor(red: 0.55, green: 0.85, blue: 1.0, alpha: 1.0)
-        ctx.fillEllipse(in: CGRect(x: 20, y: 10, width: 16, height: 20))
-        // 머리
-        ctx.fillEllipse(in: CGRect(x: 21, y: 28, width: 14, height: 12))
-        ctx.setFillColor(red: 0.1, green: 0.1, blue: 0.15, alpha: 1.0)
-        ctx.fillEllipse(in: CGRect(x: 25, y: 33, width: 3, height: 3))
-        ctx.fillEllipse(in: CGRect(x: 30, y: 33, width: 3, height: 3))
-        // 날개 (흰 반투명)
-        ctx.setFillColor(red: 1.0, green: 1.0, blue: 1.0, alpha: 0.7)
-        let flap = dancing ? abs(sin(phase * 14.0)) * 8.0 : 4.0
-        ctx.fillEllipse(in: CGRect(x: 8 + tilt, y: 22, width: 12, height: 8 + flap))
-        ctx.fillEllipse(in: CGRect(x: 36 - tilt, y: 22, width: 12, height: 8 + flap))
-    }
-}
-
 // MARK: - 스니퍼: 땅 파기 후 고대 씨앗
 
 public final class ASnifferWindow: EntityWindow {
@@ -522,7 +506,10 @@ public final class ASnifferWindow: EntityWindow {
     private var tick: Timer?
     private var phase: TimeInterval = 0
     private var digCooldown = Cooldown()
-    private var drawView: ASnifferDrawView?
+    private var sceneView: MobSceneView?
+    private var rig: QuadRig?
+    private var snout: SCNNode?
+    private var seed: SCNNode?
     private let panelW: CGFloat = 88
     private let panelH: CGFloat = 56
 
@@ -530,8 +517,35 @@ public final class ASnifferWindow: EntityWindow {
         self.position = startPos
         self.onTap = onTap
         super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
-        let view = ASnifferDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
-        self.drawView = view
+        let view = MobSceneView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
+        let green = VoxelColor.rgb(0.25, 0.5, 0.28)
+        let darkGreen = VoxelColor.rgb(0.2, 0.42, 0.22)
+        let r = QuadRig(bodyColor: green, headColor: green, legColor: darkGreen, tailColor: nil)
+        r.scale = SCNVector3(1.2, 1.2, 1.2)
+        let snout = vbox(0.22, 0.20, 0.22, darkGreen)
+        snout.position = SCNVector3(0, -0.10, 0.34)
+        r.head.addChildNode(snout)
+        self.snout = snout
+        let nose = vbox(0.12, 0.08, 0.06, VoxelColor.rgb(0.18, 0.38, 0.2))
+        nose.position = SCNVector3(0, -0.12, 0.48)
+        r.head.addChildNode(nose)
+        let eye = vbox(0.07, 0.07, 0.02, VoxelColor.rgb(0.08, 0.08, 0.08))
+        eye.position = SCNVector3(0.14, 0.08, 0.25)
+        r.head.addChildNode(eye)
+        for sx in [-0.12, 0.0, 0.12] as [CGFloat] {
+            let spike = vbox(0.10, 0.16, 0.10, VoxelColor.rgb(0.35, 0.62, 0.35))
+            spike.position = SCNVector3(sx, 0.33, -0.05)
+            r.body.addChildNode(spike)
+        }
+        let seed = vbox(0.12, 0.12, 0.12, .glow(0.6, 1.0, 0.4))
+        seed.position = SCNVector3(0.30, -0.30, 0.30)
+        seed.isHidden = true
+        r.body.addChildNode(seed)
+        self.seed = seed
+        view.setSubject(r)
+        self.rig = r
+        self.sceneView = view
+        view.onTap = { [weak self] in guard let self = self else { return }; self.onTap(self) }
         contentView = view
     }
 
@@ -543,9 +557,10 @@ public final class ASnifferWindow: EntityWindow {
             guard let self = self else { t.invalidate(); return }
             self.phase += 1.0 / 60.0
             self.digCooldown.tick(1.0 / 60.0)
-            self.drawView?.phase = self.phase
-            self.drawView?.ready = self.isReady
-            self.drawView?.needsDisplay = true
+            self.rig?.walk(1.0 / 60.0)
+            let digging = !self.isReady
+            self.snout?.position.y = -0.10 + (digging ? CGFloat(abs(sin(self.phase * 5.0))) * -0.06 : 0)
+            self.seed?.isHidden = digging
         }
         RunLoop.main.add(tick!, forMode: .common)
     }
@@ -569,47 +584,6 @@ public final class ASnifferWindow: EntityWindow {
     }
 }
 
-private final class ASnifferDrawView: NSView {
-    var phase: TimeInterval = 0
-    var ready = false
-
-    override func draw(_ dirtyRect: NSRect) {
-        guard let ctx = NSGraphicsContext.current?.cgContext else { return }
-        let dig = ready ? 0 : abs(sin(phase * 5.0)) * 4.0
-        // 몸통 (진녹색 대형)
-        ctx.setFillColor(red: 0.25, green: 0.5, blue: 0.28, alpha: 1.0)
-        ctx.fillEllipse(in: CGRect(x: 10, y: 12, width: 56, height: 28))
-        // 주둥이 (아래로 파기)
-        ctx.fill(CGRect(x: 62, y: 10 - dig, width: 16, height: 14))
-        // 코
-        ctx.setFillColor(red: 0.18, green: 0.38, blue: 0.2, alpha: 1.0)
-        ctx.fillEllipse(in: CGRect(x: 66, y: 12 - dig, width: 8, height: 6))
-        // 눈
-        ctx.setFillColor(red: 0.08, green: 0.08, blue: 0.08, alpha: 1.0)
-        ctx.fillEllipse(in: CGRect(x: 58, y: 28, width: 4, height: 4))
-        // 등 가시
-        ctx.setFillColor(red: 0.35, green: 0.62, blue: 0.35, alpha: 1.0)
-        for x in [20, 32, 44] as [CGFloat] {
-            ctx.fill(CGRect(x: x, y: 38, width: 6, height: 8))
-        }
-        // 다리
-        ctx.setFillColor(red: 0.2, green: 0.42, blue: 0.22, alpha: 1.0)
-        for x in [18, 34, 50] as [CGFloat] {
-            ctx.fill(CGRect(x: x, y: 2, width: 8, height: 12))
-        }
-        // 흙 파티클
-        if !ready {
-            ctx.setFillColor(red: 0.5, green: 0.38, blue: 0.28, alpha: 0.9)
-            let px = 70 + sin(phase * 7.0) * 5
-            ctx.fillEllipse(in: CGRect(x: px, y: 2, width: 6, height: 5))
-        } else {
-            // 고대 씨앗 반짝임
-            ctx.setFillColor(red: 0.6, green: 1.0, blue: 0.4, alpha: 1.0)
-            ctx.fillEllipse(in: CGRect(x: 68, y: 2, width: 8, height: 8))
-        }
-    }
-}
-
 // MARK: - 철골렘: 플레이어 근처 고정 + 순찰 펀치 + 장미
 
 public final class AIronGolemWindow: EntityWindow {
@@ -618,7 +592,8 @@ public final class AIronGolemWindow: EntityWindow {
     private var tick: Timer?
     private var phase: TimeInterval = 0
     private var punchLeft: TimeInterval = 0
-    private var drawView: AIronGolemDrawView?
+    private var sceneView: MobSceneView?
+    private var rig: BipedRig?
     private let panelW: CGFloat = 72
     private let panelH: CGFloat = 72
 
@@ -626,8 +601,33 @@ public final class AIronGolemWindow: EntityWindow {
         self.position = startPos
         self.onTap = onTap
         super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
-        let view = AIronGolemDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
-        self.drawView = view
+        let view = MobSceneView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
+        let r = BipedRig(headColor: .rgb(0.82, 0.82, 0.85), torsoColor: .rgb(0.82, 0.82, 0.85), limbColor: .rgb(0.78, 0.78, 0.80))
+        r.scale = SCNVector3(0.8, 0.8, 0.8)
+        let mid = vbox(0.50, 0.35, 0.30, .rgb(0.82, 0.82, 0.85))
+        mid.position = SCNVector3(0, -0.55, 0)
+        r.torso.addChildNode(mid)
+        let base = vbox(0.62, 0.40, 0.36, .rgb(0.82, 0.82, 0.85))
+        base.position = SCNVector3(0, -0.95, 0)
+        r.torso.addChildNode(base)
+        let vine = vbox(0.20, 0.08, 0.24, .rgb(0.35, 0.6, 0.3))
+        vine.position = SCNVector3(0, 0.10, 0)
+        r.torso.addChildNode(vine)
+        for sx in [-0.12, 0.12] as [CGFloat] {
+            let eye = vbox(0.08, 0.10, 0.04, .glow(1.0, 0.5, 0.2))
+            eye.position = SCNVector3(sx, 0.05, 0.26)
+            r.head.addChildNode(eye)
+        }
+        let rose = vbox(0.10, 0.10, 0.10, .rgb(1.0, 0.2, 0.25))
+        rose.position = SCNVector3(0, -0.72, 0.06)
+        r.armL.addChildNode(rose)
+        let stem = vbox(0.04, 0.12, 0.04, .rgb(0.2, 0.6, 0.25))
+        stem.position = SCNVector3(0, -0.62, 0.06)
+        r.armL.addChildNode(stem)
+        view.setSubject(r)
+        self.rig = r
+        self.sceneView = view
+        view.onTap = { [weak self] in guard let self = self else { return }; self.onTap(self) }
         contentView = view
     }
 
@@ -646,15 +646,14 @@ public final class AIronGolemWindow: EntityWindow {
                 self.position.y += (want.y - self.position.y) * 1.0 / 60.0
                 self.setFrameOrigin(NSPoint(x: self.position.x - self.panelW / 2, y: self.position.y))
             }
-            self.drawView?.phase = self.phase
-            self.drawView?.punching = self.punchLeft > 0
-            self.drawView?.needsDisplay = true
+            self.rig?.walk(1.0 / 60.0)
         }
         RunLoop.main.add(tick!, forMode: .common)
     }
 
     public func punch() {
         punchLeft = 0.6
+        rig?.attack()
     }
 
     public override func mouseDown(with event: NSEvent) {
@@ -665,41 +664,6 @@ public final class AIronGolemWindow: EntityWindow {
         tick?.invalidate()
         tick = nil
         super.close()
-    }
-}
-
-private final class AIronGolemDrawView: NSView {
-    var phase: TimeInterval = 0
-    var punching = false
-
-    override func draw(_ dirtyRect: NSRect) {
-        guard let ctx = NSGraphicsContext.current?.cgContext else { return }
-        // 다리
-        ctx.setFillColor(red: 0.75, green: 0.75, blue: 0.78, alpha: 1.0)
-        ctx.fill(CGRect(x: 24, y: 2, width: 10, height: 18))
-        ctx.fill(CGRect(x: 38, y: 2, width: 10, height: 18))
-        // 몸통
-        ctx.setFillColor(red: 0.82, green: 0.82, blue: 0.85, alpha: 1.0)
-        ctx.fill(CGRect(x: 18, y: 20, width: 36, height: 28))
-        // 덩굴 무늬
-        ctx.setFillColor(red: 0.35, green: 0.6, blue: 0.3, alpha: 1.0)
-        ctx.fill(CGRect(x: 24, y: 34, width: 8, height: 4))
-        ctx.fill(CGRect(x: 40, y: 28, width: 8, height: 4))
-        // 팔 (펀치 시 앞으로)
-        let reach: CGFloat = punching ? 10.0 : 0
-        ctx.setFillColor(red: 0.78, green: 0.78, blue: 0.8, alpha: 1.0)
-        ctx.fill(CGRect(x: 8, y: 22, width: 10, height: 24))
-        ctx.fill(CGRect(x: 54 - reach, y: 22 + reach * 0.4, width: 10, height: 24))
-        // 머리
-        ctx.fill(CGRect(x: 24, y: 48, width: 24, height: 16))
-        ctx.setFillColor(red: 1.0, green: 0.5, blue: 0.2, alpha: 1.0)
-        ctx.fillEllipse(in: CGRect(x: 29, y: 54, width: 4, height: 4))
-        ctx.fillEllipse(in: CGRect(x: 39, y: 54, width: 4, height: 4))
-        // 장미
-        ctx.setFillColor(red: 1.0, green: 0.2, blue: 0.25, alpha: 1.0)
-        ctx.fillEllipse(in: CGRect(x: 9, y: 46, width: 7, height: 7))
-        ctx.setFillColor(red: 0.2, green: 0.6, blue: 0.25, alpha: 1.0)
-        ctx.fill(CGRect(x: 11, y: 42, width: 3, height: 5))
     }
 }
 
@@ -716,7 +680,9 @@ public final class AStrayWindow: EntityWindow {
     private var fireCooldown = Cooldown()
     private var slowLeft: TimeInterval = 0
     private var wander = WanderState(speed: 26.0)
-    private var drawView: AStrayDrawView?
+    private var sceneView: MobSceneView?
+    private var rig: BipedRig?
+    private var slowMark: SCNNode?
     private let panelW: CGFloat = 64
     private let panelH: CGFloat = 56
 
@@ -724,8 +690,27 @@ public final class AStrayWindow: EntityWindow {
         self.position = startPos
         self.onTap = onTap
         super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
-        let view = AStrayDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
-        self.drawView = view
+        let view = MobSceneView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
+        let bone = VoxelColor.rgb(0.8, 0.85, 0.88)
+        let rag = VoxelColor.rgb(0.55, 0.6, 0.65)
+        let r = BipedRig(headColor: bone, torsoColor: bone, limbColor: rag)
+        for sx in [-0.10, 0.10] as [CGFloat] {
+            let eye = vbox(0.08, 0.08, 0.02, .glow(0.4, 0.8, 1.0))
+            eye.position = SCNVector3(sx, 0.05, 0.26)
+            r.head.addChildNode(eye)
+        }
+        let bow = vbox(0.05, 0.55, 0.05, VoxelColor.rgb(0.45, 0.32, 0.2))
+        bow.position = SCNVector3(0.32, -0.30, 0)
+        r.torso.addChildNode(bow)
+        let mark = vbox(0.16, 0.10, 0.16, .glow(0.4, 0.7, 1.0))
+        mark.position = SCNVector3(-0.30, 0.45, 0)
+        mark.isHidden = true
+        r.torso.addChildNode(mark)
+        self.slowMark = mark
+        view.setSubject(r)
+        self.rig = r
+        self.sceneView = view
+        view.onTap = { [weak self] in guard let self = self else { return }; self.onTap(self) }
         contentView = view
     }
 
@@ -746,22 +731,21 @@ public final class AStrayWindow: EntityWindow {
                 self.fireCooldown.trigger(6.0)
                 self.onFire?(CGPoint(x: self.position.x, y: self.position.y + 24))
             }
-            self.drawView?.slowed = self.slowLeft > 0
-            self.drawView?.facingRight = self.wander.direction > 0
-            self.drawView?.phase = self.phase
-            self.drawView?.needsDisplay = true
+            self.rig?.walk(dt)
+            self.rig?.eulerAngles.y = self.wander.direction > 0 ? CGFloat(Double.pi / 2.0) : CGFloat(-Double.pi / 2.0)
+            self.slowMark?.isHidden = self.slowLeft <= 0
         }
         RunLoop.main.add(tick!, forMode: .common)
     }
 
     @discardableResult
     public func hit() -> Bool {
+        rig?.attack()
         return counter.hit()
     }
 
     public func applySlow() {
         slowLeft = 3.0
-        drawView?.needsDisplay = true
     }
 
     public override func mouseDown(with event: NSEvent) {
@@ -772,43 +756,6 @@ public final class AStrayWindow: EntityWindow {
         tick?.invalidate()
         tick = nil
         super.close()
-    }
-}
-
-private final class AStrayDrawView: NSView {
-    var phase: TimeInterval = 0
-    var facingRight = true
-    var slowed = false
-
-    override func draw(_ dirtyRect: NSRect) {
-        guard let ctx = NSGraphicsContext.current?.cgContext else { return }
-        let w = bounds.width
-        ctx.saveGState()
-        if !facingRight {
-            ctx.translateBy(x: w, y: 0)
-            ctx.scaleBy(x: -1.0, y: 1.0)
-        }
-        // 몸 (회백색 해골)
-        ctx.setFillColor(red: 0.8, green: 0.85, blue: 0.88, alpha: 1.0)
-        ctx.fill(CGRect(x: 22, y: 8, width: 20, height: 26))
-        // 머리 + 눈 (푸른 눈)
-        ctx.fill(CGRect(x: 20, y: 34, width: 24, height: 16))
-        ctx.setFillColor(red: 0.4, green: 0.8, blue: 1.0, alpha: 1.0)
-        ctx.fillEllipse(in: CGRect(x: 26, y: 40, width: 5, height: 5))
-        ctx.fillEllipse(in: CGRect(x: 35, y: 40, width: 5, height: 5))
-        // 낡은 누더기
-        ctx.setFillColor(red: 0.55, green: 0.6, blue: 0.65, alpha: 1.0)
-        ctx.fill(CGRect(x: 22, y: 14, width: 20, height: 6))
-        // 활
-        ctx.setStrokeColor(red: 0.45, green: 0.32, blue: 0.2, alpha: 1.0)
-        ctx.setLineWidth(2.0)
-        ctx.strokeEllipse(in: CGRect(x: 46, y: 16, width: 10, height: 26))
-        // 슬로우 표시
-        if slowed {
-            ctx.setFillColor(red: 0.4, green: 0.7, blue: 1.0, alpha: 1.0)
-            ctx.fillEllipse(in: CGRect(x: 8, y: 44, width: 12, height: 8))
-        }
-        ctx.restoreGState()
     }
 }
 
@@ -868,7 +815,9 @@ public final class AHuskWindow: EntityWindow {
     private var phase: TimeInterval = 0
     private var hungerLeft: TimeInterval = 0
     private var wander = WanderState(speed: 20.0)
-    private var drawView: AHuskDrawView?
+    private var sceneView: MobSceneView?
+    private var rig: BipedRig?
+    private var hungerMark: SCNNode?
     private let panelW: CGFloat = 64
     private let panelH: CGFloat = 60
 
@@ -876,8 +825,26 @@ public final class AHuskWindow: EntityWindow {
         self.position = startPos
         self.onTap = onTap
         super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
-        let view = AHuskDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
-        self.drawView = view
+        let view = MobSceneView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
+        let sand = VoxelColor.rgb(0.78, 0.68, 0.5)
+        let r = BipedRig(headColor: sand, torsoColor: sand, limbColor: .rgb(0.45, 0.38, 0.3))
+        let tear = vbox(0.38, 0.10, 0.24, .rgb(0.45, 0.38, 0.3))
+        tear.position = SCNVector3(0, -0.15, 0)
+        r.torso.addChildNode(tear)
+        for sx in [-0.10, 0.10] as [CGFloat] {
+            let eye = vbox(0.08, 0.08, 0.02, VoxelColor.rgb(0.2, 0.15, 0.1))
+            eye.position = SCNVector3(sx, 0.05, 0.26)
+            r.head.addChildNode(eye)
+        }
+        let mark = vbox(0.16, 0.12, 0.16, .glow(1.0, 0.6, 0.2))
+        mark.position = SCNVector3(0.30, 0.45, 0)
+        mark.isHidden = true
+        r.torso.addChildNode(mark)
+        self.hungerMark = mark
+        view.setSubject(r)
+        self.rig = r
+        self.sceneView = view
+        view.onTap = { [weak self] in guard let self = self else { return }; self.onTap(self) }
         contentView = view
     }
 
@@ -896,10 +863,9 @@ public final class AHuskWindow: EntityWindow {
             }
             self.position.x += self.wander.tick(1.0 / 60.0)
             self.setFrameOrigin(NSPoint(x: self.position.x - self.panelW / 2, y: self.position.y))
-            self.drawView?.hungry = self.isHungry
-            self.drawView?.remain = self.hungerLeft
-            self.drawView?.phase = self.phase
-            self.drawView?.needsDisplay = true
+            self.rig?.walk(1.0 / 60.0)
+            self.rig?.eulerAngles.y = self.wander.direction > 0 ? CGFloat(Double.pi / 2.0) : CGFloat(-Double.pi / 2.0)
+            self.hungerMark?.isHidden = !self.isHungry
         }
         RunLoop.main.add(tick!, forMode: .common)
     }
@@ -920,37 +886,6 @@ public final class AHuskWindow: EntityWindow {
     }
 }
 
-private final class AHuskDrawView: NSView {
-    var phase: TimeInterval = 0
-    var hungry = false
-    var remain: TimeInterval = 0
-
-    override func draw(_ dirtyRect: NSRect) {
-        guard let ctx = NSGraphicsContext.current?.cgContext else { return }
-        // 몸 (황갈색 허스크)
-        ctx.setFillColor(red: 0.78, green: 0.68, blue: 0.5, alpha: 1.0)
-        ctx.fill(CGRect(x: 20, y: 8, width: 24, height: 28))
-        // 머리
-        ctx.fill(CGRect(x: 18, y: 36, width: 28, height: 18))
-        // 눈 (어두운 눈)
-        ctx.setFillColor(red: 0.2, green: 0.15, blue: 0.1, alpha: 1.0)
-        ctx.fillEllipse(in: CGRect(x: 24, y: 44, width: 5, height: 5))
-        ctx.fillEllipse(in: CGRect(x: 35, y: 44, width: 5, height: 5))
-        // 찢긴 옷
-        ctx.setFillColor(red: 0.45, green: 0.38, blue: 0.3, alpha: 1.0)
-        ctx.fill(CGRect(x: 20, y: 20, width: 24, height: 6))
-        // 허기 표시
-        if hungry {
-            ctx.setFillColor(red: 1.0, green: 0.6, blue: 0.2, alpha: 1.0)
-            ctx.fillEllipse(in: CGRect(x: 46, y: 48, width: 12, height: 8))
-            ctx.setFillColor(red: 0.1, green: 0.1, blue: 0.1, alpha: 1.0)
-            let secs = Int(ceil(remain))
-            let label = "\(secs)" as NSString
-            label.draw(at: CGPoint(x: 49, y: 48), withAttributes: [.font: NSFont.systemFont(ofSize: 7)])
-        }
-    }
-}
-
 // MARK: - 보고드: 독화살 + 버섯 (시간 만료 해제)
 
 public final class ABoggedWindow: EntityWindow {
@@ -961,7 +896,9 @@ public final class ABoggedWindow: EntityWindow {
     private var phase: TimeInterval = 0
     private var poisonLeft: TimeInterval = 0
     private var wander = WanderState(speed: 22.0)
-    private var drawView: ABoggedDrawView?
+    private var sceneView: MobSceneView?
+    private var rig: BipedRig?
+    private var poisonPuff: SCNNode?
     private let panelW: CGFloat = 60
     private let panelH: CGFloat = 56
 
@@ -969,8 +906,34 @@ public final class ABoggedWindow: EntityWindow {
         self.position = startPos
         self.onTap = onTap
         super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
-        let view = ABoggedDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
-        self.drawView = view
+        let view = MobSceneView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
+        let bog = VoxelColor.rgb(0.55, 0.6, 0.4)
+        let r = BipedRig(headColor: bog, torsoColor: bog, limbColor: .rgb(0.45, 0.52, 0.34))
+        for sx in [-0.14, 0.14] as [CGFloat] {
+            let shroom = vbox(0.14, 0.08, 0.14, .rgb(0.85, 0.2, 0.2))
+            shroom.position = SCNVector3(sx, 0.30, 0)
+            r.head.addChildNode(shroom)
+            let dot = vbox(0.04, 0.04, 0.02, .rgb(1.0, 1.0, 1.0))
+            dot.position = SCNVector3(sx, 0.32, 0.08)
+            r.head.addChildNode(dot)
+        }
+        for sx in [-0.10, 0.10] as [CGFloat] {
+            let eye = vbox(0.07, 0.07, 0.02, VoxelColor.rgb(0.1, 0.1, 0.1))
+            eye.position = SCNVector3(sx, 0.05, 0.26)
+            r.head.addChildNode(eye)
+        }
+        let bow = vbox(0.05, 0.50, 0.05, VoxelColor.rgb(0.45, 0.32, 0.2))
+        bow.position = SCNVector3(0.32, -0.30, 0)
+        r.torso.addChildNode(bow)
+        let puff = vbox(0.14, 0.14, 0.14, .glow(0.3, 0.9, 0.3))
+        puff.position = SCNVector3(0.34, 0.30, 0)
+        puff.isHidden = true
+        r.torso.addChildNode(puff)
+        self.poisonPuff = puff
+        view.setSubject(r)
+        self.rig = r
+        self.sceneView = view
+        view.onTap = { [weak self] in guard let self = self else { return }; self.onTap(self) }
         contentView = view
     }
 
@@ -989,9 +952,10 @@ public final class ABoggedWindow: EntityWindow {
             }
             self.position.x += self.wander.tick(1.0 / 60.0)
             self.setFrameOrigin(NSPoint(x: self.position.x - self.panelW / 2, y: self.position.y))
-            self.drawView?.poisoned = self.isPoisoned
-            self.drawView?.phase = self.phase
-            self.drawView?.needsDisplay = true
+            self.rig?.walk(1.0 / 60.0)
+            self.rig?.eulerAngles.y = self.wander.direction > 0 ? CGFloat(Double.pi / 2.0) : CGFloat(-Double.pi / 2.0)
+            self.poisonPuff?.isHidden = !self.isPoisoned
+            self.poisonPuff?.position.y = 0.30 + CGFloat(sin(self.phase * 4.0)) * 0.05
         }
         RunLoop.main.add(tick!, forMode: .common)
     }
@@ -1012,37 +976,6 @@ public final class ABoggedWindow: EntityWindow {
     }
 }
 
-private final class ABoggedDrawView: NSView {
-    var phase: TimeInterval = 0
-    var poisoned = false
-
-    override func draw(_ dirtyRect: NSRect) {
-        guard let ctx = NSGraphicsContext.current?.cgContext else { return }
-        // 몸 (녹갈색)
-        ctx.setFillColor(red: 0.55, green: 0.6, blue: 0.4, alpha: 1.0)
-        ctx.fill(CGRect(x: 18, y: 8, width: 22, height: 26))
-        // 머리 + 버섯 2개
-        ctx.fill(CGRect(x: 16, y: 34, width: 26, height: 16))
-        ctx.setFillColor(red: 0.85, green: 0.2, blue: 0.2, alpha: 1.0)
-        ctx.fillEllipse(in: CGRect(x: 16, y: 48, width: 10, height: 6))
-        ctx.fillEllipse(in: CGRect(x: 30, y: 48, width: 10, height: 6))
-        ctx.setFillColor(red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0)
-        ctx.fillEllipse(in: CGRect(x: 19, y: 50, width: 2, height: 2))
-        ctx.fillEllipse(in: CGRect(x: 33, y: 50, width: 2, height: 2))
-        // 눈
-        ctx.setFillColor(red: 0.1, green: 0.1, blue: 0.1, alpha: 1.0)
-        ctx.fillEllipse(in: CGRect(x: 22, y: 40, width: 4, height: 4))
-        ctx.fillEllipse(in: CGRect(x: 32, y: 40, width: 4, height: 4))
-        // 독 표시 (초록 기포)
-        if poisoned {
-            ctx.setFillColor(red: 0.3, green: 0.9, blue: 0.3, alpha: 0.85)
-            let by = 12 + sin(phase * 4.0) * 3
-            ctx.fillEllipse(in: CGRect(x: 44, y: by, width: 8, height: 8))
-            ctx.fillEllipse(in: CGRect(x: 48, y: by + 10, width: 5, height: 5))
-        }
-    }
-}
-
 // MARK: - 크리킹: 밤에만 눈 고정 얼음 3초, 낮 소멸
 
 public final class ACreakingWindow: EntityWindow {
@@ -1052,7 +985,9 @@ public final class ACreakingWindow: EntityWindow {
     private var tick: Timer?
     private var phase: TimeInterval = 0
     private var frozenLeft: TimeInterval = 0
-    private var drawView: ACreakingDrawView?
+    private var sceneView: MobSceneView?
+    private var rig: BipedRig?
+    private var ice: SCNNode?
     private let panelW: CGFloat = 68
     private let panelH: CGFloat = 64
 
@@ -1060,8 +995,29 @@ public final class ACreakingWindow: EntityWindow {
         self.position = startPos
         self.onTap = onTap
         super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
-        let view = ACreakingDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
-        self.drawView = view
+        let view = MobSceneView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
+        let bark = VoxelColor.rgb(0.75, 0.7, 0.62)
+        let darkBark = VoxelColor.rgb(0.7, 0.65, 0.57)
+        let r = BipedRig(headColor: bark, torsoColor: bark, limbColor: darkBark)
+        for sx in [-0.09, 0.0, 0.09] as [CGFloat] {
+            let eye = vbox(0.06, 0.16, 0.02, .glow(1.0, 0.6, 0.1))
+            eye.position = SCNVector3(sx, 0.05, 0.26)
+            r.head.addChildNode(eye)
+        }
+        for sx in [-0.32, 0.32] as [CGFloat] {
+            let branch = vbox(0.22, 0.08, 0.08, darkBark)
+            branch.position = SCNVector3(sx, 0.10, 0)
+            r.torso.addChildNode(branch)
+        }
+        let ice = vbox(0.55, 0.10, 0.40, .rgb(0.6, 0.9, 1.0))
+        ice.position = SCNVector3(0, -0.85, 0)
+        ice.isHidden = true
+        r.torso.addChildNode(ice)
+        self.ice = ice
+        view.setSubject(r)
+        self.rig = r
+        self.sceneView = view
+        view.onTap = { [weak self] in guard let self = self else { return }; self.onTap(self) }
         contentView = view
     }
 
@@ -1080,10 +1036,9 @@ public final class ACreakingWindow: EntityWindow {
                 self.frozenLeft -= 1.0 / 60.0
                 if self.frozenLeft <= 0 { self.isFrozen = false }
             }
-            self.drawView?.frozen = self.isFrozen
-            self.drawView?.daytime = !ACreakingWindow.isNight()
-            self.drawView?.phase = self.phase
-            self.drawView?.needsDisplay = true
+            self.ice?.isHidden = !self.isFrozen
+            self.rig?.opacity = ACreakingWindow.isNight() ? 1.0 : 0.35
+            self.rig?.walk(1.0 / 60.0)
         }
         RunLoop.main.add(tick!, forMode: .common)
     }
@@ -1104,41 +1059,6 @@ public final class ACreakingWindow: EntityWindow {
     }
 }
 
-private final class ACreakingDrawView: NSView {
-    var phase: TimeInterval = 0
-    var frozen = false
-    var daytime = false
-
-    override func draw(_ dirtyRect: NSRect) {
-        guard let ctx = NSGraphicsContext.current?.cgContext else { return }
-        let alpha: CGFloat = daytime ? 0.35 : 1.0
-        // 몸통 (창백한 나무 껍질)
-        ctx.setFillColor(red: 0.75, green: 0.7, blue: 0.62, alpha: alpha)
-        ctx.fill(CGRect(x: 22, y: 8, width: 24, height: 32))
-        // 머리 + 세로 눈 3개 (주황 발광)
-        ctx.fill(CGRect(x: 20, y: 40, width: 28, height: 18))
-        if !daytime {
-            let blink = 0.7 + 0.3 * sin(phase * 5.0)
-            ctx.setFillColor(red: 1.0, green: CGFloat(0.6 * blink), blue: 0.1, alpha: 1.0)
-        } else {
-            ctx.setFillColor(red: 0.5, green: 0.45, blue: 0.4, alpha: alpha)
-        }
-        for x in [26, 33, 40] as [CGFloat] {
-            ctx.fill(CGRect(x: x, y: 45, width: 3, height: 9))
-        }
-        // 가지 팔
-        ctx.setFillColor(red: 0.7, green: 0.65, blue: 0.57, alpha: alpha)
-        ctx.fill(CGRect(x: 10, y: 20, width: 12, height: 5))
-        ctx.fill(CGRect(x: 46, y: 20, width: 12, height: 5))
-        // 얼음 표시
-        if frozen {
-            ctx.setFillColor(red: 0.6, green: 0.9, blue: 1.0, alpha: 0.85)
-            ctx.fill(CGRect(x: 18, y: 4, width: 32, height: 6))
-            ctx.fillEllipse(in: CGRect(x: 30, y: 56, width: 8, height: 6))
-        }
-    }
-}
-
 // MARK: - 엔더마이트: 작게 기어다님 + 1타
 
 public final class AEndermiteWindow: EntityWindow {
@@ -1147,7 +1067,8 @@ public final class AEndermiteWindow: EntityWindow {
     private var tick: Timer?
     private var phase: TimeInterval = 0
     private var dir: CGFloat = 1
-    private var drawView: AEndermiteDrawView?
+    private var sceneView: MobSceneView?
+    private var rig: QuadRig?
     private let panelW: CGFloat = 44
     private let panelH: CGFloat = 28
 
@@ -1155,8 +1076,20 @@ public final class AEndermiteWindow: EntityWindow {
         self.position = startPos
         self.onTap = onTap
         super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
-        let view = AEndermiteDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
-        self.drawView = view
+        let view = MobSceneView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
+        let purple = VoxelColor.rgb(0.55, 0.3, 0.75)
+        let r = QuadRig(bodyColor: purple, headColor: .rgb(0.5, 0.25, 0.7), legColor: .rgb(0.4, 0.2, 0.6), tailColor: nil)
+        r.scale = SCNVector3(0.55, 0.55, 0.55)
+        let eye = vbox(0.08, 0.08, 0.02, .glow(1.0, 0.2, 0.2))
+        eye.position = SCNVector3(0.08, 0.05, 0.25)
+        r.head.addChildNode(eye)
+        let mote = vbox(0.08, 0.08, 0.08, .glow(0.7, 0.4, 1.0))
+        mote.position = SCNVector3(-0.30, 0.25, 0)
+        r.body.addChildNode(mote)
+        view.setSubject(r)
+        self.rig = r
+        self.sceneView = view
+        view.onTap = { [weak self] in guard let self = self else { return }; self.onTap(self) }
         contentView = view
     }
 
@@ -1172,9 +1105,8 @@ public final class AEndermiteWindow: EntityWindow {
             let wiggle = sin(self.phase * 10.0) * 6.0
             self.position.x += (self.dir * 70.0 + wiggle) / 60.0
             self.setFrameOrigin(NSPoint(x: self.position.x - self.panelW / 2, y: self.position.y))
-            self.drawView?.facingRight = self.dir > 0
-            self.drawView?.phase = self.phase
-            self.drawView?.needsDisplay = true
+            self.rig?.walk(1.0 / 60.0)
+            self.rig?.eulerAngles.y = self.dir > 0 ? CGFloat(Double.pi / 2.0) : CGFloat(-Double.pi / 2.0)
         }
         RunLoop.main.add(tick!, forMode: .common)
     }
@@ -1187,41 +1119,6 @@ public final class AEndermiteWindow: EntityWindow {
         tick?.invalidate()
         tick = nil
         super.close()
-    }
-}
-
-private final class AEndermiteDrawView: NSView {
-    var phase: TimeInterval = 0
-    var facingRight = true
-
-    override func draw(_ dirtyRect: NSRect) {
-        guard let ctx = NSGraphicsContext.current?.cgContext else { return }
-        let w = bounds.width
-        ctx.saveGState()
-        if !facingRight {
-            ctx.translateBy(x: w, y: 0)
-            ctx.scaleBy(x: -1.0, y: 1.0)
-        }
-        // 몸 마디 3개 (보라)
-        ctx.setFillColor(red: 0.55, green: 0.3, blue: 0.75, alpha: 1.0)
-        ctx.fillEllipse(in: CGRect(x: 6, y: 8, width: 12, height: 10))
-        ctx.fillEllipse(in: CGRect(x: 16, y: 9, width: 12, height: 10))
-        ctx.fillEllipse(in: CGRect(x: 26, y: 8, width: 12, height: 10))
-        // 머리 + 빨간 눈
-        ctx.setFillColor(red: 0.5, green: 0.25, blue: 0.7, alpha: 1.0)
-        ctx.fillEllipse(in: CGRect(x: 32, y: 12, width: 8, height: 8))
-        ctx.setFillColor(red: 1.0, green: 0.2, blue: 0.2, alpha: 1.0)
-        ctx.fillEllipse(in: CGRect(x: 36, y: 15, width: 3, height: 3))
-        // 다리 (꿈틀)
-        ctx.setFillColor(red: 0.4, green: 0.2, blue: 0.6, alpha: 1.0)
-        let lift = sin(phase * 12.0) * 1.5
-        for (i, x) in ([10, 20, 30] as [CGFloat]).enumerated() {
-            ctx.fill(CGRect(x: x, y: 2 + (i % 2 == 0 ? lift : -lift), width: 3, height: 7))
-        }
-        // 엔더 파티클
-        ctx.setFillColor(red: 0.7, green: 0.4, blue: 1.0, alpha: 0.8)
-        ctx.fillEllipse(in: CGRect(x: 4 + sin(phase * 3.0) * 2, y: 20, width: 3, height: 3))
-        ctx.restoreGState()
     }
 }
 
@@ -1287,7 +1184,8 @@ public final class ASkeletonHorseTrapWindow: EntityWindow {
     private var tick: Timer?
     private var phase: TimeInterval = 0
     private var wander = WanderState(speed: 34.0)
-    private var drawView: ASkeletonHorseTrapDrawView?
+    private var sceneView: MobSceneView?
+    private var rig: QuadRig?
     private let panelW: CGFloat = 88
     private let panelH: CGFloat = 60
 
@@ -1295,8 +1193,32 @@ public final class ASkeletonHorseTrapWindow: EntityWindow {
         self.position = startPos
         self.onTap = onTap
         super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
-        let view = ASkeletonHorseTrapDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
-        self.drawView = view
+        let view = MobSceneView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
+        let bone = VoxelColor.rgb(0.88, 0.88, 0.88)
+        let r = QuadRig(bodyColor: bone, headColor: bone, legColor: .rgb(0.82, 0.82, 0.82), tailColor: bone)
+        for sx in [-0.12, -0.04, 0.04, 0.12] as [CGFloat] {
+            let rib = vbox(0.04, 0.30, 0.52, .rgb(0.6, 0.6, 0.62))
+            rib.position = SCNVector3(sx, 0.05, 0)
+            r.body.addChildNode(rib)
+        }
+        let eye = vbox(0.07, 0.07, 0.02, VoxelColor.rgb(0.1, 0.1, 0.1))
+        eye.position = SCNVector3(0.12, 0.05, 0.25)
+        r.head.addChildNode(eye)
+        let saddle = vbox(0.40, 0.08, 0.50, .rgb(0.5, 0.32, 0.2))
+        saddle.position = SCNVector3(0, 0.30, -0.05)
+        r.body.addChildNode(saddle)
+        for sx in [-0.10, 0.10] as [CGFloat] {
+            let riderBody = vbox(0.12, 0.16, 0.12, bone)
+            riderBody.position = SCNVector3(sx, 0.44, -0.05)
+            r.body.addChildNode(riderBody)
+            let riderHead = vbox(0.12, 0.12, 0.12, bone)
+            riderHead.position = SCNVector3(sx, 0.58, -0.05)
+            r.body.addChildNode(riderHead)
+        }
+        view.setSubject(r)
+        self.rig = r
+        self.sceneView = view
+        view.onTap = { [weak self] in guard let self = self else { return }; self.onTap(self) }
         contentView = view
     }
 
@@ -1308,10 +1230,8 @@ public final class ASkeletonHorseTrapWindow: EntityWindow {
             self.position.x += self.wander.tick(1.0 / 60.0)
             let trot = abs(sin(self.phase * 8.0)) * 5.0
             self.setFrameOrigin(NSPoint(x: self.position.x - self.panelW / 2, y: self.position.y + trot))
-            self.drawView?.facingRight = self.wander.direction > 0
-            self.drawView?.hits = self.hits
-            self.drawView?.phase = self.phase
-            self.drawView?.needsDisplay = true
+            self.rig?.walk(1.0 / 60.0)
+            self.rig?.eulerAngles.y = self.wander.direction > 0 ? CGFloat(Double.pi / 2.0) : CGFloat(-Double.pi / 2.0)
         }
         RunLoop.main.add(tick!, forMode: .common)
     }
@@ -1319,8 +1239,6 @@ public final class ASkeletonHorseTrapWindow: EntityWindow {
     @discardableResult
     public func hit() -> Bool {
         let defeated = counter.hit()
-        drawView?.hits = counter.hits
-        drawView?.needsDisplay = true
         return defeated
     }
 
@@ -1332,53 +1250,5 @@ public final class ASkeletonHorseTrapWindow: EntityWindow {
         tick?.invalidate()
         tick = nil
         super.close()
-    }
-}
-
-private final class ASkeletonHorseTrapDrawView: NSView {
-    var phase: TimeInterval = 0
-    var facingRight = true
-    var hits: Int = 0
-
-    override func draw(_ dirtyRect: NSRect) {
-        guard let ctx = NSGraphicsContext.current?.cgContext else { return }
-        let w = bounds.width
-        ctx.saveGState()
-        if !facingRight {
-            ctx.translateBy(x: w, y: 0)
-            ctx.scaleBy(x: -1.0, y: 1.0)
-        }
-        // 해골마 몸통 (뼈 백색)
-        ctx.setFillColor(red: 0.88, green: 0.88, blue: 0.88, alpha: 1.0)
-        ctx.fill(CGRect(x: 16, y: 14, width: 44, height: 16))
-        // 갈비뼈 줄무늬
-        ctx.setFillColor(red: 0.6, green: 0.6, blue: 0.62, alpha: 1.0)
-        for x in [22, 30, 38, 46] as [CGFloat] {
-            ctx.fill(CGRect(x: x, y: 14, width: 2, height: 16))
-        }
-        // 목 + 머리
-        ctx.setFillColor(red: 0.88, green: 0.88, blue: 0.88, alpha: 1.0)
-        ctx.fill(CGRect(x: 56, y: 24, width: 10, height: 16))
-        ctx.fill(CGRect(x: 58, y: 36, width: 16, height: 10))
-        ctx.setFillColor(red: 0.1, green: 0.1, blue: 0.1, alpha: 1.0)
-        ctx.fillEllipse(in: CGRect(x: 66, y: 39, width: 4, height: 4))
-        // 다리 (뼈)
-        ctx.setFillColor(red: 0.82, green: 0.82, blue: 0.82, alpha: 1.0)
-        let trot = sin(phase * 8.0) * 2.0
-        ctx.fill(CGRect(x: 22, y: 2 + trot, width: 4, height: 12))
-        ctx.fill(CGRect(x: 32, y: 2 - trot, width: 4, height: 12))
-        ctx.fill(CGRect(x: 44, y: 2 + trot, width: 4, height: 12))
-        ctx.fill(CGRect(x: 52, y: 2 - trot, width: 4, height: 12))
-        // 기마 스켈레톤 2기 (안장 위 미니)
-        ctx.setFillColor(red: 0.92, green: 0.92, blue: 0.92, alpha: 1.0)
-        ctx.fillEllipse(in: CGRect(x: 28, y: 30, width: 8, height: 9))
-        ctx.fillEllipse(in: CGRect(x: 40, y: 30, width: 8, height: 9))
-        ctx.setFillColor(red: 0.1, green: 0.1, blue: 0.1, alpha: 1.0)
-        ctx.fillEllipse(in: CGRect(x: 30, y: 34, width: 2, height: 2))
-        ctx.fillEllipse(in: CGRect(x: 42, y: 34, width: 2, height: 2))
-        // 안장
-        ctx.setFillColor(red: 0.5, green: 0.32, blue: 0.2, alpha: 1.0)
-        ctx.fill(CGRect(x: 26, y: 28, width: 26, height: 5))
-        ctx.restoreGState()
     }
 }

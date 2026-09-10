@@ -1,5 +1,6 @@
 import AppKit
 import CoreGraphics
+import SceneKit
 
 // 17차 백로그 5종(약탈자습격·피리·활공링·멍때리기·몹머리) 단일 파일.
 // EventManager.shared.entries()로 메뉴에 연결한다.
@@ -58,13 +59,38 @@ private final class Extra17PillagerWindow: EntityWindow {
     var onTap: (() -> Void)?
     private var animTimer: Timer?
     private var phase: TimeInterval = 0
-    private var drawView: Extra17PillagerDrawView?
+    private var sceneView: MobSceneView?
+    private var rig: BipedRig?
 
     init(startPos: CGPoint) {
         let size = NSSize(width: 48, height: 68)
         super.init(contentRect: NSRect(x: startPos.x - 24, y: startPos.y, width: size.width, height: size.height), ignoresMouse: false)
-        let view = Extra17PillagerDrawView(frame: NSRect(origin: .zero, size: size))
-        self.drawView = view
+        let view = MobSceneView(frame: NSRect(origin: .zero, size: size))
+        let r = BipedRig(
+            headColor: .rgb(0.85, 0.70, 0.60),
+            torsoColor: .rgb(0.45, 0.42, 0.45),
+            limbColor: .rgb(0.35, 0.33, 0.35)
+        )
+        for x in [-0.08, 0.08] as [CGFloat] {
+            let eye = vbox(0.09, 0.05, 0.02, .rgb(0.08, 0.08, 0.08))
+            eye.position = SCNVector3(x, 0.06, 0.26)
+            r.head.addChildNode(eye)
+            let brow = vbox(0.12, 0.04, 0.02, .rgb(0.08, 0.08, 0.08))
+            brow.position = SCNVector3(x, 0.15, 0.26)
+            brow.eulerAngles.z = x > 0 ? 0.25 : -0.25
+            r.head.addChildNode(brow)
+        }
+        let stock = vbox(0.08, 0.44, 0.08, .rgb(0.35, 0.25, 0.15))
+        stock.position = SCNVector3(0, -0.60, 0.10)
+        r.armR.addChildNode(stock)
+        let bow = vbox(0.34, 0.06, 0.06, .rgb(0.35, 0.25, 0.15))
+        bow.position = SCNVector3(0, -0.48, 0.14)
+        r.armR.addChildNode(bow)
+        r.addTo(view.scene!, scale: 0.9)
+        view.setSubject(r)
+        self.rig = r
+        self.sceneView = view
+        view.onTap = { [weak self] in self?.onTap?() }
         contentView = view
     }
 
@@ -73,8 +99,7 @@ private final class Extra17PillagerWindow: EntityWindow {
         animTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] t in
             guard let self = self else { t.invalidate(); return }
             self.phase += 1.0 / 60.0
-            self.drawView?.bob = sin(self.phase * 6.0) * 2.0
-            self.drawView?.needsDisplay = true
+            self.rig?.position.y = CGFloat(sin(self.phase * 6.0)) * 0.05
         }
         RunLoop.main.add(animTimer!, forMode: .common)
     }
@@ -94,32 +119,6 @@ private final class Extra17PillagerWindow: EntityWindow {
         animTimer?.invalidate()
         animTimer = nil
         super.close()
-    }
-}
-
-private final class Extra17PillagerDrawView: NSView {
-    var bob: CGFloat = 0
-
-    override func draw(_ dirtyRect: NSRect) {
-        guard let ctx = NSGraphicsContext.current?.cgContext else { return }
-        // 몸통 (회색 코트)
-        ctx.setFillColor(red: 0.45, green: 0.42, blue: 0.45, alpha: 1.0)
-        ctx.fill(CGRect(x: 14, y: 20 + bob, width: 20, height: 24))
-        // 머리
-        ctx.setFillColor(red: 0.85, green: 0.70, blue: 0.60, alpha: 1.0)
-        ctx.fill(CGRect(x: 13, y: 44 + bob, width: 22, height: 18))
-        // 눈 (사나운 눈썹)
-        ctx.setFillColor(red: 0.08, green: 0.08, blue: 0.08, alpha: 1.0)
-        ctx.fill(CGRect(x: 17, y: 53 + bob, width: 6, height: 3))
-        ctx.fill(CGRect(x: 25, y: 53 + bob, width: 6, height: 3))
-        // 석궁 (옆에 든 막대)
-        ctx.setFillColor(red: 0.35, green: 0.25, blue: 0.15, alpha: 1.0)
-        ctx.fill(CGRect(x: 36, y: 26 + bob, width: 4, height: 22))
-        ctx.fill(CGRect(x: 30, y: 34 + bob, width: 16, height: 3))
-        // 다리
-        ctx.setFillColor(red: 0.35, green: 0.33, blue: 0.35, alpha: 1.0)
-        ctx.fill(CGRect(x: 16, y: 4, width: 7, height: 16))
-        ctx.fill(CGRect(x: 25, y: 4, width: 7, height: 16))
     }
 }
 

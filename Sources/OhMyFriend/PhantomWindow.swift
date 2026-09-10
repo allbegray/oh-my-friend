@@ -1,5 +1,6 @@
 import AppKit
 import CoreGraphics
+import SceneKit
 
 public protocol PhantomWindowDelegate: AnyObject {
     func phantomWindowDidClick(_ window: PhantomWindow)
@@ -19,7 +20,7 @@ public final class PhantomWindow: EntityWindow {
     private var swoopTimer: TimeInterval = 4.0
     private var lifeTimer: TimeInterval = 0
     private let maxLife: TimeInterval = 60.0
-    private var drawView: PhantomDrawView?
+    private var rig: FlyerRig?
     private var isGone = false
 
     public init(startPos: CGPoint, delegate: PhantomWindowDelegate) {
@@ -28,8 +29,24 @@ public final class PhantomWindow: EntityWindow {
         self.phantomDelegate = delegate
         let size = NSSize(width: 84, height: 48)
         super.init(contentRect: NSRect(x: startPos.x - 42, y: startPos.y, width: size.width, height: size.height), ignoresMouse: false)
-        let view = PhantomDrawView(frame: NSRect(origin: .zero, size: size))
-        self.drawView = view
+        let view = MobSceneView(frame: NSRect(origin: .zero, size: size))
+        let rig = FlyerRig(
+            bodyColor: .rgb(0.30, 0.48, 0.52),
+            wingColor: .rgb(0.35, 0.55, 0.60)
+        )
+        rig.wingL.scale = SCNVector3(1.6, 1.4, 1.6)
+        rig.wingR.scale = SCNVector3(1.6, 1.4, 1.6)
+        for ex in [-0.08, 0.08] as [CGFloat] {
+            let eye = vbox(0.06, 0.08, 0.02, .glow(0.95, 0.25, 0.35))
+            eye.position = SCNVector3(ex, 0.05, 0.17)
+            rig.body.addChildNode(eye)
+        }
+        view.setSubject(rig)
+        self.rig = rig
+        view.onTap = { [weak self] in
+            guard let self = self else { return }
+            self.phantomDelegate?.phantomWindowDidClick(self)
+        }
         contentView = view
     }
 
@@ -65,8 +82,7 @@ public final class PhantomWindow: EntityWindow {
                 }
             }
             self.setFrameOrigin(NSPoint(x: self.position.x - 42, y: self.position.y))
-            self.drawView?.flap = sin(self.phase * 14.0)
-            self.drawView?.needsDisplay = true
+            self.rig?.flap(1.0 / 60.0)
         }
         RunLoop.main.add(flyTimer!, forMode: .common)
     }

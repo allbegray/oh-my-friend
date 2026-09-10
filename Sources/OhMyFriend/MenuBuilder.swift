@@ -202,7 +202,6 @@ struct MenuBuilder {
         menu.addItem(petSubmenuItem)
 
         // 5. Fun Interactions Submenu
-        let actMenu = NSMenu()
         let actEntries: [ExtraMenuEntry] = [
             ExtraMenuEntry({ "🤸‍♂️ 공중제비 (Backflip)" }, { [weak app] in app?.didSelectBackflip() }, keyEquivalent: "b"),
             ExtraMenuEntry({ "🕺 쉬프트 댄스 (Sneak Dance)" }, { [weak app] in app?.didSelectSneakDance() }, keyEquivalent: "t"),
@@ -274,24 +273,20 @@ struct MenuBuilder {
             ExtraMenuEntry({ "🌳 사과나무 심기 (Tree)" }, { [weak app] in app?.didSelectPlantTree() }),
             ExtraMenuEntry({ [weak app] in "🍞 빵 굽기 (밀: \(app?.player.playerWheat ?? 0)/3)" }, { [weak app] in app?.didSelectBakeBread() }),
         ]
-        for e in actEntries { actMenu.addItem(ClosureMenuItem(e)) }
-        app.ladderMenuItem = actMenu.items.first(where: { $0.title == "🪜 사다리 타고 창문 내려가기 (Ladder Descent)" })
+        let actSubmenuItem = makeSearchableMenu(title: "✨ 재미있는 모션 실행", groups: [("실행", actEntries)])
+        menu.addItem(actSubmenuItem)
+        app.ladderMenuItem = actSubmenuItem.submenu?.items.first(where: { $0.title == "🪜 사다리 타고 창문 내려가기 (Ladder Descent)" })
         if app.window.characterView.characterNode.isTotemEquipped {
-            actMenu.items.first(where: { $0.title == "✨ 불사의 토템 들기 (Totem)" })?.state = .on
+            actSubmenuItem.submenu?.items.first(where: { $0.title == "✨ 불사의 토템 들기 (Totem)" })?.state = .on
         }
         if app.isDefenseMode {
-            actMenu.items.first(where: { $0.title.hasPrefix("🏹 디펜스전 모드") })?.state = .on
+            actSubmenuItem.submenu?.items.first(where: { $0.title.hasPrefix("🏹 디펜스전 모드") })?.state = .on
         }
-        let actSubmenuItem = NSMenuItem(title: "✨ 재미있는 모션 실행", action: nil, keyEquivalent: "")
-        actSubmenuItem.submenu = actMenu
-        menu.addItem(actSubmenuItem)
 
-        let extraSubmenuItem = NSMenuItem(title: "🎉 추가 모션 9~17차", action: nil, keyEquivalent: "")
-        extraSubmenuItem.submenu = app.buildExtraMenu()
+        let extraSubmenuItem = makeSearchableMenu(title: "🎉 추가 모션 9~17차", groups: app.extraGroups())
         menu.addItem(extraSubmenuItem)
 
-        let extra2SubmenuItem = NSMenuItem(title: "✨ 신규 100선 (A~J)", action: nil, keyEquivalent: "")
-        extra2SubmenuItem.submenu = app.buildExtraMenu2()
+        let extra2SubmenuItem = makeSearchableMenu(title: "✨ 신규 100선 (A~J)", groups: app.extraGroups2())
         menu.addItem(extra2SubmenuItem)
         // 4. Scale Submenu
         let scaleMenu = NSMenu()

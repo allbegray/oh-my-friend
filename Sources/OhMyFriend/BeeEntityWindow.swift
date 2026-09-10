@@ -1,14 +1,32 @@
 import AppKit
 import CoreGraphics
+import SceneKit
 
 public final class BeeEntityWindow: EntityWindow {
     public var followOffset: CGPoint = .zero
     private var wobble: CGFloat = 0
+    private var rig: FlyerRig?
 
     public init(startPos: CGPoint) {
         let size = NSSize(width: 30, height: 26)
         super.init(contentRect: NSRect(x: startPos.x - 15, y: startPos.y, width: size.width, height: size.height), ignoresMouse: true)
-        contentView = BeeDrawView(frame: NSRect(origin: .zero, size: size))
+        let view = MobSceneView(frame: NSRect(origin: .zero, size: size))
+        let rig = FlyerRig(
+            bodyColor: .rgb(0.95, 0.75, 0.15),
+            wingColor: .rgb(1.0, 1.0, 1.0)
+        )
+        for z in [-0.08, 0.06] as [CGFloat] {
+            let stripe = vbox(0.34, 0.10, 0.05, .rgb(0.15, 0.12, 0.10))
+            stripe.position = SCNVector3(0, 0.05, z)
+            rig.body.addChildNode(stripe)
+        }
+        let stinger = vbox(0.08, 0.08, 0.10, .rgb(0.15, 0.12, 0.10))
+        stinger.position = SCNVector3(0, -0.05, -0.20)
+        rig.body.addChildNode(stinger)
+        rig.addTo(view.scene!, scale: 0.9)
+        view.setSubject(rig)
+        self.rig = rig
+        contentView = view
     }
 
     required init?(coder: NSCoder) {
@@ -17,27 +35,12 @@ public final class BeeEntityWindow: EntityWindow {
 
     public func follow(target: CGPoint, excited: Bool) {
         wobble += excited ? 0.35 : 0.18
+        rig?.flap(excited ? 1.0 / 30.0 : 1.0 / 60.0)
         let wob = sin(wobble) * (excited ? 16.0 : 9.0)
         setFrameOrigin(NSPoint(
             x: target.x + followOffset.x,
             y: target.y + followOffset.y + wob
         ))
-    }
-}
-
-private final class BeeDrawView: NSView {
-    override func draw(_ dirtyRect: NSRect) {
-        guard let ctx = NSGraphicsContext.current?.cgContext else { return }
-        let w = bounds.width
-        let h = bounds.height
-        ctx.setFillColor(red: 1.0, green: 1.0, blue: 1.0, alpha: 0.75)
-        ctx.fillEllipse(in: CGRect(x: 2, y: h - 12, width: 9, height: 8))
-        ctx.fillEllipse(in: CGRect(x: w - 11, y: h - 12, width: 9, height: 8))
-        ctx.setFillColor(red: 0.95, green: 0.75, blue: 0.15, alpha: 1.0)
-        ctx.fillEllipse(in: CGRect(x: 6, y: 4, width: w - 12, height: h - 12))
-        ctx.setFillColor(red: 0.15, green: 0.12, blue: 0.10, alpha: 1.0)
-        ctx.fill(CGRect(x: 11, y: 5, width: 3, height: h - 13))
-        ctx.fill(CGRect(x: 17, y: 5, width: 3, height: h - 13))
     }
 }
 

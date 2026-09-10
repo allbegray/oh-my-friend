@@ -1,5 +1,6 @@
 import AppKit
 import CoreGraphics
+import SceneKit
 
 public enum SlimeSize: CaseIterable {
     case big
@@ -46,7 +47,7 @@ public final class SlimeWindow: EntityWindow {
     private var hopTimer: Timer?
     private var hopPhase: CGFloat = 0
     private var direction: CGFloat = 1
-    private var drawView: SlimeDrawView?
+    private var rig: CubeRig?
     private var isDead = false
 
     public init(size: SlimeSize, startPos: CGPoint, delegate: SlimeWindowDelegate) {
@@ -57,8 +58,20 @@ public final class SlimeWindow: EntityWindow {
         let s = size.panelSize
         let frame = NSRect(x: startPos.x - s / 2.0, y: startPos.y, width: s, height: s)
         super.init(contentRect: frame, ignoresMouse: false)
-        let view = SlimeDrawView(frame: NSRect(origin: .zero, size: frame.size))
-        self.drawView = view
+        let view = MobSceneView(frame: NSRect(origin: .zero, size: frame.size))
+        let cubeSize: CGFloat
+        switch size {
+        case .big: cubeSize = 1.2
+        case .medium: cubeSize = 0.85
+        case .small: cubeSize = 0.6
+        }
+        let rig = CubeRig(color: .rgb(0.25, 0.85, 0.35), size: cubeSize, alpha: 0.82)
+        view.setSubject(rig)
+        self.rig = rig
+        view.onTap = { [weak self] in
+            guard let self = self else { return }
+            self.slimeDelegate?.attackSlime(self)
+        }
         contentView = view
     }
 
@@ -78,9 +91,7 @@ public final class SlimeWindow: EntityWindow {
             }
             let s = self.slimeSize.panelSize
             self.setFrameOrigin(NSPoint(x: self.position.x - s / 2.0, y: self.position.y + hopHeight))
-            let squash: CGFloat = hopCycle < 0.45 ? 1.0 + sin(hopCycle / 0.45 * CGFloat.pi) * 0.12 : 0.9
-            self.drawView?.squash = squash
-            self.drawView?.needsDisplay = true
+            self.rig?.squash(hopCycle < 0.45 ? 0.05 : 0.45)
         }
         RunLoop.main.add(hopTimer!, forMode: .common)
     }
@@ -92,8 +103,6 @@ public final class SlimeWindow: EntityWindow {
     public func takeHit() {
         guard !isDead else { return }
         hp -= 1
-        drawView?.flash = 1.0
-        drawView?.needsDisplay = true
         if hp <= 0 {
             isDead = true
             hopTimer?.invalidate()

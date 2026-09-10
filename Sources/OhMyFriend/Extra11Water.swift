@@ -1,6 +1,7 @@
 import AppKit
 import CoreGraphics
 import Foundation
+import SceneKit
 
 // 11차 백로그: 물 5종(발광오징어·복어·기포기둥·스펀지·무지개) + WaterManager.
 // - 기존 파일 수정 없음. WeatherManager는 읽기(isRaining) + 공개 API(isEnabled)만 사용.
@@ -11,14 +12,37 @@ public final class GlowSquidWindow: EntityWindow {
     private var tick: Timer?
     private var phase: TimeInterval = 0
     private var baseY: CGFloat = 0
-    private var drawView: GlowSquidDrawView?
+    private var rig: FlyerRig?
 
     public init(startPos: CGPoint) {
         self.baseY = startPos.y
         let size = NSSize(width: 72, height: 64)
         super.init(contentRect: NSRect(x: startPos.x - 36, y: startPos.y, width: size.width, height: size.height), ignoresMouse: false)
-        let view = GlowSquidDrawView(frame: NSRect(origin: .zero, size: size))
-        self.drawView = view
+        let view = MobSceneView(frame: NSRect(origin: .zero, size: size))
+        let rig = FlyerRig(bodyColor: .rgb(0.10, 0.55, 0.60), wingColor: .rgb(0.10, 0.45, 0.50))
+        let mantle = vbox(0.55, 0.45, 0.45, .rgb(0.10, 0.55, 0.60))
+        mantle.position = SCNVector3(0, 0.15, 0)
+        rig.body.addChildNode(mantle)
+        let band = vbox(0.57, 0.12, 0.47, .rgb(0.25, 0.80, 0.85))
+        band.position = SCNVector3(0, 0.28, 0)
+        rig.body.addChildNode(band)
+        for sx in [-0.10, 0.10] as [CGFloat] {
+            let white = vbox(0.11, 0.14, 0.02, .rgb(1.0, 1.0, 1.0))
+            white.position = SCNVector3(sx, 0.05, 0.24)
+            rig.body.addChildNode(white)
+            let pupil = vbox(0.05, 0.08, 0.02, .rgb(0.05, 0.10, 0.15))
+            pupil.position = SCNVector3(sx, 0.04, 0.26)
+            rig.body.addChildNode(pupil)
+        }
+        for i in 0..<6 {
+            let a = CGFloat(i) * 1.05
+            let dot = vbox(0.06, 0.06, 0.06, .glow(0.45, 1.0, 0.95))
+            dot.position = SCNVector3(Float(cos(a) * 0.35), 0.15 + Float(sin(a * 1.7) * 0.25), Float(sin(a) * 0.30))
+            rig.body.addChildNode(dot)
+        }
+        view.setSubject(rig)
+        self.rig = rig
+        view.onTap = { [weak self] in self?.onTap?() }
         contentView = view
     }
 
@@ -30,8 +54,7 @@ public final class GlowSquidWindow: EntityWindow {
             let bob = sin(self.phase * 2.0) * 10.0
             let f = self.frame
             self.setFrameOrigin(NSPoint(x: f.origin.x, y: self.baseY + bob))
-            self.drawView?.phase = CGFloat(self.phase)
-            self.drawView?.needsDisplay = true
+            self.rig?.flap(1.0 / 30.0)
         }
         if let tick = tick { RunLoop.main.add(tick, forMode: .common) }
     }
@@ -99,14 +122,37 @@ public final class PufferfishWindow: EntityWindow {
     private var phase: TimeInterval = 0
     private var wander = WanderState(speed: 25)
     private var pos: CGPoint
-    private var drawView: PufferfishDrawView?
+    private var rig: CubeRig?
+    private var spikesNode: SCNNode?
 
     public init(startPos: CGPoint) {
         self.pos = startPos
         let size = NSSize(width: 64, height: 56)
         super.init(contentRect: NSRect(x: startPos.x - 32, y: startPos.y, width: size.width, height: size.height), ignoresMouse: false)
-        let view = PufferfishDrawView(frame: NSRect(origin: .zero, size: size))
-        self.drawView = view
+        let view = MobSceneView(frame: NSRect(origin: .zero, size: size))
+        let rig = CubeRig(color: .rgb(0.95, 0.80, 0.35), size: 0.9, alpha: 1.0)
+        let mouth = vbox(0.22, 0.10, 0.03, .rgb(0.90, 0.60, 0.25))
+        mouth.position = SCNVector3(0, -0.20, 0.46)
+        rig.cube.addChildNode(mouth)
+        let spikes = SCNNode()
+        for i in 0..<10 {
+            let a = CGFloat(i) * .pi / 5.0
+            let spike = vbox(0.05, 0.22, 0.05, .rgb(0.55, 0.40, 0.20))
+            spike.position = SCNVector3(Float(cos(a) * 0.55), Float(sin(a) * 0.55), 0)
+            spike.eulerAngles.z = a - CGFloat.pi / 2
+            spikes.addChildNode(spike)
+        }
+        for sz in [-0.45, 0.45] as [CGFloat] {
+            let spike = vbox(0.05, 0.05, 0.22, .rgb(0.55, 0.40, 0.20))
+            spike.position = SCNVector3(0, 0, sz)
+            spikes.addChildNode(spike)
+        }
+        spikes.isHidden = true
+        rig.cube.addChildNode(spikes)
+        self.spikesNode = spikes
+        view.setSubject(rig)
+        self.rig = rig
+        view.onTap = { [weak self] in self?.onTap?() }
         contentView = view
     }
 
@@ -124,10 +170,10 @@ public final class PufferfishWindow: EntityWindow {
             let puffed = d < 60.0
             if puffed != self.isPuffed {
                 self.isPuffed = puffed
-                self.drawView?.isPuffed = puffed
+                self.spikesNode?.isHidden = !puffed
             }
-            self.drawView?.phase = CGFloat(self.phase)
-            self.drawView?.needsDisplay = true
+            self.rig?.squash(0.10 + 0.06 * CGFloat(sin(self.phase * 6.0)))
+            self.rig?.eulerAngles.y = self.wander.direction > 0 ? 0 : CGFloat.pi
         }
         if let tick = tick { RunLoop.main.add(tick, forMode: .common) }
     }

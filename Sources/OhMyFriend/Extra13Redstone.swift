@@ -1,5 +1,6 @@
 import AppKit
 import CoreGraphics
+import SceneKit
 
 // 13차 백로그: 레드스톤 5종(레버·램프 / 음표 블록 / 그림 액자 / 배너 염료 / 트립와이어).
 // RedstoneManager.shared.entries()로 메뉴에 연결한다.
@@ -312,10 +313,12 @@ private final class RS13LampDrawView: NSView {
 // MARK: - 음표 블록
 
 private final class RS13NoteBlockWindow: EntityWindow {
-    var noteName: String { didSet { drawView?.noteName = noteName; drawView?.needsDisplay = true } }
+    var noteName: String { didSet { noteLabel?.stringValue = "♪ \(noteName)" } }
     var onClosed: (() -> Void)?
     private let onHit: () -> Void
-    private var drawView: RS13NoteDrawView?
+    private var sceneView: MobSceneView?
+    private var rig: CubeRig?
+    private var noteLabel: NSTextField?
     private var timer: Timer?
     private var elapsed: TimeInterval = 0
 
@@ -324,9 +327,23 @@ private final class RS13NoteBlockWindow: EntityWindow {
         self.onHit = onHit
         let size = NSSize(width: 72, height: 80)
         super.init(contentRect: NSRect(x: floorPos.x - size.width / 2, y: floorPos.y, width: size.width, height: size.height), ignoresMouse: false)
-        let v = RS13NoteDrawView(frame: NSRect(origin: .zero, size: size))
-        v.noteName = noteName
-        drawView = v
+        let v = MobSceneView(frame: NSRect(origin: .zero, size: size))
+        let r = CubeRig(color: .rgb(0.5, 0.35, 0.2), size: 1.0)
+        let lid = vbox(1.02, 0.14, 1.02, .rgb(0.15, 0.12, 0.12))
+        lid.position = SCNVector3(0, 0.55, 0)
+        r.cube.addChildNode(lid)
+        r.addTo(v.scene!, scale: 0.85)
+        v.setSubject(r)
+        let label = NSTextField(labelWithString: "♪ \(noteName)")
+        label.font = NSFont.boldSystemFont(ofSize: 17)
+        label.textColor = NSColor.systemPurple
+        label.alignment = .center
+        label.frame = NSRect(x: 0, y: size.height - 26, width: size.width, height: 22)
+        v.addSubview(label)
+        self.rig = r
+        self.sceneView = v
+        self.noteLabel = label
+        v.onTap = { [weak self] in self?.onHit() }
         contentView = v
     }
 
@@ -347,8 +364,12 @@ private final class RS13NoteBlockWindow: EntityWindow {
     }
 
     func pulse() {
-        drawView?.pulsePhase = 1.0
-        drawView?.needsDisplay = true
+        rig?.squash(1.0)
+        noteLabel?.font = NSFont.boldSystemFont(ofSize: 24)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+            self?.rig?.squash(0)
+            self?.noteLabel?.font = NSFont.boldSystemFont(ofSize: 17)
+        }
     }
 
     override func mouseDown(with event: NSEvent) { onHit() }
@@ -358,28 +379,6 @@ private final class RS13NoteBlockWindow: EntityWindow {
         timer = nil
         super.close()
         onClosed?()
-    }
-}
-
-private final class RS13NoteDrawView: NSView {
-    var noteName = "도"
-    var pulsePhase: CGFloat = 0
-    override func draw(_ dirtyRect: NSRect) {
-        guard let ctx = NSGraphicsContext.current?.cgContext else { return }
-        let w = bounds.width
-        ctx.setFillColor(red: 0.5, green: 0.35, blue: 0.2, alpha: 1.0)
-        ctx.fill(CGRect(x: 8, y: 0, width: w - 16, height: 44))
-        ctx.setFillColor(red: 0.35, green: 0.22, blue: 0.12, alpha: 1.0)
-        ctx.fill(CGRect(x: 8, y: 0, width: w - 16, height: 8))
-        ctx.setFillColor(red: 0.15, green: 0.12, blue: 0.12, alpha: 1.0)
-        ctx.fill(CGRect(x: 12, y: 34, width: w - 24, height: 6))
-        let scale = 1.0 + pulsePhase * 0.35
-        let note = NSAttributedString(
-            string: "♪ \(noteName)",
-            attributes: [.font: NSFont.boldSystemFont(ofSize: 20 * scale), .foregroundColor: NSColor.systemPurple]
-        )
-        note.draw(at: NSPoint(x: w / 2 - 22 * scale, y: 46))
-        if pulsePhase > 0 { pulsePhase = max(0, pulsePhase - 0.25); needsDisplay = true }
     }
 }
 

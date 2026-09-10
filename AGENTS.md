@@ -113,6 +113,8 @@ Sources/OhMyFriend/
 ├── PlayerState.swift                   # 플레이어 재화·버프·강화 13필드
 ├── MenuBuilder.swift                   # 메뉴 구축 521줄 분리(선언적 entries)
 └── MobDirector.swift                   # 앰비언트 몹 자동 스폰 6종 분리
+├── MenuSearch.swift                    # 검색 내장 메뉴(3대 대형 메뉴 실시간 필터)
+├── VoxelMobKit.swift                   # 3D 복셀 릭 4종 + SceneKit 몹 뷰
 ```
 ```
 
@@ -124,6 +126,8 @@ Sources/OhMyFriend/
 ## 실행 기록
 
 ### 2026-09-10
+- **[3D 전환] 전면 복셀화(v0.23.0)**: `VoxelMobKit.swift` 신규(4종 릭 + 몹 뷰). 코어 16종 + 배치 생물 40여종 3D 포팅(행동·보상 동일). 검증: `swift build` 에러 0건, 번들 생성 및 4초 실행 스모크 테스트.
+- **[검색 메뉴] 3대 대형 메뉴 실시간 필터(v0.22.0)**: `MenuSearch.swift` 신규(첫 줄 검색 필드 + 열린 메뉴 내 교체, 빈 쿼리 시 기존 구조 유지). 실행 메뉴·9~17차·A~J 적용. 검증: `swift build` 에러 0건, 번들 생성 및 4초 실행 스모크 테스트.
 - **[아키텍처 심화] 5종 일괄 개선(v0.21.0, 동작 변경 없음)**: `EntityWindow`(206곳 상용구 응축) + `ItemSpec` 레지스트리(4 switch→조회) + 액션 메뉴 선언적 전환(105→44) + `EntityKit`(106개소 전환) + 분해(`PlayerState`·`MenuBuilder`·`MobDirector`). AppController 4,370→3,522줄. 검증: `swift build` 에러 0건, 번들 생성 및 4초 실행 스모크 테스트.
 - **[신규 100선] A~J 100종 일괄 구축(v0.20.0)**: 배치 단일 파일 10개(ExtraA~ExtraJ, 분야 접두어 클래스·Manager `entries()`·`RewardCenter` 브리지로 기존 코드 무수정 병렬 안전) + `ExtraMenus.buildExtraMenu2()` 중앙 서브메뉴("✨ 신규 100선 (A~J)"). A신규몹·B네더·C엔드·D바다·E동물·F레드스톤·G건축·H마법·I구조물·J메타. 검증: `swift build` 에러 0건, 번들 생성 및 4초 실행 스모크 테스트. 백로그 전량 완료.
 - **[고증 9~17차] 잔여 백로그 44종 일괄 구축(v0.19.0)**: `ExtraBacklog.swift` 공용 허브 + `ExtraMenus.swift` 중앙 서브메뉴("🎉 추가 모션 9~17차") + 배치 단일 파일 9개(Extra9~Extra17, 각 Manager 소유 수명주기·`entries()` 메뉴 기술자·`RewardCenter` 브리지로 기존 코드 무수정 병렬 안전). 9차 야생동물·10차 어둠네더·11차 물과비·12차 소셜(발전과제 v0.13.0 제외)·13차 레드스톤·14차 겨울·15차 사막·16차 엔드·17차 이벤트. `HeldItem.carrot/salmon/sponge` 3D 모델 추가. 검증: `swift build` 에러 0건, 번들 생성 및 4초 실행 스모크 테스트. 백로그 전량 완료.

@@ -33,6 +33,37 @@ extension AppController {
         return root
     }
 
+    // 검색 필터용 그룹 기술자: buildExtraMenu/buildExtraMenu2와 같은 순서·제목.
+    // 기존 build 계열은 그대로 두며, MenuSearch.makeSearchableMenu 입력으로만 쓴다.
+    func extraGroups() -> [(String, [ExtraMenuEntry])] {
+        [
+            ("🌿 야생 동물 (9차)", WildlifeManager.shared.entries()),
+            ("🌑 어둠·네더 몹 (10차)", DarkNetherManager.shared.entries()),
+            ("🌊 물과 비 (11차)", WaterManager.shared.entries()),
+            ("👥 소셜·메타 (12차)", SocialManager.shared.entries()),
+            ("🧱 레드스톤·꾸미기 (13차)", RedstoneManager.shared.entries()),
+            ("❄️ 겨울 (14차)", WinterManager.shared.entries()),
+            ("🏜️ 사막 캐러밴 (15차)", CaravanManager.shared.entries()),
+            ("🌌 엔드 (16차)", EndManager.shared.entries()),
+            ("🎪 이벤트 (17차)", EventManager.shared.entries()),
+        ]
+    }
+
+    func extraGroups2() -> [(String, [ExtraMenuEntry])] {
+        [
+            ("👹 신규 몹 (A)", MobsAManager.shared.entries()),
+            ("🔥 네더 확장 (B)", NetherBManager.shared.entries()),
+            ("🌌 엔드 확장 (C)", EndCManager.shared.entries()),
+            ("🌊 바다 (D)", SeaDManager.shared.entries()),
+            ("🐾 동물·사육 (E)", AnimalsEManager.shared.entries()),
+            ("🧱 레드스톤 (F)", RedstoneFManager.shared.entries()),
+            ("🏠 건축·꾸미기 (G)", DecorGManager.shared.entries()),
+            ("🪄 마법·전투 (H)", MagicHManager.shared.entries()),
+            ("🏛️ 구조물·보스 (I)", StructuresIManager.shared.entries()),
+            ("🎭 생활·메타 (J)", MetaJManager.shared.entries()),
+        ]
+    }
+
     private func addExtraBatch(_ root: NSMenu, title: String, entries: [ExtraMenuEntry]) {
         let sub = NSMenu()
         for e in entries {

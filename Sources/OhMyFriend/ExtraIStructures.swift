@@ -1,6 +1,7 @@
 import AppKit
 import CoreGraphics
 import Foundation
+import SceneKit
 
 // I분야 구조물 10종: 저택·소환사·변명자·불길한병·전초기지·고대도시·트라이얼·해저사원·엔드배·영웅 + StructuresIManager.
 // StructuresIManager.shared.entries()로 메뉴 연결한다.
@@ -382,15 +383,31 @@ private final class IMansionDrawView: NSView {
 public final class IIllagerVexWindow: EntityWindow {
     private let onTap: (IIllagerVexWindow) -> Void
     private var hits = HitCounter(maxHits: 1)
+    private var rig: FlyerRig?
 
     public init(startPos: CGPoint, onTap: @escaping (IIllagerVexWindow) -> Void) {
         self.onTap = onTap
         let size = NSSize(width: 30, height: 30)
         super.init(contentRect: NSRect(x: startPos.x - 15, y: startPos.y, width: size.width, height: size.height), ignoresMouse: false)
-        contentView = IIllagerVexDrawView(frame: NSRect(origin: .zero, size: size))
+        let view = MobSceneView(frame: NSRect(origin: .zero, size: size))
+        let rig = FlyerRig(bodyColor: .rgb(0.75, 0.85, 0.95), wingColor: .rgb(0.85, 0.92, 1.0))
+        for ex in [-0.07, 0.07] as [CGFloat] {
+            let eye = vbox(0.06, 0.08, 0.02, .glow(0.95, 0.20, 0.25))
+            eye.position = SCNVector3(ex, 0.05, 0.17)
+            rig.body.addChildNode(eye)
+        }
+        rig.scale = SCNVector3(0.55, 0.55, 0.55)
+        view.setSubject(rig)
+        self.rig = rig
+        view.onTap = { [weak self] in self?.handleTap() }
+        contentView = view
     }
 
     public override func mouseDown(with event: NSEvent) {
+        handleTap()
+    }
+
+    private func handleTap() {
         if hits.hit() {
             SoundAndEffectsManager.shared.play(.pop)
             RewardCenter.say("👻 벡스 처치!")
@@ -423,7 +440,9 @@ public final class IEvokerWindow: EntityWindow {
     private var tick: Timer?
     private var phase: TimeInterval = 0
     private var vexes: [IIllagerVexWindow] = []
-    private var drawView: IEvokerDrawView?
+    private var rig: BipedRig?
+    private var sceneView: MobSceneView?
+    private var vexPips: [SCNNode] = []
     private var basePos: CGPoint
     private let panelW: CGFloat = 56
     private let panelH: CGFloat = 76
@@ -432,8 +451,28 @@ public final class IEvokerWindow: EntityWindow {
         self.basePos = startPos
         self.onTap = onTap
         super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
-        let view = IEvokerDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
-        self.drawView = view
+        let view = MobSceneView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
+        let rig = BipedRig(
+            headColor: .rgb(0.85, 0.72, 0.62),
+            torsoColor: .rgb(0.35, 0.30, 0.32),
+            limbColor: .rgb(0.22, 0.18, 0.20)
+        )
+        for ex in [-0.10, 0.10] as [CGFloat] {
+            let eye = vbox(0.08, 0.10, 0.02, .rgb(0.15, 0.35, 0.15))
+            eye.position = SCNVector3(ex, 0.08, 0.26)
+            rig.head.addChildNode(eye)
+        }
+        for i in 0..<3 {
+            let pip = vbox(0.10, 0.10, 0.05, .glow(0.75, 0.85, 1.0))
+            pip.position = SCNVector3(-0.14 + CGFloat(i) * 0.14, -0.62, 0.14)
+            rig.torso.addChildNode(pip)
+            vexPips.append(pip)
+        }
+        rig.scale = SCNVector3(0.62, 0.62, 0.62)
+        view.setSubject(rig)
+        self.rig = rig
+        self.sceneView = view
+        view.onTap = { [weak self] in guard let self = self else { return }; self.onTap(self) }
         contentView = view
     }
 
@@ -445,8 +484,7 @@ public final class IEvokerWindow: EntityWindow {
             let v = IIllagerVexWindow(startPos: pos) { [weak self] _ in
                 guard let self = self else { return }
                 self.vexAlive = max(0, self.vexAlive - 1)
-                self.drawView?.vexLeft = self.vexAlive
-                self.drawView?.needsDisplay = true
+                self.syncPips()
                 if self.vexAlive == 0 {
                     RewardCenter.say("🧙 본체 등장!")
                     SoundAndEffectsManager.shared.play(.alert)
@@ -455,22 +493,27 @@ public final class IEvokerWindow: EntityWindow {
             vexes.append(v)
             v.orderFrontRegardless()
         }
-        drawView?.vexLeft = vexAlive
+        syncPips()
         tick = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] t in
             guard let self = self else { t.invalidate(); return }
             self.phase += 1.0 / 60.0
-            self.drawView?.phase = self.phase
-            self.drawView?.needsDisplay = true
+            self.rig?.walk(1.0 / 60.0)
+            self.rig?.position.y = CGFloat(sin(self.phase * 3.0)) * 0.05
         }
         RunLoop.main.add(tick!, forMode: .common)
+    }
+
+    private func syncPips() {
+        for (i, pip) in vexPips.enumerated() {
+            pip.isHidden = i >= vexAlive
+        }
     }
 
     @discardableResult
     public func hitBody() -> Bool {
         guard !isVexPhase, !isDefeated else { return false }
         _ = bodyHits.hit()
-        drawView?.hits = bodyHits.hits
-        drawView?.needsDisplay = true
+        rig?.attack()
         return true
     }
 
@@ -524,7 +567,8 @@ public final class IVindicatorWindow: EntityWindow {
     private var tick: Timer?
     private var phase: TimeInterval = 0
     private var wander = WanderState(speed: 150)
-    private var drawView: IVindicatorDrawView?
+    private var rig: BipedRig?
+    private var sceneView: MobSceneView?
     private let panelW: CGFloat = 52
     private let panelH: CGFloat = 70
 
@@ -532,8 +576,28 @@ public final class IVindicatorWindow: EntityWindow {
         self.position = startPos
         self.onTap = onTap
         super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
-        let view = IVindicatorDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
-        self.drawView = view
+        let view = MobSceneView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
+        let rig = BipedRig(
+            headColor: .rgb(0.85, 0.72, 0.62),
+            torsoColor: .rgb(0.40, 0.36, 0.38),
+            limbColor: .rgb(0.30, 0.27, 0.29)
+        )
+        for ex in [-0.10, 0.10] as [CGFloat] {
+            let eye = vbox(0.08, 0.10, 0.02, .rgb(0.12, 0.30, 0.12))
+            eye.position = SCNVector3(ex, 0.08, 0.26)
+            rig.head.addChildNode(eye)
+        }
+        let haft = vbox(0.07, 0.55, 0.07, .rgb(0.55, 0.38, 0.22))
+        haft.position = SCNVector3(0, -0.62, 0.06)
+        rig.armR.addChildNode(haft)
+        let axeHead = vbox(0.22, 0.16, 0.05, .rgb(0.70, 0.70, 0.72))
+        axeHead.position = SCNVector3(0, -0.86, 0.06)
+        rig.armR.addChildNode(axeHead)
+        rig.scale = SCNVector3(0.62, 0.62, 0.62)
+        view.setSubject(rig)
+        self.rig = rig
+        self.sceneView = view
+        view.onTap = { [weak self] in guard let self = self else { return }; self.onTap(self) }
         contentView = view
     }
 
@@ -550,9 +614,8 @@ public final class IVindicatorWindow: EntityWindow {
             }
             self.position.x += self.wander.tick(1.0 / 60.0)
             self.setFrameOrigin(NSPoint(x: self.position.x - self.panelW / 2, y: self.position.y))
-            self.drawView?.facingRight = self.wander.direction > 0
-            self.drawView?.step = sin(self.phase * 12.0)
-            self.drawView?.needsDisplay = true
+            self.rig?.walk(1.0 / 60.0)
+            self.rig?.eulerAngles.y = self.wander.direction > 0 ? 0 : CGFloat.pi
         }
         RunLoop.main.add(tick!, forMode: .common)
     }

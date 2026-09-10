@@ -1,5 +1,6 @@
 import AppKit
 import CoreGraphics
+import SceneKit
 
 public protocol SpiderWindowDelegate: AnyObject {
     func spiderWindowDidClick(_ window: SpiderWindow)
@@ -16,7 +17,7 @@ public final class SpiderWindow: EntityWindow {
     private var crawlTimer: Timer?
     private var dir: CGFloat = 1
     private var phase: TimeInterval = 0
-    private var drawView: SpiderDrawView?
+    private var rig: QuadRig?
     private var isGone = false
 
     public init(startPos: CGPoint, surfaceTop: CGFloat, surfaceBottom: CGFloat, delegate: SpiderWindowDelegate) {
@@ -26,8 +27,27 @@ public final class SpiderWindow: EntityWindow {
         self.spiderDelegate = delegate
         let size = NSSize(width: 56, height: 44)
         super.init(contentRect: NSRect(x: startPos.x - 28, y: startPos.y, width: size.width, height: size.height), ignoresMouse: false)
-        let view = SpiderDrawView(frame: NSRect(origin: .zero, size: size))
-        self.drawView = view
+        let view = MobSceneView(frame: NSRect(origin: .zero, size: size))
+        let rig = QuadRig(
+            bodyColor: .rgb(0.18, 0.14, 0.16),
+            headColor: .rgb(0.18, 0.14, 0.16),
+            legColor: .rgb(0.15, 0.12, 0.14)
+        )
+        for ex in [-0.15, -0.09, -0.03, 0.03, 0.09, 0.15] as [CGFloat] {
+            let eye = vbox(0.06, 0.06, 0.02, .glow(0.95, 0.15, 0.25))
+            eye.position = SCNVector3(ex, 0.08, 0.25)
+            rig.head.addChildNode(eye)
+        }
+        for spot in [SCNVector3(-0.18, -0.25, 0.0), SCNVector3(0.18, -0.25, 0.0)] {
+            let leg = limbJoint(mesh: vbox(0.16, 0.45, 0.16, .rgb(0.15, 0.12, 0.14)), at: spot, drop: -0.225)
+            rig.body.addChildNode(leg)
+        }
+        view.setSubject(rig)
+        self.rig = rig
+        view.onTap = { [weak self] in
+            guard let self = self else { return }
+            self.spiderDelegate?.spiderWindowDidClick(self)
+        }
         contentView = view
     }
 
@@ -46,8 +66,7 @@ public final class SpiderWindow: EntityWindow {
                 self.dir = 1
             }
             self.setFrameOrigin(NSPoint(x: self.position.x - 28, y: self.position.y))
-            self.drawView?.legWiggle = sin(self.phase * 16.0)
-            self.drawView?.needsDisplay = true
+            self.rig?.walk(1.0 / 60.0)
         }
         RunLoop.main.add(crawlTimer!, forMode: .common)
     }

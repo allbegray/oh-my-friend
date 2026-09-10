@@ -1,5 +1,6 @@
 import AppKit
 import CoreGraphics
+import SceneKit
 
 public protocol PandaWindowDelegate: AnyObject {
     func pandaWindowDidClick(_ window: PandaWindow)
@@ -17,15 +18,44 @@ public final class PandaWindow: EntityWindow {
     private var sneezePhase: TimeInterval = -1
     private var hopVelocity: CGFloat = 0
     private var hopY: CGFloat = 0
-    private var drawView: PandaDrawView?
+    private var sceneView: MobSceneView?
+    private var rig: QuadRig?
+    private var roll: CGFloat = 0
+    private var facingRight = true
+    private var sneezeT: TimeInterval = -1
 
     public init(startPos: CGPoint, delegate: PandaWindowDelegate) {
         self.position = startPos
         self.pandaDelegate = delegate
         let size = NSSize(width: 76, height: 60)
         super.init(contentRect: NSRect(x: startPos.x - 38, y: startPos.y, width: size.width, height: size.height), ignoresMouse: false)
-        let view = PandaDrawView(frame: NSRect(origin: .zero, size: size))
-        self.drawView = view
+        let view = MobSceneView(frame: NSRect(origin: .zero, size: size))
+        let rig = QuadRig(
+            bodyColor: .rgb(1.0, 1.0, 1.0),
+            headColor: .rgb(1.0, 1.0, 1.0),
+            legColor: .rgb(0.12, 0.12, 0.12),
+            tailColor: nil
+        )
+        for x in [-0.13, 0.13] as [CGFloat] {
+            let patch = vbox(0.14, 0.16, 0.02, .rgb(0.12, 0.12, 0.12))
+            patch.position = SCNVector3(x, 0.03, 0.25)
+            rig.head.addChildNode(patch)
+            let glint = vbox(0.04, 0.05, 0.025, .rgb(1.0, 1.0, 1.0))
+            glint.position = SCNVector3(x + 0.03, 0.06, 0.25)
+            rig.head.addChildNode(glint)
+        }
+        for x in [-0.16, 0.16] as [CGFloat] {
+            let ear = vbox(0.14, 0.14, 0.10, .rgb(0.12, 0.12, 0.12))
+            ear.position = SCNVector3(x, 0.30, 0)
+            rig.head.addChildNode(ear)
+        }
+        let nose = vbox(0.08, 0.06, 0.02, .rgb(0.12, 0.12, 0.12))
+        nose.position = SCNVector3(0, -0.08, 0.25)
+        rig.head.addChildNode(nose)
+        rig.addTo(view.scene!, scale: 1.0)
+        view.setSubject(rig)
+        self.rig = rig
+        self.sceneView = view
         contentView = view
         resetSneezeCountdown()
     }
@@ -45,19 +75,23 @@ public final class PandaWindow: EntityWindow {
             }
             if self.isBambooNearby {
                 self.position.x += self.dir * 40.0 / 60.0
-                self.drawView?.rotation += self.dir * 0.12
+                self.roll += self.dir * 0.12
+                self.rig?.walk(1.0 / 60.0)
             } else {
                 self.position.x += self.dir * 25.0 / 60.0
-                self.drawView?.rotation = 0
+                self.roll = 0
+                self.rig?.walk(1.0 / 60.0)
             }
+            self.rig?.eulerAngles.z = self.roll
+            self.rig?.eulerAngles.y = self.dir > 0 ? 0 : CGFloat.pi
             if self.sneezePhase >= 0 {
                 self.sneezePhase += 1.0 / 60.0
                 if self.sneezePhase > 0.8 {
                     self.sneezePhase = -1
-                    self.drawView?.sneezeT = -1
+                    self.sneezeT = -1
                     self.resetSneezeCountdown()
                 } else {
-                    self.drawView?.sneezeT = self.sneezePhase
+                    self.sneezeT = self.sneezePhase
                 }
             } else {
                 self.sneezeCountdown -= 1.0 / 60.0
@@ -74,9 +108,7 @@ public final class PandaWindow: EntityWindow {
                 }
             }
             self.setFrameOrigin(NSPoint(x: self.position.x - 38, y: self.position.y + self.hopY))
-            self.drawView?.facingRight = self.dir > 0
-            self.drawView?.bob = sin(self.phase * 4.0)
-            self.drawView?.needsDisplay = true
+            self.facingRight = self.dir > 0
         }
         RunLoop.main.add(tickTimer!, forMode: .common)
     }
@@ -98,56 +130,9 @@ public final class PandaWindow: EntityWindow {
 
     private func fireSneeze() {
         sneezePhase = 0
-        drawView?.sneezeT = 0
+        sneezeT = 0
         hopVelocity = 110
         hopY = 1
         SoundAndEffectsManager.shared.play(.pop)
-        drawView?.needsDisplay = true
-    }
-}
-
-private final class PandaDrawView: NSView {
-    var facingRight = true
-    var bob: CGFloat = 0
-    var rotation: CGFloat = 0
-    var sneezeT: TimeInterval = -1
-
-    override func draw(_ dirtyRect: NSRect) {
-        guard let ctx = NSGraphicsContext.current?.cgContext else { return }
-        let w = bounds.width
-        ctx.saveGState()
-        if !facingRight {
-            ctx.translateBy(x: w, y: 0)
-            ctx.scaleBy(x: -1.0, y: 1.0)
-        }
-        ctx.saveGState()
-        ctx.translateBy(x: w / 2.0, y: 28 + bob)
-        ctx.rotate(by: rotation)
-        ctx.translateBy(x: -w / 2.0, y: -(28 + bob))
-        ctx.setFillColor(red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0)
-        ctx.fillEllipse(in: CGRect(x: 14, y: 12 + bob, width: 48, height: 34))
-        ctx.setFillColor(red: 0.12, green: 0.12, blue: 0.12, alpha: 1.0)
-        ctx.fillEllipse(in: CGRect(x: 10, y: 38 + bob, width: 14, height: 14))
-        ctx.fillEllipse(in: CGRect(x: 52, y: 38 + bob, width: 14, height: 14))
-        ctx.fillEllipse(in: CGRect(x: 24, y: 26 + bob, width: 14, height: 16))
-        ctx.fillEllipse(in: CGRect(x: 40, y: 26 + bob, width: 14, height: 16))
-        ctx.fillEllipse(in: CGRect(x: 16, y: 2, width: 12, height: 12))
-        ctx.fillEllipse(in: CGRect(x: 48, y: 2, width: 12, height: 12))
-        ctx.setFillColor(red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0)
-        ctx.fillEllipse(in: CGRect(x: 27, y: 31 + bob, width: 4, height: 5))
-        ctx.fillEllipse(in: CGRect(x: 43, y: 31 + bob, width: 4, height: 5))
-        ctx.setFillColor(red: 0.12, green: 0.12, blue: 0.12, alpha: 1.0)
-        ctx.fillEllipse(in: CGRect(x: 35, y: 20 + bob, width: 8, height: 6))
-        if sneezeT >= 0 {
-            let a = max(0.0, 1.0 - CGFloat(sneezeT) / 0.8)
-            ctx.setFillColor(red: 0.85, green: 0.95, blue: 1.0, alpha: a)
-            for i in 0..<6 {
-                let px = 60 + CGFloat(i * 5)
-                let py = 30 + bob + CGFloat((i % 3) * 6) - CGFloat(sneezeT) * 20.0
-                ctx.fillEllipse(in: CGRect(x: px, y: py, width: 4, height: 4))
-            }
-        }
-        ctx.restoreGState()
-        ctx.restoreGState()
     }
 }

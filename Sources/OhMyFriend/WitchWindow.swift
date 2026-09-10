@@ -1,5 +1,6 @@
 import AppKit
 import CoreGraphics
+import SceneKit
 
 public final class WitchWindow: EntityWindow {
     public var anchor: CGPoint = .zero
@@ -9,7 +10,8 @@ public final class WitchWindow: EntityWindow {
     private var throwTimer: TimeInterval = 5.0
     private let onThrow: () -> Void
     private let onDefeat: () -> Void
-    private var drawView: WitchDrawView?
+    private var sceneView: MobSceneView?
+    private var rig: BipedRig?
     private var isGone = false
 
     public init(startPos: CGPoint, onThrow: @escaping () -> Void, onDefeat: @escaping () -> Void) {
@@ -18,8 +20,36 @@ public final class WitchWindow: EntityWindow {
         self.onDefeat = onDefeat
         let size = NSSize(width: 56, height: 84)
         super.init(contentRect: NSRect(x: startPos.x - 28, y: startPos.y, width: size.width, height: size.height), ignoresMouse: false)
-        let view = WitchDrawView(frame: NSRect(origin: .zero, size: size))
-        self.drawView = view
+        let view = MobSceneView(frame: NSRect(origin: .zero, size: size))
+        let robe = VoxelColor.rgb(0.25, 0.12, 0.35)
+        let robeDark = VoxelColor.rgb(0.15, 0.08, 0.25)
+        let skin = VoxelColor.rgb(0.55, 0.75, 0.55)
+        let r = BipedRig(headColor: skin, torsoColor: robe, limbColor: robeDark)
+        r.torso.scale.y = 1.25
+        let nose = vbox(0.10, 0.12, 0.10, VoxelColor.rgb(0.35, 0.85, 0.35))
+        nose.position = SCNVector3(0, -0.05, 0.28)
+        r.head.addChildNode(nose)
+        let socket = VoxelColor.rgb(0.10, 0.10, 0.10)
+        let eyeL = vbox(0.07, 0.08, 0.02, socket)
+        eyeL.position = SCNVector3(-0.10, 0.08, 0.26)
+        r.head.addChildNode(eyeL)
+        let eyeR = vbox(0.07, 0.08, 0.02, socket)
+        eyeR.position = SCNVector3(0.10, 0.08, 0.26)
+        r.head.addChildNode(eyeR)
+        let brim = vbox(0.64, 0.06, 0.64, robeDark)
+        brim.position = SCNVector3(0, 0.28, 0)
+        r.head.addChildNode(brim)
+        let cone = SCNNode(geometry: SCNCone(topRadius: 0.02, bottomRadius: 0.24, height: 0.45))
+        cone.geometry?.materials = [voxelMaterial(robeDark)]
+        cone.position = SCNVector3(0, 0.52, 0)
+        r.head.addChildNode(cone)
+        let potion = vbox(0.10, 0.14, 0.10, VoxelColor.glow(0.35, 0.85, 0.35))
+        potion.position = SCNVector3(0, -0.70, 0.06)
+        r.armR.addChildNode(potion)
+        view.setSubject(r)
+        self.rig = r
+        self.sceneView = view
+        view.onTap = { [weak self] in self?.hit() }
         contentView = view
     }
 
@@ -32,8 +62,8 @@ public final class WitchWindow: EntityWindow {
             self.throwTimer -= 1.0 / 60.0
             let cy = self.anchor.y + 60 + sin(self.phase * 1.3) * 14.0
             self.setFrameOrigin(NSPoint(x: self.anchor.x - 28, y: cy))
-            self.drawView?.bob = sin(self.phase * 5.0)
-            self.drawView?.needsDisplay = true
+            self.rig?.walk(1.0 / 60.0)
+            self.rig?.position.y = CGFloat(sin(self.phase * 5.0)) * 0.05
             if self.throwTimer <= 0 {
                 self.throwTimer = Double.random(in: 6.0...9.0)
                 self.onThrow()
@@ -43,6 +73,10 @@ public final class WitchWindow: EntityWindow {
     }
 
     public override func mouseDown(with event: NSEvent) {
+        hit()
+    }
+
+    private func hit() {
         hp -= 1
         if hp <= 0 {
             guard !isGone else { return }
@@ -68,30 +102,5 @@ public final class WitchWindow: EntityWindow {
         flyTimer?.invalidate()
         flyTimer = nil
         super.close()
-    }
-}
-
-private final class WitchDrawView: NSView {
-    var bob: CGFloat = 0
-
-    override func draw(_ dirtyRect: NSRect) {
-        guard let ctx = NSGraphicsContext.current?.cgContext else { return }
-        let w = bounds.width
-        ctx.setFillColor(red: 0.25, green: 0.12, blue: 0.35, alpha: 1.0)
-        ctx.fill(CGRect(x: 14, y: 10 + bob, width: 28, height: 34))
-        ctx.setFillColor(red: 0.55, green: 0.75, blue: 0.55, alpha: 1.0)
-        ctx.fill(CGRect(x: 18, y: 44 + bob, width: 20, height: 14))
-        ctx.setFillColor(red: 0.10, green: 0.10, blue: 0.10, alpha: 1.0)
-        ctx.fillEllipse(in: CGRect(x: 23, y: 50 + bob, width: 4, height: 5))
-        ctx.fillEllipse(in: CGRect(x: 31, y: 50 + bob, width: 4, height: 5))
-        ctx.setFillColor(red: 0.15, green: 0.08, blue: 0.25, alpha: 1.0)
-        ctx.beginPath()
-        ctx.move(to: CGPoint(x: w / 2.0 - 16, y: 58 + bob))
-        ctx.addLine(to: CGPoint(x: w / 2.0 + 16, y: 58 + bob))
-        ctx.addLine(to: CGPoint(x: w / 2.0, y: 80 + bob))
-        ctx.closePath()
-        ctx.fillPath()
-        ctx.setFillColor(red: 0.35, green: 0.85, blue: 0.35, alpha: 0.9)
-        ctx.fillEllipse(in: CGRect(x: w - 18, y: 20 + bob, width: 8, height: 10))
     }
 }

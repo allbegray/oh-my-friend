@@ -1,5 +1,6 @@
 import AppKit
 import CoreGraphics
+import SceneKit
 
 public protocol ZombieWindowDelegate: AnyObject {
     func zombieWindowDidClick(_ window: ZombieWindow)
@@ -13,7 +14,7 @@ public final class ZombieWindow: EntityWindow {
     private var hp = 2
     private var chaseTimer: Timer?
     private var phase: TimeInterval = 0
-    private var drawView: ZombieDrawView?
+    private var rig: BipedRig?
     private var isGone = false
     public var target: CGPoint = .zero
 
@@ -23,8 +24,24 @@ public final class ZombieWindow: EntityWindow {
         self.zombieDelegate = delegate
         let size = NSSize(width: 44, height: 66)
         super.init(contentRect: NSRect(x: startPos.x - 22, y: startPos.y, width: size.width, height: size.height), ignoresMouse: false)
-        let view = ZombieDrawView(frame: NSRect(origin: .zero, size: size))
-        self.drawView = view
+        let view = MobSceneView(frame: NSRect(origin: .zero, size: size))
+        let rig = BipedRig(
+            headColor: .rgb(0.25, 0.55, 0.35),
+            torsoColor: .rgb(0.25, 0.55, 0.35),
+            limbColor: .rgb(0.20, 0.45, 0.30)
+        )
+        for ex in [-0.12, 0.12] as [CGFloat] {
+            let eye = vbox(0.08, 0.10, 0.02, .glow(0.6, 0.2, 0.9))
+            eye.position = SCNVector3(ex, 0.05, 0.26)
+            rig.head.addChildNode(eye)
+        }
+        rig.scale = SCNVector3(0.6, 0.6, 0.6)
+        view.setSubject(rig)
+        self.rig = rig
+        view.onTap = { [weak self] in
+            guard let self = self else { return }
+            self.zombieDelegate?.zombieWindowDidClick(self)
+        }
         contentView = view
     }
 
@@ -40,9 +57,10 @@ public final class ZombieWindow: EntityWindow {
                 self.position.x += dir * 95.0 / 60.0
             }
             self.setFrameOrigin(NSPoint(x: self.position.x - 22, y: self.position.y))
-            self.drawView?.facingRight = dir > 0
-            self.drawView?.step = sin(self.phase * 10.0)
-            self.drawView?.needsDisplay = true
+            self.rig?.walk(1.0 / 60.0)
+            self.rig?.armL.eulerAngles.x = -1.4
+            self.rig?.armR.eulerAngles.x = -1.4
+            self.rig?.eulerAngles.y = dir > 0 ? 0 : CGFloat.pi
         }
         RunLoop.main.add(chaseTimer!, forMode: .common)
     }

@@ -1,5 +1,6 @@
 import AppKit
 import CoreGraphics
+import SceneKit
 
 public final class GoatWindow: EntityWindow {
     public var targetX: CGFloat = 0
@@ -10,7 +11,9 @@ public final class GoatWindow: EntityWindow {
     private var phase: GoatPhase = .graze
     private var phaseTimer: TimeInterval = 3.0
     private var dir: CGFloat = 1
-    private var drawView: GoatDrawView?
+    private var sceneView: MobSceneView?
+    private var rig: QuadRig?
+    private var isAiming = false
     private var didHitThisCharge = false
 
     private enum GoatPhase {
@@ -26,8 +29,32 @@ public final class GoatWindow: EntityWindow {
         self.targetX = startPos.x
         let size = NSSize(width: 72, height: 56)
         super.init(contentRect: NSRect(x: startPos.x - 36, y: startPos.y, width: size.width, height: size.height), ignoresMouse: false)
-        let view = GoatDrawView(frame: NSRect(origin: .zero, size: size))
-        self.drawView = view
+        let view = MobSceneView(frame: NSRect(origin: .zero, size: size))
+        let rig = QuadRig(
+            bodyColor: .rgb(0.90, 0.90, 0.86),
+            headColor: .rgb(0.90, 0.90, 0.86),
+            legColor: .rgb(0.90, 0.90, 0.86),
+            tailColor: .rgb(0.90, 0.90, 0.86)
+        )
+        for x in [-0.16, 0.16] as [CGFloat] {
+            let horn = vbox(0.08, 0.28, 0.08, .rgb(0.55, 0.42, 0.28))
+            horn.position = SCNVector3(x, 0.34, -0.05)
+            horn.eulerAngles.z = x > 0 ? -0.25 : 0.25
+            rig.head.addChildNode(horn)
+        }
+        let beard = vbox(0.10, 0.16, 0.06, .rgb(0.75, 0.72, 0.68))
+        beard.position = SCNVector3(0, -0.30, 0.15)
+        rig.head.addChildNode(beard)
+        let eyeL = vbox(0.05, 0.05, 0.02, .rgb(0.10, 0.10, 0.10))
+        eyeL.position = SCNVector3(-0.12, 0.05, 0.25)
+        rig.head.addChildNode(eyeL)
+        let eyeR = vbox(0.05, 0.05, 0.02, .rgb(0.10, 0.10, 0.10))
+        eyeR.position = SCNVector3(0.12, 0.05, 0.25)
+        rig.head.addChildNode(eyeR)
+        rig.addTo(view.scene!, scale: 1.0)
+        view.setSubject(rig)
+        self.rig = rig
+        self.sceneView = view
         contentView = view
     }
 
@@ -47,8 +74,8 @@ public final class GoatWindow: EntityWindow {
                     self.phase = .aim
                     self.phaseTimer = 0.8
                     self.dir = self.targetX >= self.position.x ? 1 : -1
-                    self.drawView?.isAiming = true
-                    self.drawView?.needsDisplay = true
+                    self.isAiming = true
+                    self.rig?.head.eulerAngles.x = 0.35
                     SoundAndEffectsManager.shared.play(.alert)
                 }
             case .aim:
@@ -59,6 +86,8 @@ public final class GoatWindow: EntityWindow {
                 }
             case .charge:
                 self.position.x += self.dir * 380.0 / 60.0
+                self.rig?.walk(1.0 / 60.0)
+                self.rig?.walk(1.0 / 60.0)
                 self.setFrameOrigin(NSPoint(x: self.position.x - 36, y: self.position.y))
                 if !self.didHitThisCharge && abs(self.targetX - self.position.x) < 50 {
                     self.didHitThisCharge = true
@@ -67,12 +96,14 @@ public final class GoatWindow: EntityWindow {
                 if self.phaseTimer <= 0 {
                     self.phase = .graze
                     self.phaseTimer = Double.random(in: 2.5...4.5)
-                    self.drawView?.isAiming = false
-                    self.drawView?.needsDisplay = true
+                    self.isAiming = false
+                    self.rig?.head.eulerAngles.x = 0
                 }
             }
-            self.drawView?.facingRight = self.dir > 0
-            self.drawView?.needsDisplay = true
+            if self.phase != .charge {
+                self.rig?.walk(1.0 / 120.0)
+            }
+            self.rig?.eulerAngles.y = self.dir > 0 ? 0 : CGFloat.pi
         }
         RunLoop.main.add(aiTimer!, forMode: .common)
     }
@@ -85,40 +116,5 @@ public final class GoatWindow: EntityWindow {
         aiTimer?.invalidate()
         aiTimer = nil
         super.close()
-    }
-}
-
-private final class GoatDrawView: NSView {
-    var facingRight = true
-    var isAiming = false
-
-    override func draw(_ dirtyRect: NSRect) {
-        guard let ctx = NSGraphicsContext.current?.cgContext else { return }
-        let w = bounds.width
-        ctx.saveGState()
-        if !facingRight {
-            ctx.translateBy(x: w, y: 0)
-            ctx.scaleBy(x: -1.0, y: 1.0)
-        }
-        let body: CGFloat = isAiming ? 0.75 : 0.90
-        ctx.setFillColor(red: body, green: body, blue: body * 0.96, alpha: 1.0)
-        ctx.fill(CGRect(x: 14, y: 10, width: 36, height: 22))
-        ctx.fill(CGRect(x: 44, y: 18, width: 14, height: 14))
-        ctx.setFillColor(red: 0.55, green: 0.42, blue: 0.28, alpha: 1.0)
-        ctx.fill(CGRect(x: 56, y: 24, width: 8, height: 4))
-        ctx.fill(CGRect(x: 56, y: 14, width: 8, height: 4))
-        ctx.setFillColor(red: 0.10, green: 0.10, blue: 0.10, alpha: 1.0)
-        ctx.fill(CGRect(x: 48, y: 24, width: 3, height: 3))
-        ctx.setFillColor(red: body, green: body, blue: body * 0.96, alpha: 1.0)
-        for x in [18, 28, 38, 46] as [CGFloat] {
-            ctx.fill(CGRect(x: x, y: 0, width: 5, height: 12))
-        }
-        ctx.setFillColor(red: body, green: body, blue: body * 0.96, alpha: 1.0)
-        ctx.fill(CGRect(x: 8, y: 14, width: 10, height: 8))
-        if isAiming {
-            ctx.setFillColor(red: 1.0, green: 0.2, blue: 0.2, alpha: 1.0)
-            ctx.fillEllipse(in: CGRect(x: 46, y: 34, width: 8, height: 8))
-        }
-        ctx.restoreGState()
     }
 }

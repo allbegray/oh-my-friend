@@ -1,5 +1,6 @@
 import AppKit
 import CoreGraphics
+import SceneKit
 
 public protocol FoxWindowDelegate: AnyObject {
     func foxWindowDidClick(_ window: FoxWindow)
@@ -15,7 +16,9 @@ public final class FoxWindow: EntityWindow {
     private var lifeTimer: TimeInterval = 0
     private let maxLife: TimeInterval = 14.0
     private var dir: CGFloat = 1
-    private var drawView: FoxDrawView?
+    private var sceneView: MobSceneView?
+    private var rig: QuadRig?
+    private var emojiLabel: NSTextField?
     private var isGone = false
 
     public init(startPos: CGPoint, delegate: FoxWindowDelegate) {
@@ -23,8 +26,42 @@ public final class FoxWindow: EntityWindow {
         self.foxDelegate = delegate
         let size = NSSize(width: 64, height: 44)
         super.init(contentRect: NSRect(x: startPos.x - 32, y: startPos.y, width: size.width, height: size.height), ignoresMouse: false)
-        let view = FoxDrawView(frame: NSRect(origin: .zero, size: size))
-        self.drawView = view
+        let view = MobSceneView(frame: NSRect(origin: .zero, size: size))
+        let orange = VoxelColor.rgb(0.90, 0.45, 0.12)
+        let cream = VoxelColor.rgb(0.95, 0.92, 0.88)
+        let r = QuadRig(bodyColor: orange, headColor: orange, legColor: orange, tailColor: orange)
+        let earL = vbox(0.12, 0.20, 0.08, orange)
+        earL.position = SCNVector3(-0.14, 0.32, 0)
+        r.head.addChildNode(earL)
+        let earR = vbox(0.12, 0.20, 0.08, orange)
+        earR.position = SCNVector3(0.14, 0.32, 0)
+        r.head.addChildNode(earR)
+        let eyeMat = VoxelColor.rgb(0.10, 0.10, 0.10)
+        let eyeL = vbox(0.07, 0.07, 0.02, eyeMat)
+        eyeL.position = SCNVector3(-0.10, 0.05, 0.25)
+        r.head.addChildNode(eyeL)
+        let eyeR = vbox(0.07, 0.07, 0.02, eyeMat)
+        eyeR.position = SCNVector3(0.10, 0.05, 0.25)
+        r.head.addChildNode(eyeR)
+        let tip = vbox(0.14, 0.14, 0.14, cream)
+        tip.position = SCNVector3(0, 0.36, -0.24)
+        r.tail.addChildNode(tip)
+        view.setSubject(r)
+        self.rig = r
+        self.sceneView = view
+        let label = NSTextField(labelWithString: "")
+        label.font = NSFont.systemFont(ofSize: 16)
+        label.isEditable = false
+        label.isBordered = false
+        label.drawsBackground = false
+        label.frame = NSRect(x: 0, y: size.height - 22, width: size.width, height: 20)
+        label.alignment = .center
+        view.addSubview(label)
+        self.emojiLabel = label
+        view.onTap = { [weak self] in
+            guard let self = self else { return }
+            self.foxDelegate?.foxWindowDidClick(self)
+        }
         contentView = view
     }
 
@@ -40,9 +77,9 @@ public final class FoxWindow: EntityWindow {
             let dash = 170.0 + min(120.0, self.lifeTimer * 20.0)
             self.position.x += self.dir * dash / 60.0
             self.setFrameOrigin(NSPoint(x: self.position.x - 32, y: self.position.y))
-            self.drawView?.facingRight = self.dir > 0
-            self.drawView?.carriedEmoji = self.carriedEmoji
-            self.drawView?.needsDisplay = true
+            self.rig?.walk(1.0 / 60.0)
+            self.rig?.eulerAngles.y = CGFloat(self.dir > 0 ? Double.pi / 2.0 : -Double.pi / 2.0)
+            self.emojiLabel?.stringValue = self.carriedEmoji ?? ""
             if self.lifeTimer >= self.maxLife {
                 self.disappear(escaped: true)
             }
@@ -69,43 +106,5 @@ public final class FoxWindow: EntityWindow {
         dartTimer?.invalidate()
         dartTimer = nil
         super.close()
-    }
-}
-
-private final class FoxDrawView: NSView {
-    var facingRight = true
-    var carriedEmoji: String?
-
-    override func draw(_ dirtyRect: NSRect) {
-        guard let ctx = NSGraphicsContext.current?.cgContext else { return }
-        let w = bounds.width
-        let h = bounds.height
-        ctx.saveGState()
-        if !facingRight {
-            ctx.translateBy(x: w, y: 0)
-            ctx.scaleBy(x: -1.0, y: 1.0)
-        }
-        ctx.setFillColor(red: 0.90, green: 0.45, blue: 0.12, alpha: 1.0)
-        ctx.fill(CGRect(x: 10, y: 6, width: 36, height: 20))
-        ctx.fill(CGRect(x: 40, y: 10, width: 14, height: 12))
-        ctx.setFillColor(red: 0.95, green: 0.92, blue: 0.88, alpha: 1.0)
-        ctx.fill(CGRect(x: 50, y: 12, width: 6, height: 8))
-        ctx.setFillColor(red: 0.90, green: 0.45, blue: 0.12, alpha: 1.0)
-        ctx.fill(CGRect(x: 12, y: 26, width: 8, height: 10))
-        ctx.fill(CGRect(x: 24, y: 26, width: 8, height: 10))
-        ctx.setFillColor(red: 0.10, green: 0.10, blue: 0.10, alpha: 1.0)
-        ctx.fill(CGRect(x: 44, y: 18, width: 4, height: 4))
-        ctx.setFillColor(red: 0.90, green: 0.45, blue: 0.12, alpha: 1.0)
-        ctx.fill(CGRect(x: 2, y: 8, width: 12, height: 8))
-        ctx.setFillColor(red: 0.95, green: 0.92, blue: 0.88, alpha: 1.0)
-        ctx.fill(CGRect(x: 0, y: 8, width: 5, height: 8))
-        ctx.restoreGState()
-        if let item = carriedEmoji {
-            let text = NSAttributedString(
-                string: item,
-                attributes: [.font: NSFont.systemFont(ofSize: 16)]
-            )
-            text.draw(at: NSPoint(x: w / 2.0 - 9, y: h - 20))
-        }
     }
 }

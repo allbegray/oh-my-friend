@@ -1,16 +1,28 @@
 import AppKit
 import CoreGraphics
+import SceneKit
 
 public final class AxolotlWindow: EntityWindow {
     private var followTimer: Timer?
     private var phase: TimeInterval = 0
-    private var drawView: AxolotlDrawView?
+    private var facingRight = true
+    private var sceneView: MobSceneView?
+    private var rig: QuadRig?
 
     public init() {
         let size = NSSize(width: 36, height: 28)
         super.init(contentRect: NSRect(x: 300, y: 300, width: size.width, height: size.height), ignoresMouse: true)
-        let view = AxolotlDrawView(frame: NSRect(origin: .zero, size: size))
-        self.drawView = view
+        let view = MobSceneView(frame: NSRect(origin: .zero, size: size))
+        let rig = QuadRig(bodyColor: .rgb(0.95, 0.55, 0.65), headColor: .rgb(0.95, 0.55, 0.65), legColor: .rgb(0.85, 0.40, 0.52), tailColor: .rgb(0.95, 0.55, 0.65))
+        for (sx, sy) in [(-0.28, 0.10), (-0.28, -0.10), (0.28, 0.10), (0.28, -0.10)] as [(CGFloat, CGFloat)] {
+            let gill = vbox(0.08, 0.15, 0.08, .rgb(1.0, 0.85, 0.30))
+            gill.position = SCNVector3(sx, sy, 0.10)
+            rig.head.addChildNode(gill)
+        }
+        rig.scale = SCNVector3(0.55, 0.55, 0.55)
+        view.setSubject(rig)
+        self.rig = rig
+        self.sceneView = view
         contentView = view
     }
 
@@ -24,8 +36,8 @@ public final class AxolotlWindow: EntityWindow {
         followTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 30.0, repeats: true) { [weak self] _ in
             guard let self = self else { return }
             self.phase += 1.0 / 30.0
-            self.drawView?.wiggle = sin(self.phase * 6.0)
-            self.drawView?.needsDisplay = true
+            self.rig?.walk(1.0 / 30.0)
+            self.rig?.eulerAngles.z = sin(self.phase * 6.0) * 0.08
         }
         RunLoop.main.add(followTimer!, forMode: .common)
     }
@@ -33,38 +45,13 @@ public final class AxolotlWindow: EntityWindow {
     public func moveToShoulder(playerPos: CGPoint, facingRight: Bool) {
         let offsetX: CGFloat = facingRight ? -26 : 26
         setFrameOrigin(NSPoint(x: playerPos.x + offsetX - 18, y: playerPos.y + 52))
-        drawView?.facingRight = facingRight
+        self.facingRight = facingRight
+        rig?.eulerAngles.y = facingRight ? .pi / 2.0 : -.pi / 2.0
     }
 
     public override func close() {
         followTimer?.invalidate()
         followTimer = nil
         super.close()
-    }
-}
-
-private final class AxolotlDrawView: NSView {
-    var wiggle: CGFloat = 0
-    var facingRight = true
-
-    override func draw(_ dirtyRect: NSRect) {
-        guard let ctx = NSGraphicsContext.current?.cgContext else { return }
-        let w = bounds.width
-        let h = bounds.height
-        ctx.saveGState()
-        if !facingRight {
-            ctx.translateBy(x: w, y: 0)
-            ctx.scaleBy(x: -1.0, y: 1.0)
-        }
-        ctx.setFillColor(red: 0.95, green: 0.55, blue: 0.65, alpha: 1.0)
-        ctx.fillEllipse(in: CGRect(x: 6, y: 6, width: w - 12, height: h - 10))
-        ctx.fill(CGRect(x: w - 12, y: 8 + wiggle * 2, width: 8, height: 8))
-        ctx.setFillColor(red: 0.90, green: 0.35, blue: 0.50, alpha: 1.0)
-        for y in [h - 12, h - 16, h - 8] as [CGFloat] {
-            ctx.fillEllipse(in: CGRect(x: 2, y: y, width: 6, height: 5))
-        }
-        ctx.setFillColor(red: 0.15, green: 0.10, blue: 0.12, alpha: 1.0)
-        ctx.fillEllipse(in: CGRect(x: w - 14, y: h - 16, width: 4, height: 5))
-        ctx.restoreGState()
     }
 }

@@ -1,6 +1,7 @@
 import AppKit
 import CoreGraphics
 import Foundation
+import SceneKit
 
 // 9차 야생동물 백로그: 토끼·북극곰·개구리·거북·발자국 + WildlifeManager.
 // AppController "🎉 추가 모션" 서브메뉴에서 WildlifeManager.shared.entries()로 호출한다.
@@ -142,7 +143,7 @@ public final class RabbitWindow: EntityWindow {
     private var phase: TimeInterval = 0
     private var wander = WanderState(speed: 42)
     private var boost: TimeInterval = 0
-    private var drawView: RabbitDrawView?
+    private var rig: QuadRig?
     private let panelW: CGFloat = 64
     private let panelH: CGFloat = 48
 
@@ -150,8 +151,27 @@ public final class RabbitWindow: EntityWindow {
         self.position = startPos
         self.onTap = onTap
         super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
-        let view = RabbitDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
-        self.drawView = view
+        let view = MobSceneView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
+        let rig = QuadRig(bodyColor: .rgb(0.72, 0.60, 0.50), headColor: .rgb(0.72, 0.60, 0.50), legColor: .rgb(0.65, 0.53, 0.44), tailColor: .rgb(0.97, 0.97, 0.97))
+        for sx in [-0.12, 0.12] as [CGFloat] {
+            let ear = vbox(0.10, 0.30, 0.06, .rgb(0.72, 0.60, 0.50))
+            ear.position = SCNVector3(sx, 0.38, 0)
+            rig.head.addChildNode(ear)
+            let inner = vbox(0.05, 0.18, 0.02, .rgb(0.95, 0.75, 0.78))
+            inner.position = SCNVector3(sx, 0.36, 0.04)
+            rig.head.addChildNode(inner)
+        }
+        for sx in [-0.10, 0.10] as [CGFloat] {
+            let eye = vbox(0.07, 0.09, 0.02, .glow(0.90, 0.10, 0.12))
+            eye.position = SCNVector3(sx, 0.03, 0.25)
+            rig.head.addChildNode(eye)
+        }
+        view.setSubject(rig)
+        self.rig = rig
+        view.onTap = { [weak self] in
+            guard let self = self else { return }
+            self.onTap(self)
+        }
         contentView = view
     }
 
@@ -174,9 +194,8 @@ public final class RabbitWindow: EntityWindow {
             self.position.x += self.wander.tick(dt) * (lured ? 1.4 : 1.0)
             let hop = abs(sin(self.phase * 7.0)) * 16.0 + (self.boost > 0 ? 8.0 : 0)
             self.setFrameOrigin(NSPoint(x: self.position.x - self.panelW / 2, y: self.position.y + hop))
-            self.drawView?.facingRight = self.wander.direction > 0
-            self.drawView?.hop = hop
-            self.drawView?.needsDisplay = true
+            self.rig?.walk(dt)
+            self.rig?.eulerAngles.y = self.wander.direction > 0 ? 0 : CGFloat.pi
         }
         RunLoop.main.add(tick!, forMode: .common)
     }
@@ -241,7 +260,8 @@ public final class PolarBearWindow: EntityWindow {
     private var phase: TimeInterval = 0
     private var wander = WanderState(speed: 18)
     private var rageLeft: TimeInterval = 0
-    private var drawView: PolarBearDrawView?
+    private var rig: QuadRig?
+    private var eyeNodes: [SCNNode] = []
     private let panelW: CGFloat = 84
     private let panelH: CGFloat = 56
 
@@ -249,8 +269,32 @@ public final class PolarBearWindow: EntityWindow {
         self.position = startPos
         self.onTap = onTap
         super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
-        let view = PolarBearDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
-        self.drawView = view
+        let view = MobSceneView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
+        let rig = QuadRig(bodyColor: .rgb(0.96, 0.96, 0.97), headColor: .rgb(0.96, 0.96, 0.97), legColor: .rgb(0.90, 0.90, 0.91), tailColor: .rgb(0.96, 0.96, 0.97))
+        rig.scale = SCNVector3(1.15, 1.15, 1.15)
+        let snout = vbox(0.20, 0.16, 0.12, .rgb(0.90, 0.90, 0.92))
+        snout.position = SCNVector3(0, -0.08, 0.28)
+        rig.head.addChildNode(snout)
+        let nose = vbox(0.07, 0.07, 0.03, .rgb(0.15, 0.15, 0.15))
+        nose.position = SCNVector3(0, -0.05, 0.35)
+        rig.head.addChildNode(nose)
+        for sx in [-0.15, 0.15] as [CGFloat] {
+            let ear = vbox(0.12, 0.12, 0.08, .rgb(0.93, 0.93, 0.94))
+            ear.position = SCNVector3(sx, 0.28, -0.05)
+            rig.head.addChildNode(ear)
+        }
+        for sx in [-0.10, 0.10] as [CGFloat] {
+            let eye = vbox(0.07, 0.08, 0.02, .rgb(0.12, 0.12, 0.12))
+            eye.position = SCNVector3(sx, 0.08, 0.25)
+            rig.head.addChildNode(eye)
+            eyeNodes.append(eye)
+        }
+        view.setSubject(rig)
+        self.rig = rig
+        view.onTap = { [weak self] in
+            guard let self = self else { return }
+            self.onTap(self)
+        }
         contentView = view
     }
 
@@ -272,10 +316,12 @@ public final class PolarBearWindow: EntityWindow {
             }
             self.position.x += self.wander.tick(dt) * (raged ? 2.0 : 1.0)
             self.setFrameOrigin(NSPoint(x: self.position.x - self.panelW / 2, y: self.position.y))
-            self.drawView?.facingRight = self.wander.direction > 0
-            self.drawView?.enraged = self.rageLeft > 0
-            self.drawView?.bob = sin(self.phase * 3.0)
-            self.drawView?.needsDisplay = true
+            self.rig?.walk(dt)
+            self.rig?.eulerAngles.y = self.wander.direction > 0 ? 0 : CGFloat.pi
+            let enraged = self.rageLeft > 0
+            for eye in self.eyeNodes {
+                eye.geometry?.materials = [voxelMaterial(enraged ? .glow(0.95, 0.10, 0.10) : .rgb(0.12, 0.12, 0.12))]
+            }
         }
         RunLoop.main.add(tick!, forMode: .common)
     }
@@ -363,7 +409,9 @@ public final class FrogWindow: EntityWindow {
     private var wander = WanderState(speed: 55)
     private var tongueLeft: TimeInterval = 0
     private var flyAngle: Double = 0
-    private var drawView: FrogDrawView?
+    private var rig: QuadRig?
+    private var tongueNode: SCNNode?
+    private var flyNode: SCNNode?
     private let panelW: CGFloat = 52
     private let panelH: CGFloat = 40
     private let tonguePeriod: TimeInterval = 0.6
@@ -372,8 +420,31 @@ public final class FrogWindow: EntityWindow {
         self.position = startPos
         self.onTap = onTap
         super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
-        let view = FrogDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
-        self.drawView = view
+        let view = MobSceneView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
+        let rig = QuadRig(bodyColor: .rgb(0.30, 0.70, 0.30), headColor: .rgb(0.30, 0.70, 0.30), legColor: .rgb(0.25, 0.62, 0.25), tailColor: nil)
+        for sx in [-0.12, 0.12] as [CGFloat] {
+            let bulge = vbox(0.16, 0.14, 0.14, .rgb(0.35, 0.75, 0.32))
+            bulge.position = SCNVector3(sx, 0.30, 0.02)
+            rig.head.addChildNode(bulge)
+            let pupil = vbox(0.07, 0.07, 0.02, .rgb(0.08, 0.08, 0.08))
+            pupil.position = SCNVector3(sx, 0.30, 0.10)
+            rig.head.addChildNode(pupil)
+        }
+        let tongue = vbox(0.34, 0.05, 0.05, .rgb(1.0, 0.45, 0.55))
+        tongue.position = SCNVector3(0, 0.0, 0.42)
+        tongue.isHidden = true
+        rig.head.addChildNode(tongue)
+        self.tongueNode = tongue
+        let fly = vbox(0.08, 0.08, 0.08, .rgb(0.20, 0.20, 0.20))
+        fly.position = SCNVector3(0.4, 1.1, 0.5)
+        rig.addChildNode(fly)
+        self.flyNode = fly
+        view.setSubject(rig)
+        self.rig = rig
+        view.onTap = { [weak self] in
+            guard let self = self else { return }
+            self.onTap(self)
+        }
         contentView = view
     }
 
@@ -389,6 +460,7 @@ public final class FrogWindow: EntityWindow {
             let dx = self.wander.tick(1.0 / 60.0)
             if hopCycle > 0.3 {
                 self.position.x += dx
+                self.rig?.walk(1.0 / 60.0)
             }
             let hop = max(0, hopCycle) * 14.0
             self.setFrameOrigin(NSPoint(x: self.position.x - self.panelW / 2, y: self.position.y + hop))
@@ -407,11 +479,10 @@ public final class FrogWindow: EntityWindow {
                     SoundAndEffectsManager.shared.play(.gulp)
                 }
             }
-            self.drawView?.facingRight = self.wander.direction > 0
-            self.drawView?.hop = hop
-            self.drawView?.tongueOut = self.tongueLeft > 0
-            self.drawView?.fly = self.flyOffset()
-            self.drawView?.needsDisplay = true
+            self.rig?.eulerAngles.y = self.wander.direction > 0 ? 0 : CGFloat.pi
+            self.tongueNode?.isHidden = self.tongueLeft <= 0
+            let fly = self.flyOffset()
+            self.flyNode?.position = SCNVector3(Float(fly.x / 45.0), Float(1.0 + fly.y / 55.0), 0.5)
         }
         RunLoop.main.add(tick!, forMode: .common)
     }
@@ -435,8 +506,7 @@ public final class FrogWindow: EntityWindow {
     }
 }
 
-private final class FrogDrawView: NSView {
-    var facingRight = true
+private final class FrogDrawView: NSView {    var facingRight = true
     var hop: CGFloat = 0
     var tongueOut = false
     var fly = CGPoint.zero
@@ -494,7 +564,7 @@ public final class TurtleWindow: EntityWindow {
     private var phase: TimeInterval = 0
     private var wander = WanderState(speed: 12)
     private var shellCooldown = Cooldown()
-    private var drawView: TurtleDrawView?
+    private var rig: QuadRig?
     private let panelW: CGFloat = 72
     private let panelH: CGFloat = 44
 
@@ -502,8 +572,22 @@ public final class TurtleWindow: EntityWindow {
         self.position = startPos
         self.onTap = onTap
         super.init(contentRect: NSRect(x: startPos.x - panelW / 2, y: startPos.y, width: panelW, height: panelH), ignoresMouse: false)
-        let view = TurtleDrawView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
-        self.drawView = view
+        let view = MobSceneView(frame: NSRect(origin: .zero, size: NSSize(width: panelW, height: panelH)))
+        let rig = QuadRig(bodyColor: .rgb(0.25, 0.55, 0.28), headColor: .rgb(0.45, 0.72, 0.42), legColor: .rgb(0.40, 0.66, 0.38), tailColor: nil)
+        for sx in [-0.11, 0.11] as [CGFloat] {
+            let plate = vbox(0.18, 0.06, 0.60, .rgb(0.35, 0.65, 0.35))
+            plate.position = SCNVector3(sx, 0.28, -0.05)
+            rig.body.addChildNode(plate)
+        }
+        let eye = vbox(0.06, 0.06, 0.02, .rgb(0.08, 0.08, 0.08))
+        eye.position = SCNVector3(0.12, 0.05, 0.25)
+        rig.head.addChildNode(eye)
+        view.setSubject(rig)
+        self.rig = rig
+        view.onTap = { [weak self] in
+            guard let self = self else { return }
+            self.onTap(self)
+        }
         contentView = view
     }
 
@@ -517,9 +601,8 @@ public final class TurtleWindow: EntityWindow {
             self.shellCooldown.tick(dt)
             self.position.x += self.wander.tick(dt)
             self.setFrameOrigin(NSPoint(x: self.position.x - self.panelW / 2, y: self.position.y))
-            self.drawView?.facingRight = self.wander.direction > 0
-            self.drawView?.step = sin(self.phase * 3.0)
-            self.drawView?.needsDisplay = true
+            self.rig?.walk(dt)
+            self.rig?.eulerAngles.y = self.wander.direction > 0 ? 0 : CGFloat.pi
         }
         RunLoop.main.add(tick!, forMode: .common)
     }
