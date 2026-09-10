@@ -1082,6 +1082,30 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
         cw.orderFrontRegardless()
         cw.creeperView.creeperNode.showOverheadEmoji("👾 나타났다!", duration: 1.8)
         SoundAndEffectsManager.shared.play(.alert)
+
+        // 플레이어 살기 감지 대사 출력
+        let warningQuotes = [
+            "등골이 서늘한데...? 살기가 느껴져! 😨",
+            "불길한 기운이 감돈다... 크리퍼인가?! ⚠️",
+            "뒤에서 바스락거리는 소리가 들렸어! 💢",
+            "크리퍼 냄새가 나는데... 어디지?! 👃",
+            "잠깐... 불길한 시선이 느껴져! 👀",
+            "살기 감지! 무기 들 준비 해! ⚔️"
+        ]
+        let quote = warningQuotes.randomElement() ?? warningQuotes[0]
+        window.characterView.characterNode.showOverheadEmoji(quote, duration: 3.0)
+
+        // 소환된 펫이 있다면 펫도 위협을 감지하고 반응!
+        if let petNode = petWindow?.petView.petNode {
+            let petReaction: String
+            switch petNode.kind {
+            case .wolf: petReaction = "으르렁...! 🐺"
+            case .cat: petReaction = "하악질! 😾"
+            case .parrot: petReaction = "비상! 비상! 🦜"
+            case .pig: petReaction = "꿀꿀?! 🐷"
+            }
+            petNode.showOverheadEmoji(petReaction, duration: 2.5)
+        }
     }
 
     public func despawnCreeper() {
