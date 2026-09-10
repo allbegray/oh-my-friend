@@ -61,6 +61,7 @@ Sources/OhMyFriend/
 ## 실행 기록
 
 ### 2026-09-10
+- **.idea/ 디렉토리 git ignore 및 저장소 인덱스 추적 제외**: JetBrains/IDEA 설정 파일(`.idea/`)을 `.gitignore`에 등록하고 원격 저장소 추적에서 안전하게 분리.
 - **[M1-M4, L2-L4] 고급 원작 고증 7대 기능(창 압축, 모서리 낚시, 겉날개 활공, 늑대 꼬리, 스킨 필터, 인챈트 광택, 배터리 허기) 구축**:
   - `[M1]` `WindowMinimizer.swift` 및 `WindowSquashOverlayWindow.swift`: 접근성 API/AppleScript 기반 유압 피스톤 창 압축 최소화 구현.
   - `[M2]` `FishingLoot.swift`, 3D 낚싯대 모델 및 찌/입질 파티클, 6종 전리품(연어, 복어, 인챈트북, 네더라이트 등) 낚시 FSM 구현.
