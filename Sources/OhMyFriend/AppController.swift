@@ -639,9 +639,12 @@ public final class AppController: NSObject, CharacterViewDelegate, NSMenuDelegat
         let screen = ScreenEnvironment.shared.screen(for: physics.position)
 
         // 2. 모든 창 위에 폭파 연출 오버레이 생성
+        //    동시에 폭발하는 창들이 파편 예산을 나눠 쓴다 (파편 수 = 프레임당 그리기 비용)
+        let debrisShare = max(BlockBreakOverlayWindow.minimumDebrisPerWindow,
+                              BlockBreakOverlayWindow.debrisBudgetTotal / max(1, windows.count))
         var overlays: [BlockBreakOverlayWindow] = []
         for info in windows {
-            let overlay = BlockBreakOverlayWindow(over: info.frame, on: screen)
+            let overlay = BlockBreakOverlayWindow(over: info.frame, on: screen, debrisBudget: debrisShare)
             overlay.onBreakFinished = { [weak self, weak overlay] in
                 guard let self = self else { return }
                 self.breakOverlays.removeAll { $0 === overlay }
