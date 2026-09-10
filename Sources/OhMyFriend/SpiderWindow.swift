@@ -1,0 +1,124 @@
+import AppKit
+import CoreGraphics
+
+public protocol SpiderWindowDelegate: AnyObject {
+    func spiderWindowDidClick(_ window: SpiderWindow)
+    func spiderWindowDidLeave(_ window: SpiderWindow)
+}
+
+public final class SpiderWindow: NSPanel {
+    public private(set) var position: CGPoint
+    public var surfaceTop: CGFloat = 0
+    public var surfaceBottom: CGFloat = 0
+    public weak var spiderDelegate: SpiderWindowDelegate?
+
+    private var hp = 2
+    private var crawlTimer: Timer?
+    private var dir: CGFloat = 1
+    private var phase: TimeInterval = 0
+    private var drawView: SpiderDrawView?
+    private var isGone = false
+
+    public init(startPos: CGPoint, surfaceTop: CGFloat, surfaceBottom: CGFloat, delegate: SpiderWindowDelegate) {
+        self.position = startPos
+        self.surfaceTop = surfaceTop
+        self.surfaceBottom = surfaceBottom
+        self.spiderDelegate = delegate
+        let size = NSSize(width: 56, height: 44)
+        super.init(
+            contentRect: NSRect(x: startPos.x - 28, y: startPos.y, width: size.width, height: size.height),
+            styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered,
+            defer: false
+        )
+        self.level = .floating
+        self.isOpaque = false
+        self.backgroundColor = .clear
+        self.hasShadow = false
+        self.ignoresMouseEvents = false
+        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        let view = SpiderDrawView(frame: NSRect(origin: .zero, size: size))
+        self.drawView = view
+        contentView = view
+    }
+
+    public func start() {
+        orderFrontRegardless()
+        SoundAndEffectsManager.shared.play(.pop)
+        crawlTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] t in
+            guard let self = self else { t.invalidate(); return }
+            self.phase += 1.0 / 60.0
+            self.position.y += self.dir * 70.0 / 60.0
+            if self.position.y >= self.surfaceTop {
+                self.position.y = self.surfaceTop
+                self.dir = -1
+            } else if self.position.y <= self.surfaceBottom {
+                self.position.y = self.surfaceBottom
+                self.dir = 1
+            }
+            self.setFrameOrigin(NSPoint(x: self.position.x - 28, y: self.position.y))
+            self.drawView?.legWiggle = sin(self.phase * 16.0)
+            self.drawView?.needsDisplay = true
+        }
+        RunLoop.main.add(crawlTimer!, forMode: .common)
+    }
+
+    public override func mouseDown(with event: NSEvent) {
+        spiderDelegate?.spiderWindowDidClick(self)
+    }
+
+    public func takeHit() {
+        hp -= 1
+        if hp <= 0 {
+            disappear(defeated: true)
+        } else {
+            SoundAndEffectsManager.shared.play(.pop)
+        }
+    }
+
+    public func disappear(defeated: Bool) {
+        guard !isGone else { return }
+        isGone = true
+        crawlTimer?.invalidate()
+        crawlTimer = nil
+        spiderDelegate?.spiderWindowDidLeave(self)
+        close()
+    }
+
+    public override func close() {
+        crawlTimer?.invalidate()
+        crawlTimer = nil
+        super.close()
+    }
+}
+
+private final class SpiderDrawView: NSView {
+    var legWiggle: CGFloat = 0
+
+    override func draw(_ dirtyRect: NSRect) {
+        guard let ctx = NSGraphicsContext.current?.cgContext else { return }
+        let w = bounds.width
+        let h = bounds.height
+        ctx.setStrokeColor(red: 0.15, green: 0.12, blue: 0.14, alpha: 1.0)
+        ctx.setLineWidth(2.5)
+        for i in 0..<4 {
+            let y = 8 + CGFloat(i) * 8
+            let spread = 6 + legWiggle * 2
+            ctx.beginPath()
+            ctx.move(to: CGPoint(x: 14, y: y))
+            ctx.addLine(to: CGPoint(x: 14 - spread, y: y + 6))
+            ctx.strokePath()
+            ctx.beginPath()
+            ctx.move(to: CGPoint(x: w - 14, y: y))
+            ctx.addLine(to: CGPoint(x: w - 14 + spread, y: y + 6))
+            ctx.strokePath()
+        }
+        ctx.setFillColor(red: 0.18, green: 0.14, blue: 0.16, alpha: 1.0)
+        ctx.fillEllipse(in: CGRect(x: 16, y: 8, width: w - 32, height: 24))
+        ctx.setFillColor(red: 0.95, green: 0.15, blue: 0.25, alpha: 1.0)
+        for x in [20, 26, 32] as [CGFloat] {
+            ctx.fillEllipse(in: CGRect(x: x, y: 24, width: 4, height: 4))
+            ctx.fillEllipse(in: CGRect(x: w - x - 4, y: 24, width: 4, height: 4))
+        }
+    }
+}

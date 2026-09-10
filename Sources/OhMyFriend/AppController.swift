@@ -3,7 +3,7 @@ import CoreGraphics
 import SceneKit
 import UniformTypeIdentifiers
 
-public final class AppController: NSObject, CharacterViewDelegate, PetViewDelegate, CreeperViewDelegate, EndermanViewDelegate, SkeletonViewDelegate, SlimeWindowDelegate, FoxWindowDelegate, NSMenuDelegate {
+public final class AppController: NSObject, CharacterViewDelegate, PetViewDelegate, CreeperViewDelegate, EndermanViewDelegate, SkeletonViewDelegate, SlimeWindowDelegate, FoxWindowDelegate, PhantomWindowDelegate, SpiderWindowDelegate, GhastWindowDelegate, ZombieWindowDelegate, NSMenuDelegate {
     private var window: CharacterWindow!
     private var physics: PhysicsEngine!
     private var behavior = CharacterBehaviorController()
@@ -359,6 +359,11 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
         updatePotions(dt: dt)
         updateMinecart(dt: dt)
         updateGoat()
+        updatePhantom(dt: dt)
+        updateSpider()
+        updateGhast()
+        updateSiege(dt: dt)
+        updateAxolotl()
 
         // Fox: 밤에만 가끔 출현
         if DayNightCycleManager.shared.isNight && foxWindow == nil {
@@ -975,6 +980,26 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
         let advItem = NSMenuItem(title: "🏆 발전 과제 (\(AdvancementManager.shared.unlockedCount)/\(AdvancementID.allCases.count))", action: #selector(didSelectAdvancements), keyEquivalent: "")
         advItem.target = self
         actMenu.addItem(advItem)
+
+        let phantomItem = NSMenuItem(title: "👻 팬텀 소환 (Spawn Phantom)", action: #selector(didSelectSpawnPhantom), keyEquivalent: "")
+        phantomItem.target = self
+        actMenu.addItem(phantomItem)
+
+        let spiderItem = NSMenuItem(title: "🕷️ 거미 소환 (Spawn Spider)", action: #selector(didSelectSpawnSpider), keyEquivalent: "")
+        spiderItem.target = self
+        actMenu.addItem(spiderItem)
+
+        let ghastItem = NSMenuItem(title: "🔥 가스트 소환 (Spawn Ghast)", action: #selector(didSelectSpawnGhast), keyEquivalent: "")
+        ghastItem.target = self
+        actMenu.addItem(ghastItem)
+
+        let siegeItem = NSMenuItem(title: "🧟 좀비 공성전 (Siege)", action: #selector(didSelectSpawnSiege), keyEquivalent: "")
+        siegeItem.target = self
+        actMenu.addItem(siegeItem)
+
+        let axolotlItem = NSMenuItem(title: "🦎 아홀로틀 데려오기 (Axolotl)", action: #selector(didSelectAxolotl), keyEquivalent: "")
+        axolotlItem.target = self
+        actMenu.addItem(axolotlItem)
         let actSubmenuItem = NSMenuItem(title: "✨ 재미있는 모션 실행", action: nil, keyEquivalent: "")
         actSubmenuItem.submenu = actMenu
         menu.addItem(actSubmenuItem)
@@ -1857,6 +1882,11 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
             damage += 2
             playerEmoji += " 💪힘!"
         }
+        if axolotlWindow != nil {
+            damage += 1
+            playerEmoji += " 🦎엄호!"
+            axolotlAssist()
+        }
 
         window.characterView.characterNode.showOverheadEmoji(playerEmoji, duration: 1.2)
 
@@ -2023,7 +2053,11 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
         playerAttackTimer = 0.35
 
         let weapon = window.characterView.characterNode.currentHeldItem
-        let damage = weapon == .diamondSword ? 3 : (weapon == .diamondPickaxe ? 2 : 1)
+        var damage = weapon == .diamondSword ? 3 : (weapon == .diamondPickaxe ? 2 : 1)
+        if axolotlWindow != nil {
+            damage += 1
+            axolotlAssist()
+        }
         window.characterView.characterNode.showOverheadEmoji("⚔️ 엔더맨 타격!", duration: 1.2)
 
         eBehav.applyDamage(
@@ -2103,7 +2137,11 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
         playerAttackTimer = 0.35
 
         let weapon = window.characterView.characterNode.currentHeldItem
-        let damage = weapon == .diamondSword ? 3 : (weapon == .diamondPickaxe ? 2 : 1)
+        var damage = weapon == .diamondSword ? 3 : (weapon == .diamondPickaxe ? 2 : 1)
+        if axolotlWindow != nil {
+            damage += 1
+            axolotlAssist()
+        }
         window.characterView.characterNode.showOverheadEmoji("⚔️ 스켈레톤 타격!", duration: 1.2)
 
         sBehav.applyDamage(
@@ -2813,6 +2851,333 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
         let w = AdvancementListWindow()
         advancementListWindow = w
         w.orderFrontRegardless()
+    }
+
+    // MARK: - Phantom (팬텀 야습)
+    private var phantomWindow: PhantomWindow?
+    private var phantomCheckTimer: TimeInterval = 0
+
+    @objc private func didSelectSpawnPhantom() {
+        spawnPhantom()
+    }
+
+    private func spawnPhantom() {
+        guard phantomWindow == nil else { return }
+        let startPos = CGPoint(x: physics.position.x, y: physics.position.y + 260)
+        let phantom = PhantomWindow(startPos: startPos, delegate: self)
+        phantomWindow = phantom
+        phantom.anchor = physics.position
+        phantom.start()
+        window.characterView.characterNode.showOverheadEmoji("👻 섬뜩한 기척...!", duration: 2.2)
+        SoundAndEffectsManager.shared.play(.alert)
+    }
+
+    public func phantomWindowDidClick(_ window: PhantomWindow) {
+        attackPhantom(window)
+    }
+
+    public func phantomWindowDidLeave(_ window: PhantomWindow) {
+        phantomWindow = nil
+    }
+
+    public func phantomWindowDidDefeat(_ window: PhantomWindow) {
+        phantomWindow = nil
+        playerXP += 6
+        self.window.characterView.characterNode.showOverheadEmoji("👻 격퇴! 막 +6XP!", duration: 2.2)
+        SoundAndEffectsManager.shared.play(.heart)
+    }
+
+    private func updatePhantom(dt: TimeInterval) {
+        guard let phantom = phantomWindow else {
+            let hour = Calendar.current.component(.hour, from: Date())
+            let deepNight = (hour >= 0 && hour < 5)
+            if deepNight || DayNightCycleManager.shared.mode == .forceNight {
+                phantomCheckTimer += dt
+                if phantomCheckTimer >= 45.0 {
+                    phantomCheckTimer = 0
+                    if Bool.random() {
+                        spawnPhantom()
+                    }
+                }
+            } else {
+                phantomCheckTimer = 0
+            }
+            return
+        }
+        phantom.anchor = physics.position
+        let dist = hypot(phantom.position.x - physics.position.x, phantom.position.y - physics.position.y)
+        if dist < 70 && playerAttackTimer <= 0 {
+            let charNode = window.characterView.characterNode
+            let guarded = charNode.isShieldEquipped && (charNode.isSneaking || charNode.isGuarding)
+            if guarded {
+                charNode.showOverheadEmoji("🛡️ 챙-! 팬텀 방어!", duration: 1.6)
+                SoundAndEffectsManager.shared.play(.pop)
+            } else if consumeTotemIfEquipped() {
+            } else {
+                physics.launch(vx: (physics.position.x >= phantom.position.x ? 200 : -200), vy: 200)
+                charNode.showOverheadEmoji("👻 할퀴었다!", duration: 1.6)
+            }
+            playerAttackTimer = 1.0
+        }
+        if dist < 90 && playerAttackTimer <= 0 {
+            attackPhantom(phantom)
+        }
+    }
+
+    private func attackPhantom(_ phantom: PhantomWindow) {
+        let charNode = window.characterView.characterNode
+        charNode.isAttackingWeapon = true
+        playerAttackTimer = 0.5
+        charNode.showOverheadEmoji("🗡️ 에잇!", duration: 1.0)
+        SoundAndEffectsManager.shared.play(.splash)
+        phantom.takeHit()
+    }
+
+    // MARK: - Spider (거미 창문 등반)
+    private var spiderWindow: SpiderWindow?
+
+    @objc private func didSelectSpawnSpider() {
+        spawnSpider()
+    }
+
+    private func spawnSpider() {
+        guard spiderWindow == nil else { return }
+        if let platform = physics.currentPlatform, case .window = platform.kind {
+            let top = platform.yTop
+            let bottom = platform.yBottom ?? (top - 300)
+            let spider = SpiderWindow(
+                startPos: CGPoint(x: physics.position.x + 80, y: (top + bottom) / 2),
+                surfaceTop: top - 10,
+                surfaceBottom: bottom,
+                delegate: self
+            )
+            spiderWindow = spider
+            spider.start()
+            window.characterView.characterNode.showOverheadEmoji("🕷️ 창문을 기어올라!", duration: 2.0)
+            SoundAndEffectsManager.shared.play(.alert)
+        } else {
+            let pos = CGPoint(x: physics.position.x + 140, y: physics.position.y)
+            let spider = SpiderWindow(startPos: pos, surfaceTop: pos.y + 200, surfaceBottom: pos.y - 40, delegate: self)
+            spiderWindow = spider
+            spider.start()
+            window.characterView.characterNode.showOverheadEmoji("🕷️ 거미다!", duration: 2.0)
+        }
+    }
+
+    public func spiderWindowDidClick(_ window: SpiderWindow) {
+        if DayNightCycleManager.shared.isNight {
+            attackSpider(window)
+        } else {
+            self.window.characterView.characterNode.showOverheadEmoji("🕷️ 낮엔 얌전하네...", duration: 1.6)
+            SoundAndEffectsManager.shared.play(.pop)
+        }
+    }
+
+    public func spiderWindowDidLeave(_ window: SpiderWindow) {
+        if spiderWindow === window {
+            spiderWindow = nil
+            playerXP += 4
+            self.window.characterView.characterNode.showOverheadEmoji("🕷️ 격퇴! 실 +4XP!", duration: 2.0)
+            SoundAndEffectsManager.shared.play(.heart)
+        }
+    }
+
+    private func attackSpider(_ spider: SpiderWindow) {
+        let charNode = window.characterView.characterNode
+        charNode.isAttackingWeapon = true
+        playerAttackTimer = 0.5
+        charNode.showOverheadEmoji("🗡️ 에잇!", duration: 1.0)
+        SoundAndEffectsManager.shared.play(.splash)
+        spider.takeHit()
+    }
+
+    private func updateSpider() {
+        guard let spider = spiderWindow else { return }
+        let dist = hypot(spider.position.x - physics.position.x, spider.position.y - physics.position.y)
+        if DayNightCycleManager.shared.isNight && dist < 110 && playerAttackTimer <= 0 {
+            attackSpider(spider)
+        }
+    }
+
+    // MARK: - Ghast (가스트 화염탄 테니스)
+    private var ghastWindow: GhastWindow?
+    private var fireballs: [FireballWindow] = []
+
+    @objc private func didSelectSpawnGhast() {
+        spawnGhast()
+    }
+
+    private func spawnGhast() {
+        guard ghastWindow == nil else { return }
+        let base: CGPoint
+        if let portal = portalOverlay {
+            base = CGPoint(x: portal.floorPos.x, y: portal.floorPos.y + 200)
+        } else {
+            base = CGPoint(x: physics.position.x - 200, y: physics.position.y + 200)
+        }
+        let ghast = GhastWindow(startPos: base, delegate: self) { [weak self] from in
+            self?.launchFireball(from: from)
+        }
+        ghastWindow = ghast
+        ghast.start()
+        window.characterView.characterNode.showOverheadEmoji("🔥 우우... 가스트다!", duration: 2.2)
+    }
+
+    private func launchFireball(from: CGPoint) {
+        let fireball = FireballWindow(from: from, target: physics.position) { [weak self] reached in
+            guard let self = self else { return }
+            if reached {
+                let charNode = self.window.characterView.characterNode
+                let guarded = charNode.isShieldEquipped && (charNode.isSneaking || charNode.isGuarding)
+                if guarded {
+                    charNode.showOverheadEmoji("🛡️ 챙-! 화염탄 방어!", duration: 1.8)
+                    SoundAndEffectsManager.shared.play(.pop)
+                } else if self.consumeTotemIfEquipped() {
+                } else {
+                    self.physics.launch(vx: (self.physics.position.x >= from.x ? 260 : -260), vy: 260)
+                    charNode.showOverheadEmoji("🔥 화염탄 직격!", duration: 1.8)
+                    SoundAndEffectsManager.shared.play(.explode)
+                }
+            } else {
+                self.deflectFireballAtGhast()
+            }
+        }
+        fireballs.append(fireball)
+        fireball.launch()
+    }
+
+    private func deflectFireballAtGhast() {
+        guard let ghast = ghastWindow else { return }
+        window.characterView.characterNode.showOverheadEmoji("🎾 쳐냈다!", duration: 1.6)
+        SoundAndEffectsManager.shared.play(.whoosh)
+        ghast.disappear(defeated: true)
+    }
+
+    public func ghastDidDefeat(_ window: GhastWindow) {
+        ghastWindow = nil
+        playerXP += 8
+        self.window.characterView.characterNode.showOverheadEmoji("🔥 가스트 격추! 눈물 +8XP!", duration: 2.5)
+        SoundAndEffectsManager.shared.play(.heart)
+    }
+
+    public func ghastDidLeave(_ window: GhastWindow) {
+        ghastWindow = nil
+    }
+
+    private func updateGhast() {
+        guard let ghast = ghastWindow else { return }
+        ghast.anchor = CGPoint(x: physics.position.x - 160, y: physics.position.y + 60)
+        fireballs.removeAll { !$0.isVisible }
+    }
+
+    // MARK: - Siege (자정 좀비 공성전)
+    private var zombieWindows: [ZombieWindow] = []
+    private var siegeCheckTimer: TimeInterval = 0
+    private var siegeActive: Bool = false
+
+    @objc private func didSelectSpawnSiege() {
+        startSiege()
+    }
+
+    private func startSiege() {
+        guard zombieWindows.isEmpty else { return }
+        siegeActive = true
+        for i in 0..<3 {
+            let pos = CGPoint(
+                x: physics.position.x + (i == 0 ? -220 : (i == 1 ? 220 : -160)),
+                y: physics.position.y
+            )
+            let zombie = ZombieWindow(startPos: pos, delegate: self)
+            zombieWindows.append(zombie)
+            zombie.start()
+        }
+        window.characterView.characterNode.showOverheadEmoji("🧟 좀비 무리다! 횃불 들어!", duration: 2.5)
+        SoundAndEffectsManager.shared.play(.alert)
+    }
+
+    public func zombieWindowDidClick(_ window: ZombieWindow) {
+        let charNode = self.window.characterView.characterNode
+        charNode.isAttackingWeapon = true
+        playerAttackTimer = 0.4
+        if charNode.currentHeldItem == .torch {
+            charNode.showOverheadEmoji("🔥 불태워라!", duration: 1.4)
+            window.takeHit()
+            window.takeHit()
+        } else {
+            charNode.showOverheadEmoji("🗡️ 에잇!", duration: 1.2)
+            window.takeHit()
+        }
+        SoundAndEffectsManager.shared.play(.splash)
+    }
+
+    public func zombieWindowDidDefeat(_ window: ZombieWindow) {
+        zombieWindows.removeAll { $0 === window }
+        playerXP += 3
+        self.window.characterView.characterNode.showOverheadEmoji("🧟 격퇴! +3XP!", duration: 1.8)
+        SoundAndEffectsManager.shared.play(.heart)
+        if siegeActive && zombieWindows.isEmpty {
+            siegeActive = false
+            playerXP += 6
+            self.window.characterView.characterNode.showOverheadEmoji("🏆 공성전 승리! +6XP!", duration: 3.0)
+            SoundAndEffectsManager.shared.play(.chime)
+            physics.jump(impulse: 380)
+        }
+    }
+
+    private func updateSiege(dt: TimeInterval) {
+        for zombie in zombieWindows {
+            zombie.target = physics.position
+            let dist = abs(zombie.position.x - physics.position.x)
+            if dist < 70 && playerAttackTimer <= 0 {
+                zombieWindowDidClick(zombie)
+            }
+        }
+        guard zombieWindows.isEmpty && !siegeActive else { return }
+        let hour = Calendar.current.component(.hour, from: Date())
+        if hour >= 0 && hour < 1 {
+            siegeCheckTimer += dt
+            if siegeCheckTimer >= 30.0 {
+                siegeCheckTimer = 0
+                if Bool.random() {
+                    startSiege()
+                }
+            }
+        } else {
+            siegeCheckTimer = 0
+        }
+    }
+
+    // MARK: - Axolotl (아홀로틀 어깨 동료)
+    private var axolotlWindow: AxolotlWindow?
+
+    @objc private func didSelectAxolotl() {
+        if let ax = axolotlWindow {
+            ax.close()
+            axolotlWindow = nil
+            return
+        }
+        guard window.characterView.characterNode.currentHeldItem == .emptyBucket else {
+            window.characterView.characterNode.showOverheadEmoji("🦎 빈 양동이를 들어봐!", duration: 2.0)
+            return
+        }
+        window.characterView.characterNode.currentHeldItem = .none
+        let ax = AxolotlWindow()
+        axolotlWindow = ax
+        ax.perch()
+        window.characterView.characterNode.showOverheadEmoji("🦎 아홀로틀이 어깨에!", duration: 2.2)
+        SoundAndEffectsManager.shared.play(.heart)
+    }
+
+    private func updateAxolotl() {
+        guard let ax = axolotlWindow else { return }
+        let facing = window.characterView.characterNode.modelRoot.eulerAngles.y >= 0
+        ax.moveToShoulder(playerPos: physics.position, facingRight: facing)
+    }
+
+    private func axolotlAssist() {
+        guard axolotlWindow != nil else { return }
+        window.characterView.characterNode.showOverheadEmoji("🦎 앙!", duration: 1.0)
+        SoundAndEffectsManager.shared.play(.splash)
     }
 
     // MARK: - Fishing (낚시)
