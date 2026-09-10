@@ -51,6 +51,9 @@ public final class MinecraftCharacterNode: SCNNode {
     // Interactive Placed Block Node (in front of player)
     public let placedBlockNode = SCNNode()
 
+    // Interactive 3D Minecraft Red Bed (빨간 침대)
+    public let bedNode = SCNNode()
+
     // Floating Overhead Emoji Billboard
     public let overheadEmojiNode = SCNNode()
     private var emojiTimer: TimeInterval = 0
@@ -101,6 +104,7 @@ public final class MinecraftCharacterNode: SCNNode {
         super.init()
         setupHierarchy()
         setupPlacedBlock()
+        setupBed()
         setupEmojiBillboard()
     }
 
@@ -242,6 +246,72 @@ public final class MinecraftCharacterNode: SCNNode {
         placedBlockNode.position = SCNVector3(0, 0.4, 0.9)
         placedBlockNode.isHidden = true
         modelRoot.addChildNode(placedBlockNode)
+    }
+
+    private func setupBed() {
+        bedNode.childNodes.forEach { $0.removeFromParentNode() }
+
+        // Authentic Minecraft Red Bed (마인크래프트 시그니처 빨간 침대)
+        let woodDark = SCNMaterial()
+        woodDark.diffuse.contents = NSColor(red: 0.35, green: 0.22, blue: 0.12, alpha: 1.0)
+        let woodPlank = SCNMaterial()
+        woodPlank.diffuse.contents = NSColor(red: 0.52, green: 0.35, blue: 0.18, alpha: 1.0)
+        let whiteWool = SCNMaterial()
+        whiteWool.diffuse.contents = NSColor(red: 0.94, green: 0.94, blue: 0.92, alpha: 1.0)
+        let redWool = SCNMaterial()
+        redWool.diffuse.contents = NSColor(red: 0.76, green: 0.14, blue: 0.14, alpha: 1.0)
+
+        // 1. 4개의 원목 모서리 다리 (높이 0.2, 두께 0.18)
+        let legW: CGFloat = 0.18
+        let legH: CGFloat = 0.20
+        let legGeom = SCNBox(width: legW, height: legH, length: legW, chamferRadius: 0)
+        legGeom.materials = [woodDark]
+
+        let halfX: CGFloat = 0.54
+        let halfZ: CGFloat = 1.30
+        let legOffsets: [(CGFloat, CGFloat)] = [
+            (-halfX, -halfZ),
+            (halfX, -halfZ),
+            (-halfX, halfZ),
+            (halfX, halfZ)
+        ]
+        for (ox, oz) in legOffsets {
+            let leg = SCNNode(geometry: legGeom)
+            leg.position = SCNVector3(ox, legH / 2.0, oz)
+            bedNode.addChildNode(leg)
+        }
+
+        // 2. 침대 원목 프레임 바닥판 (width 1.32, height 0.14, length 2.85)
+        let frameBase = SCNBox(width: 1.32, height: 0.14, length: 2.85, chamferRadius: 0)
+        frameBase.materials = [woodPlank]
+        let baseNode = SCNNode(geometry: frameBase)
+        baseNode.position = SCNVector3(0, legH + 0.07, 0)
+        bedNode.addChildNode(baseNode)
+
+        // 3. 하얀색 베개 (width 1.20, height 0.16, length 0.75) - 머리 쪽(Z 음수 방향)
+        let pillowGeom = SCNBox(width: 1.20, height: 0.16, length: 0.75, chamferRadius: 0.01)
+        pillowGeom.materials = [whiteWool]
+        let pillowNode = SCNNode(geometry: pillowGeom)
+        pillowNode.position = SCNVector3(0, legH + 0.14 + 0.08, -0.95)
+        bedNode.addChildNode(pillowNode)
+
+        // 4. 하얀색 접힌 이불깃 스트라이프 (width 1.24, height 0.16, length 0.18)
+        let stripeGeom = SCNBox(width: 1.24, height: 0.16, length: 0.18, chamferRadius: 0)
+        stripeGeom.materials = [whiteWool]
+        let stripeNode = SCNNode(geometry: stripeGeom)
+        stripeNode.position = SCNVector3(0, legH + 0.14 + 0.08, -0.48)
+        bedNode.addChildNode(stripeNode)
+
+        // 5. 마인크래프트 레드 양모 이불/매트리스 (width 1.24, height 0.16, length 1.95)
+        let blanketGeom = SCNBox(width: 1.24, height: 0.16, length: 1.95, chamferRadius: 0)
+        blanketGeom.materials = [redWool]
+        let blanketNode = SCNNode(geometry: blanketGeom)
+        blanketNode.position = SCNVector3(0, legH + 0.14 + 0.08, 0.48)
+        bedNode.addChildNode(blanketNode)
+
+        bedNode.position = SCNVector3(0, 0, 0)
+        bedNode.isHidden = true
+        modelRoot.addChildNode(bedNode)
     }
 
     private func setupEmojiBillboard() {
@@ -465,15 +535,32 @@ public final class MinecraftCharacterNode: SCNNode {
         }
 
         if isSleeping {
-            // Lie flat on back with slow deep breathing
-            modelRoot.eulerAngles = SCNVector3(-CGFloat.pi / 2.0, 0, 0)
-            let sleepBreath = sin(animTime * 1.5) * 0.04
-            bodyAnchor.position = SCNVector3(0, 0.2 + sleepBreath, 0.7)
-            rightArmJoint.eulerAngles = SCNVector3(0.3, 0, 0.2)
-            leftArmJoint.eulerAngles = SCNVector3(0.3, 0, -0.2)
-            rightLegJoint.eulerAngles = SCNVector3(0, 0, 0.1)
-            leftLegJoint.eulerAngles = SCNVector3(0, 0, -0.1)
+            bedNode.isHidden = false
+
+            // 사용자가 침대와 누워있는 캐릭터를 한눈에 볼 수 있도록 입체 사각 시점으로 회전
+            modelRoot.eulerAngles = SCNVector3(0.25, 0.60, 0)
+
+            // 침대 매트리스 위에 캐릭터를 반듯하게 눕힘
+            bodyAnchor.eulerAngles = SCNVector3(-CGFloat.pi / 2.0, 0, 0)
+
+            let sleepBreath = sin(animTime * 1.8) * 0.035
+            // 매트리스 위(Y=0.50)에 안착 및 호흡에 따른 가슴 오르내림
+            bodyAnchor.position = SCNVector3(0, 0.50 + sleepBreath, 0.20)
+
+            // 팔은 옆에 편안하게 내려놓음
+            rightArmJoint.eulerAngles = SCNVector3(0.15, 0, 0.10)
+            leftArmJoint.eulerAngles = SCNVector3(0.15, 0, -0.10)
+
+            // 다리는 침대 위에 곧게 뻗음
+            rightLegJoint.eulerAngles = SCNVector3(0, 0, 0.05)
+            leftLegJoint.eulerAngles = SCNVector3(0, 0, -0.05)
+
+            // 머리는 베개 위에 편안하게 얹고 미세하게 숨을 쉼
+            headJoint.eulerAngles = SCNVector3(0.15, sin(animTime * 0.9) * 0.08, 0)
             return
+        } else {
+            bedNode.isHidden = true
+            bodyAnchor.eulerAngles = SCNVector3(0, 0, 0)
         }
 
         if isClimbing {

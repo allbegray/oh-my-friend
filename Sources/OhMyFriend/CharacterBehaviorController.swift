@@ -110,9 +110,12 @@ public final class CharacterBehaviorController {
     }
 
     public func triggerSleep(characterNode: MinecraftCharacterNode) {
-        guard !isClimbing else { return }
+        guard !isClimbing, !isTNTActive else { return }
+        characterNode.isSleeping = true
+        characterNode.bedNode.isHidden = false
         characterNode.showOverheadEmoji("💤", duration: 2.5)
-        state = .sleep(duration: 30.0, zzzTimer: 1.5)
+        SoundAndEffectsManager.shared.play(.pop)
+        state = .sleep(duration: 35.0, zzzTimer: 1.2)
     }
 
     public func triggerEating(characterNode: MinecraftCharacterNode) {
@@ -175,6 +178,7 @@ public final class CharacterBehaviorController {
 
     private func wakeUp(characterNode: MinecraftCharacterNode) {
         characterNode.isSleeping = false
+        characterNode.bedNode.isHidden = true
         characterNode.showOverheadEmoji("❗", duration: 1.5)
         SoundAndEffectsManager.shared.play(.alert)
         state = .idle(timeLeft: 1.5)
