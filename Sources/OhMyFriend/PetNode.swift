@@ -333,9 +333,9 @@ public final class PetNode: SCNNode {
         let tailGeom = SCNBox(width: 0.08, height: 0.55, length: 0.08, chamferRadius: 0)
         tailGeom.materials = [blackMat]
         let tailMesh = SCNNode(geometry: tailGeom)
-        tailMesh.position = SCNVector3(0, 0.24, -0.20)
+        tailMesh.position = SCNVector3(0, 0.1375, -0.238)
         tailMesh.eulerAngles.x = CGFloat.pi / 3.0
-        tailJoint.position = SCNVector3(0, 0.10, -0.38)
+        tailJoint.position = SCNVector3(0, 0.10, -0.30)
         tailJoint.addChildNode(tailMesh)
 
         wingLeft.isHidden = true

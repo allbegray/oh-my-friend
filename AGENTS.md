@@ -126,6 +126,7 @@ Sources/OhMyFriend/
 ## 실행 기록
 
 ### 2026-09-10
+- **[펫] 턱시도 고양이 꼬리 분리 수정**: 꼬리가 몸통 뒤 공중에 떠 있던 버그 — 관절·메쉬를 엉덩이 뒷면에 매립(뿌리 몸통 안, 끝은 위로). 검증: PetNode 에러 0건.
 - **[파워 모드] CPU 초사이어인 단계 강화(v0.32.0)**: `CPULoadMonitor`(Mach·5초 캐시) + `PowerStageManager`(50/75/90% 0~3단계 emission·⚡🔥💥) + 메뉴 토글·3초 폴링(기본 ON). 검증: 수정 5파일 에러 0건(`SkinGalleryView` CLT SwiftUIMacros 기존 이슈만 잔존).
 - **[그래픽] 고품질화 ABD 일괄(v0.31.0)**: `StageKit` IBL(절차적 스튜디오 환경·0.6)+HDR·그림자 2048, `SkinTexture`·`MobTexture` 32픽셀·밉맵·PBR 기본값, 6개 모델 파일 Lambert→PBR 23곳(갑옷·금속 금속감, 눈·발광·그림자 유지). 검증: 수정 9파일 에러 0건(`SkinGalleryView` CLT SwiftUIMacros 기존 이슈만 잔존).
 - **[몹 고도화] 절차적 픽셀 텍스처(v0.30.0)**: `MobTexture.swift` 신규(결정적 시드·Nearest 16×16) + 크리퍼 위장·엔더맨 결·스켈레톤 뼈 질감 적용(얼굴·눈 발광·피격 플래시 유지). 검증: 수정 4파일 에러 0건(`SkinGalleryView` CLT SwiftUIMacros 기존 이슈만 잔존).
