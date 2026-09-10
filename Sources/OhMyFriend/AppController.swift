@@ -52,6 +52,13 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
     private var endermanSpawnTimer: TimeInterval = 0
     private var endermanSpawnInterval: TimeInterval = 150.0
 
+    // L2. Skin Filter & L3. Glint & L4. Battery
+    private var baseSkinTexture: SkinTexture?
+    private var currentSkinFilterName: String = "원본 (Original)"
+    private var isBatteryHungerEnabled: Bool = true
+    private var isBatteryAlertFired: Bool = false
+    private var batteryCheckTimer: TimeInterval = 0
+
     public override init() {
         super.init()
     }
@@ -62,6 +69,7 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
         guard let skin = SkinTexture(image: skinImage) else {
             fatalError("Failed to create default skin")
         }
+        self.baseSkinTexture = skin
 
         // 2. Determine initial position (above Dock or floor)
         let mainScreen = NSScreen.main ?? NSScreen.screens[0]
@@ -217,6 +225,28 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
             }
         }
 
+        // L4. Battery Hunger Check (every ~5.0s)
+        if isBatteryHungerEnabled {
+            batteryCheckTimer += dt
+            if batteryCheckTimer >= 5.0 {
+                batteryCheckTimer = 0
+                let bInfo = BatteryStatusMonitor.shared.getBatteryInfo()
+                if bInfo.hasBattery {
+                    if !bInfo.isCharging && bInfo.percent <= 20 {
+                        if !isBatteryAlertFired {
+                            isBatteryAlertFired = true
+                            window.characterView.characterNode.showOverheadEmoji("🍗 배고파... 꼬르륵 (배터리 \(bInfo.percent)%)", duration: 3.0)
+                            SoundAndEffectsManager.shared.play(.alert)
+                        }
+                    } else if bInfo.isCharging && isBatteryAlertFired {
+                        isBatteryAlertFired = false
+                        window.characterView.characterNode.showOverheadEmoji("⚡ 충전기 연결! 힘이 솟는다!", duration: 2.5)
+                        SoundAndEffectsManager.shared.play(.heart)
+                    }
+                }
+            }
+        }
+
         // 4.7. Update Enderman Entity
         if let ew = endermanWindow, let ePhys = endermanPhysics, let eBehav = endermanBehavior {
             eBehav.update(
@@ -306,6 +336,10 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
             } else {
                 desc = "🧨 TNT 설치하는 중..."
             }
+        case .squash:
+            desc = "창을 압축해서 Dock으로 치우는 중! 🗜️"
+        case .fishing:
+            desc = "물가에 낚싯대 드리우고 낚시 중 🎣"
         case .climb(_, _, let isUp):
             desc = isUp ? "🪜 사다리 타고 창문 올라가는 중" : "🪜 사다리 타고 창문 내려가는 중"
         case .fall:
@@ -351,6 +385,13 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
     }
 
     public func characterViewDidClick(_ view: CharacterView) {
+        if window.characterView.characterNode.isGliding {
+            let facingDir = window.characterView.characterNode.modelRoot.eulerAngles.y
+            physics.fireworkRocketBoost(facingDir: facingDir)
+            window.characterView.characterNode.showOverheadEmoji("🚀 슈우웅!", duration: 1.5)
+            SoundAndEffectsManager.shared.play(.ignite)
+            return
+        }
         behavior.handleCharacterClicked(physics: physics, characterNode: window.characterView.characterNode)
     }
 
@@ -438,6 +479,33 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
         skinSubmenuItem.submenu = skinMenu
         menu.addItem(skinSubmenuItem)
 
+        // L2. Skin Color / Hue Filter Submenu
+        let filterMenu = NSMenu()
+        let filters: [(name: String, hue: CGFloat, sat: CGFloat, bri: CGFloat)] = [
+            ("원본 (Original)", 0.0, 1.0, 0.0),
+            ("🌈 색조 회전 +90°", CGFloat.pi / 2.0, 1.0, 0.0),
+            ("🌈 색조 반전 +180°", CGFloat.pi, 1.0, 0.0),
+            ("🌈 네온 틴트 +270°", CGFloat.pi * 1.5, 1.3, 0.04),
+            ("⬛ 흑백 레트로 (Grayscale)", 0.0, 0.0, 0.0),
+            ("✨ 선명한 비비드 (Vivid)", 0.0, 1.8, 0.02)
+        ]
+        for f in filters {
+            let fItem = NSMenuItem(
+                title: f.name,
+                action: #selector(didSelectSkinFilter(_:)),
+                keyEquivalent: ""
+            )
+            fItem.target = self
+            fItem.representedObject = f.name
+            if currentSkinFilterName == f.name {
+                fItem.state = .on
+            }
+            filterMenu.addItem(fItem)
+        }
+        let filterSubmenuItem = NSMenuItem(title: "🎨 스킨 색조/필터 조절", action: nil, keyEquivalent: "")
+        filterSubmenuItem.submenu = filterMenu
+        menu.addItem(filterSubmenuItem)
+
         // 3. Behavior Mode Submenu
         let modeMenu = NSMenu()
         for mode in BehaviorMode.allCases {
@@ -455,6 +523,7 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
         }
         let modeSubmenuItem = NSMenuItem(title: "🎭 행동 모드", action: nil, keyEquivalent: "")
         modeSubmenuItem.submenu = modeMenu
+
         menu.addItem(modeSubmenuItem)
 
         // 4. Held Item Submenu
@@ -486,6 +555,16 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
         shieldItem.state = window.characterView.characterNode.isShieldEquipped ? .on : .off
         menu.addItem(shieldItem)
 
+
+        // Elytra Toggle
+        let elytraItem = NSMenuItem(
+            title: "🪽 겉날개 착용 (Equip Elytra)",
+            action: #selector(didToggleElytra(_:)),
+            keyEquivalent: ""
+        )
+        elytraItem.target = self
+        elytraItem.state = window.characterView.characterNode.isElytraEquipped ? .on : .off
+        menu.addItem(elytraItem)
         // Pet Companion Submenu
         let petMenu = NSMenu()
         for kind in PetKind.allCases {
@@ -502,6 +581,15 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
             petMenu.addItem(item)
         }
         petMenu.addItem(NSMenuItem.separator())
+        let feedItem = NSMenuItem(
+            title: "🦴 펫에게 간식/먹이 주기 (Feed)",
+            action: #selector(didSelectFeedPet),
+            keyEquivalent: ""
+        )
+        feedItem.target = self
+        feedItem.isEnabled = (currentPetKind != nil)
+        petMenu.addItem(feedItem)
+
         let dismissItem = NSMenuItem(
             title: "❌ 펫 소환 해제 (Dismiss)",
             action: #selector(didSelectDismissPet),
@@ -568,6 +656,10 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
         let nagItem = NSMenuItem(title: "💢 알림 안 읽는다고 구박하기 (Nag)", action: #selector(didSelectNag), keyEquivalent: "n")
         nagItem.target = self
         actMenu.addItem(nagItem)
+
+        let fishItem = NSMenuItem(title: "🎣 모서리 낚시하기 (Go Fishing)", action: #selector(didSelectFishing), keyEquivalent: "f")
+        fishItem.target = self
+        actMenu.addItem(fishItem)
         let actSubmenuItem = NSMenuItem(title: "✨ 재미있는 모션 실행", action: nil, keyEquivalent: "")
         actSubmenuItem.submenu = actMenu
         menu.addItem(actSubmenuItem)
@@ -683,6 +775,26 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
             keyEquivalent: ""
         )
         nagToggleItem.target = self
+
+        // L3. Enchantment Glint Toggle
+        let glintItem = NSMenuItem(
+            title: "🔮 무기 인챈트 광택 (Enchantment Glint)",
+            action: #selector(didToggleEnchantmentGlint(_:)),
+            keyEquivalent: ""
+        )
+        glintItem.target = self
+        glintItem.state = window.characterView.characterNode.isEnchantedGlintEnabled ? .on : .off
+        menu.addItem(glintItem)
+
+        // L4. Battery Hunger Toggle
+        let batteryToggleItem = NSMenuItem(
+            title: "🍗 맥북 배터리 연동 허기 모드",
+            action: #selector(didToggleBatteryHunger(_:)),
+            keyEquivalent: ""
+        )
+        batteryToggleItem.target = self
+        batteryToggleItem.state = isBatteryHungerEnabled ? .on : .off
+        menu.addItem(batteryToggleItem)
         nagToggleItem.state = NotificationCenterMonitor.shared.isEnabled ? .on : .off
         menu.addItem(nagToggleItem)
 
@@ -706,6 +818,15 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
         creeperToggleItem.state = isCreeperSpawnEnabled ? .on : .off
         menu.addItem(creeperToggleItem)
 
+
+        let squashItem = NSMenuItem(
+            title: "🗜️ 이 창 압축해서 Dock으로 치우기",
+            action: #selector(didSelectSquashMinimize),
+            keyEquivalent: ""
+        )
+        squashItem.target = self
+        squashItem.isEnabled = canStartSquashMinimize()
+        menu.addItem(squashItem)
         let attackItem = NSMenuItem(
             title: "🧨 TNT로 창 부수기",
             action: #selector(didSelectTNTBreak),
@@ -736,6 +857,8 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
         self.currentCustomSkinName = nil
         let img = BuiltinSkinGenerator.makeSkin(type: skinType)
         if let skin = SkinTexture(image: img) {
+            self.baseSkinTexture = skin
+            self.currentSkinFilterName = "원본 (Original)"
             window.characterView.characterNode.applySkin(skin)
         }
         statusItem?.menu = buildContextMenu()
@@ -773,10 +896,55 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
 
     private func applyCustomSkin(_ skin: SkinTexture, name: String) {
         self.currentCustomSkinName = name
+        self.baseSkinTexture = skin
+        self.currentSkinFilterName = "원본 (Original)"
         window.characterView.characterNode.applySkin(skin)
         statusItem?.menu = buildContextMenu()
     }
 
+
+    // MARK: - Skin Filter Action
+    @objc private func didSelectSkinFilter(_ sender: NSMenuItem) {
+        guard let filterName = sender.representedObject as? String else { return }
+        guard let base = baseSkinTexture else { return }
+        self.currentSkinFilterName = filterName
+
+        var adjusted: SkinTexture?
+        switch filterName {
+        case "🌈 색조 회전 +90°":
+            adjusted = base.withColorAdjustment(hueAngle: CGFloat.pi / 2.0)
+        case "🌈 색조 반전 +180°":
+            adjusted = base.withColorAdjustment(hueAngle: CGFloat.pi)
+        case "🌈 네온 틴트 +270°":
+            adjusted = base.withColorAdjustment(hueAngle: CGFloat.pi * 1.5, saturation: 1.3, brightness: 0.04)
+        case "⬛ 흑백 레트로 (Grayscale)":
+            adjusted = base.withColorAdjustment(saturation: 0.0)
+        case "✨ 선명한 비비드 (Vivid)":
+            adjusted = base.withColorAdjustment(saturation: 1.8, brightness: 0.02)
+        default:
+            adjusted = base
+        }
+
+        if let finalSkin = adjusted {
+            window.characterView.characterNode.applySkin(finalSkin)
+            SoundAndEffectsManager.shared.play(.pop)
+        }
+        statusItem?.menu = buildContextMenu()
+    }
+
+    @objc private func didToggleEnchantmentGlint(_ sender: NSMenuItem) {
+        window.characterView.characterNode.isEnchantedGlintEnabled.toggle()
+        sender.state = window.characterView.characterNode.isEnchantedGlintEnabled ? .on : .off
+        statusItem?.menu = buildContextMenu()
+        SoundAndEffectsManager.shared.play(.heart)
+    }
+
+    @objc private func didToggleBatteryHunger(_ sender: NSMenuItem) {
+        isBatteryHungerEnabled.toggle()
+        sender.state = isBatteryHungerEnabled ? .on : .off
+        statusItem?.menu = buildContextMenu()
+        SoundAndEffectsManager.shared.play(.pop)
+    }
     @objc private func didSelectBehaviorMode(_ sender: NSMenuItem) {
         guard let mode = sender.representedObject as? BehaviorMode else { return }
         behavior.mode = mode
@@ -1120,8 +1288,19 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
         statusItem?.menu = buildContextMenu()
     }
 
+    @objc private func didSelectFeedPet() {
+        guard let pw = petWindow else { return }
+        pw.petView.petNode.feed()
+        window.characterView.characterNode.showOverheadEmoji("🦴 냠냠 맛있게 먹어!", duration: 2.0)
+    }
+
     // MARK: - PetViewDelegate
     public func petViewDidClick(_ view: PetView) {
+        if window.characterView.characterNode.currentHeldItem == .bone || view.petNode.wolfHealth < 0.95 {
+            view.petNode.feed()
+            window.characterView.characterNode.showOverheadEmoji("🦴 냠냠!", duration: 1.8)
+            return
+        }
         petBehavior?.handlePetClicked(petNode: view.petNode)
     }
 
@@ -1219,6 +1398,12 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
         case .goldenApple:
             damage = 1
             playerEmoji = "🍎 사과 쿵!"
+        case .fishingRod:
+            damage = 1
+            playerEmoji = "🎣 낚싯줄 찌르기!"
+        case .bone:
+            damage = 1
+            playerEmoji = "🦴 뼈다귀 어택!"
         case .none:
             damage = 1
             playerEmoji = "👊 펀치!"
@@ -1268,6 +1453,7 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
                 "터지기 전에 베었다! 완벽한 칼각! ✨",
                 "화약 득템! 폭탄 만들러 가볼까? 💥"
             ]
+
             victoryQuote = quotes.randomElement() ?? quotes[0]
         case .diamondPickaxe:
             let quotes = [
@@ -1312,6 +1498,13 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
         isCreeperSpawnEnabled.toggle()
         sender.state = isCreeperSpawnEnabled ? .on : .off
         statusItem?.menu = buildContextMenu()
+    }
+
+    @objc private func didToggleElytra(_ sender: NSMenuItem) {
+        window.characterView.characterNode.isElytraEquipped.toggle()
+        sender.state = window.characterView.characterNode.isElytraEquipped ? .on : .off
+        statusItem?.menu = buildContextMenu()
+        SoundAndEffectsManager.shared.play(.pop)
     }
 
     // MARK: - CreeperViewDelegate
@@ -1421,6 +1614,33 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
 
     public func endermanViewDidEndDrag(_ view: EndermanView, throwVelocity: CGPoint) {
         endermanPhysics?.releaseDrag(throwVelocity: throwVelocity)
+    }
+
+    // MARK: - Fishing (낚시)
+    @objc private func didSelectFishing() {
+        behavior.triggerFishing(characterNode: window.characterView.characterNode)
+    }
+
+    // MARK: - Window Squash & Minimize (창 압축 최소화)
+    private var squashOverlay: WindowSquashOverlayWindow?
+
+    private func canStartSquashMinimize() -> Bool {
+
+        guard let p = physics?.currentPlatform, case .window = p.kind else { return false }
+        return !behavior.isClimbing && !behavior.isTNTActive && squashOverlay == nil
+    }
+
+    @objc private func didSelectSquashMinimize() {
+        guard let p = physics.currentPlatform, case let .window(winID, _, pid) = p.kind else { return }
+        guard let targetFrame = ScreenEnvironment.shared.windowCocoaFrame(windowID: winID) else { return }
+
+        let overlay = WindowSquashOverlayWindow(targetFrame: targetFrame, duration: 2.0) { [weak self] in
+            WindowMinimizer.shared.minimize(windowID: winID, pid: pid)
+            self?.squashOverlay = nil
+        }
+        self.squashOverlay = overlay
+        overlay.start()
+        behavior.startSquashMinimize(on: p, duration: 2.0, characterNode: window.characterView.characterNode)
     }
     // MARK: - Ladder Descent (사다리 타고 창문 내려가기)
     private func canStartLadderDescent() -> Bool {

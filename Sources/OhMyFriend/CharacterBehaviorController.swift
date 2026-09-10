@@ -28,6 +28,8 @@ public final class CharacterBehaviorController {
         case landedCrouch(timeLeft: TimeInterval)
         case cheer(wpm: Double, timeLeft: TimeInterval, cheerCooldown: TimeInterval)
         case nag(timeLeft: TimeInterval, phraseTimer: TimeInterval, phraseIndex: Int)
+        case squash(timeLeft: TimeInterval, windowPlatform: Platform)
+        case fishing(timeLeft: TimeInterval, biteTime: TimeInterval, hasBitten: Bool)
     }
 
     public private(set) var state: State = .idle(timeLeft: 2.0)
@@ -153,6 +155,16 @@ public final class CharacterBehaviorController {
         state = .sit(timeLeft: Double.random(in: 6.0...12.0))
     }
 
+    public func triggerFishing(characterNode: MinecraftCharacterNode) {
+        guard !isClimbing, !isTNTActive else { return }
+        characterNode.currentHeldItem = .fishingRod
+        characterNode.isFishing = true
+        characterNode.isSitting = true
+        characterNode.showOverheadEmoji("🎣 낚싯대 투척!", duration: 1.8)
+        SoundAndEffectsManager.shared.play(.pop)
+        state = .fishing(timeLeft: 4.5, biteTime: 1.8, hasBitten: false)
+    }
+
     public func triggerCheer(characterNode: MinecraftCharacterNode) {
         guard !isClimbing, !isTNTActive else { return }
         characterNode.isCheering = true
@@ -199,6 +211,19 @@ public final class CharacterBehaviorController {
         characterNode.showOverheadEmoji("❗", duration: 1.5)
         SoundAndEffectsManager.shared.play(.alert)
         state = .idle(timeLeft: 1.5)
+    }
+
+    // MARK: - Window Squash & Minimize (창 압축 최소화)
+    public func startSquashMinimize(
+        on platform: Platform,
+        duration: TimeInterval = 2.0,
+        characterNode: MinecraftCharacterNode
+    ) {
+        guard !isClimbing, !isTNTActive else { return }
+        characterNode.isPressingDown = true
+        characterNode.showOverheadEmoji("🗜️ 압축 중...!", duration: duration)
+        SoundAndEffectsManager.shared.play(.ignite)
+        state = .squash(timeLeft: duration, windowPlatform: platform)
     }
 
     // MARK: - TNT (앱 창 폭파)
@@ -468,12 +493,20 @@ public final class CharacterBehaviorController {
             characterNode.isPlacingTNT = false
             characterNode.walkSpeed = 0
             wasAirborne = true
+            characterNode.isGliding = false
+            physics.isGliding = false
             return
         }
 
         if case .airborne = physics.state {
             interruptTNTIfActive()
             cancelClimbIfActive()
+
+            // 겉날개 활공: 겉날개 착용 중이고 낙하 중이면 활공 모드 돌입!
+            if characterNode.isElytraEquipped && physics.velocity.y < -80 {
+                characterNode.isGliding = true
+                physics.isGliding = true
+            }
 
             if case .backflip(var progress) = state {
                 // Keep backflip rotating
@@ -506,6 +539,8 @@ public final class CharacterBehaviorController {
 
         // Just landed!
         if wasAirborne {
+            characterNode.isGliding = false
+            physics.isGliding = false
             wasAirborne = false
             state = .landedCrouch(timeLeft: 0.35)
             characterNode.isFalling = false
@@ -569,6 +604,48 @@ public final class CharacterBehaviorController {
         }
         // 5. Finite State Machine
         switch state {
+        case .squash(var timeLeft, let platform):
+            timeLeft -= dt
+            characterNode.walkSpeed = 0
+            characterNode.isPressingDown = true
+            characterNode.isSitting = false
+            characterNode.isSleeping = false
+            characterNode.isNagging = false
+            characterNode.isCheering = false
+            characterNode.isWaving = false
+
+            if timeLeft <= 0 {
+                characterNode.isPressingDown = false
+                physics.releaseClimb()
+                state = .fall
+            } else {
+                state = .squash(timeLeft: timeLeft, windowPlatform: platform)
+            }
+
+        case .fishing(var timeLeft, let biteTime, var hasBitten):
+            timeLeft -= dt
+            characterNode.walkSpeed = 0
+            characterNode.isSitting = true
+            characterNode.isFishing = true
+            characterNode.isPressingDown = false
+            characterNode.isSleeping = false
+
+            if !hasBitten && timeLeft <= biteTime {
+                hasBitten = true
+                characterNode.showOverheadEmoji("💦 퐁당! 입질 왔다!", duration: 1.5)
+                SoundAndEffectsManager.shared.play(.pop)
+            }
+
+            if timeLeft <= 0 {
+                characterNode.isFishing = false
+                let loot = FishingLoot.roll()
+                characterNode.showOverheadEmoji("\(loot.emoji) \(loot.name)", duration: 2.8)
+                SoundAndEffectsManager.shared.play(.heart)
+                state = .sit(timeLeft: 4.0)
+            } else {
+                state = .fishing(timeLeft: timeLeft, biteTime: biteTime, hasBitten: hasBitten)
+            }
+
         case .nag(var timeLeft, var phraseTimer, var phraseIndex):
             timeLeft -= dt
             phraseTimer -= dt

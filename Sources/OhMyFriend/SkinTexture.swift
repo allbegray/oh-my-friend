@@ -1,6 +1,7 @@
 import AppKit
 import SceneKit
 import CoreGraphics
+import CoreImage
 
 public enum BodyPart {
     case head
@@ -28,6 +29,32 @@ public final class SkinTexture {
     public static func load(from url: URL) -> SkinTexture? {
         guard let img = NSImage(contentsOf: url) else { return nil }
         return SkinTexture(image: img)
+    }
+
+    /// CoreImage 필터를 활용하여 스킨의 색조(Hue), 채도(Saturation), 밝기(Brightness)를 조절한 새 SkinTexture 생성
+    public func withColorAdjustment(
+        hueAngle: CGFloat = 0,
+        saturation: CGFloat = 1.0,
+        brightness: CGFloat = 0.0
+    ) -> SkinTexture? {
+        let ci = CIImage(cgImage: self.cgImage)
+        var output = ci
+
+        if abs(hueAngle) > 0.001 {
+            output = output.applyingFilter("CIHueAdjust", parameters: [kCIInputAngleKey: hueAngle])
+        }
+
+        if abs(saturation - 1.0) > 0.001 || abs(brightness) > 0.001 {
+            output = output.applyingFilter("CIColorControls", parameters: [
+                kCIInputSaturationKey: saturation,
+                kCIInputBrightnessKey: brightness
+            ])
+        }
+
+        let ctx = CIContext(options: nil)
+        guard let newCG = ctx.createCGImage(output, from: output.extent) else { return nil }
+        let newImage = NSImage(cgImage: newCG, size: NSSize(width: newCG.width, height: newCG.height))
+        return SkinTexture(image: newImage)
     }
 
     /// SCNBox의 6개 materials 순서:

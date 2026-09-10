@@ -7,6 +7,8 @@ public enum HeldItem: String, CaseIterable {
     case diamondSword = "다이아몬드 검 🗡️"
     case goldenApple = "황금 사과 🍎"
     case torch = "레드스톤 횃불 🕯️"
+    case fishingRod = "낚싯대 🎣"
+    case bone = "뼈다귀 🦴"
 }
 
 public final class MinecraftCharacterNode: SCNNode {
@@ -55,6 +57,23 @@ public final class MinecraftCharacterNode: SCNNode {
         didSet { updateShieldModel() }
     }
     public var isGuarding: Bool = false
+
+    // 🪽 겉날개 (Elytra)
+    public let elytraNode = SCNNode()
+    public let elytraWingLeft = SCNNode()
+    public let elytraWingRight = SCNNode()
+    public var isElytraEquipped: Bool = false {
+        didSet { updateElytraModel() }
+    }
+
+    // 🔮 무기 인챈트 보라색 마법 광택 (Enchantment Glint)
+    public var isEnchantedGlintEnabled: Bool = false {
+        didSet {
+            EnchantmentGlintShader.apply(to: rightHandItemAnchor, enabled: isEnchantedGlintEnabled)
+            EnchantmentGlintShader.apply(to: leftHandShieldAnchor, enabled: isEnchantedGlintEnabled)
+        }
+    }
+    public var isGliding: Bool = false
     // Interactive Placed Block Node (in front of player)
     public let placedBlockNode = SCNNode()
 
@@ -94,6 +113,8 @@ public final class MinecraftCharacterNode: SCNNode {
     public var isCheering: Bool = false
     public var isNagging: Bool = false
     public var isAttackingWeapon: Bool = false
+    public var isFishing: Bool = false
+    public var isPressingDown: Bool = false
 
     // Ladder climbing (사다리 등반)
     public var isClimbing: Bool = false {
@@ -134,6 +155,11 @@ public final class MinecraftCharacterNode: SCNNode {
         // 1-Overlay. Torso Jacket: W=0.88, H=1.28, L=0.48
         let torsoOverlayBox = SCNBox(width: 0.88, height: 1.28, length: 0.48, chamferRadius: 0)
         torsoOverlayMesh.geometry = torsoOverlayBox
+        // Elytra attached to back of torso
+        elytraNode.position = SCNVector3(0, 0, -0.22)
+        elytraNode.addChildNode(elytraWingLeft)
+        elytraNode.addChildNode(elytraWingRight)
+        torsoNode.addChildNode(elytraNode)
         torsoOverlayMesh.position = SCNVector3(0, 0, 0)
         torsoOverlayMesh.isHidden = true
         torsoNode.addChildNode(torsoOverlayMesh)
@@ -386,7 +412,16 @@ public final class MinecraftCharacterNode: SCNNode {
         case .torch:
             let torch = createTorchModel()
             rightHandItemAnchor.addChildNode(torch)
+
+        case .fishingRod:
+            let rod = createFishingRodModel()
+            rightHandItemAnchor.addChildNode(rod)
+
+        case .bone:
+            let bone = createBoneModel()
+            rightHandItemAnchor.addChildNode(bone)
         }
+        EnchantmentGlintShader.apply(to: rightHandItemAnchor, enabled: isEnchantedGlintEnabled)
     }
 
     private func createPickaxeModel() -> SCNNode {
@@ -478,6 +513,76 @@ public final class MinecraftCharacterNode: SCNNode {
         return root
     }
 
+    private func createFishingRodModel() -> SCNNode {
+        let root = SCNNode()
+        let woodMat = SCNMaterial()
+        woodMat.diffuse.contents = NSColor(red: 0.52, green: 0.35, blue: 0.18, alpha: 1.0)
+        let stringMat = SCNMaterial()
+        stringMat.diffuse.contents = NSColor(white: 0.90, alpha: 0.85)
+        let redMat = SCNMaterial()
+        redMat.diffuse.contents = NSColor(red: 0.85, green: 0.15, blue: 0.15, alpha: 1.0)
+        let whiteMat = SCNMaterial()
+        whiteMat.diffuse.contents = NSColor.white
+
+        // 1. 낚싯대 나무 대 (길이 1.45, 앞으로 비스듬히 뻗음)
+        let poleBox = SCNBox(width: 0.06, height: 1.45, length: 0.06, chamferRadius: 0)
+        poleBox.materials = [woodMat]
+        let poleNode = SCNNode(geometry: poleBox)
+        poleNode.position = SCNVector3(0, 0.60, 0.45)
+        poleNode.eulerAngles.x = CGFloat.pi / 3.8
+        root.addChildNode(poleNode)
+
+        // 2. 낚싯줄 (끝에서 아래로 늘어뜨림)
+        let lineBox = SCNBox(width: 0.02, height: 1.20, length: 0.02, chamferRadius: 0)
+        lineBox.materials = [stringMat]
+        let lineNode = SCNNode(geometry: lineBox)
+        lineNode.position = SCNVector3(0, 0.65, 1.15)
+        root.addChildNode(lineNode)
+
+        // 3. 찌 (빨간색 & 하얀색 큐브)
+        let bobberRed = SCNBox(width: 0.10, height: 0.06, length: 0.10, chamferRadius: 0)
+        bobberRed.materials = [redMat]
+        let bRed = SCNNode(geometry: bobberRed)
+        bRed.position = SCNVector3(0, 0.08, 1.15)
+        root.addChildNode(bRed)
+
+        let bobberWhite = SCNBox(width: 0.10, height: 0.06, length: 0.10, chamferRadius: 0)
+        bobberWhite.materials = [whiteMat]
+        let bWhite = SCNNode(geometry: bobberWhite)
+        bWhite.position = SCNVector3(0, 0.02, 1.15)
+        root.addChildNode(bWhite)
+
+        return root
+    }
+
+    private func createBoneModel() -> SCNNode {
+        let root = SCNNode()
+        let whiteMat = SCNMaterial()
+        whiteMat.diffuse.contents = NSColor(red: 0.95, green: 0.95, blue: 0.92, alpha: 1.0)
+        let mainShaft = SCNBox(width: 0.08, height: 0.65, length: 0.08, chamferRadius: 0.01)
+        mainShaft.materials = [whiteMat]
+        let sNode = SCNNode(geometry: mainShaft)
+        sNode.position = SCNVector3(0, 0.35, 0)
+        sNode.eulerAngles = SCNVector3(CGFloat.pi / 2.0, 0, 0)
+        root.addChildNode(sNode)
+
+        let knobGeom = SCNBox(width: 0.12, height: 0.10, length: 0.10, chamferRadius: 0)
+        knobGeom.materials = [whiteMat]
+        let k1 = SCNNode(geometry: knobGeom)
+        k1.position = SCNVector3(0.06, 0.35, 0.30)
+        let k2 = SCNNode(geometry: knobGeom)
+        k2.position = SCNVector3(-0.06, 0.35, 0.30)
+        let k3 = SCNNode(geometry: knobGeom)
+        k3.position = SCNVector3(0.06, 0.35, -0.30)
+        let k4 = SCNNode(geometry: knobGeom)
+        k4.position = SCNVector3(-0.06, 0.35, -0.30)
+        root.addChildNode(k1)
+        root.addChildNode(k2)
+        root.addChildNode(k3)
+        root.addChildNode(k4)
+        return root
+    }
+
     // MARK: - 3D Minecraft Shield Model
     private func updateShieldModel() {
         leftHandShieldAnchor.childNodes.forEach { $0.removeFromParentNode() }
@@ -515,6 +620,33 @@ public final class MinecraftCharacterNode: SCNNode {
         root.addChildNode(bossNode)
 
         leftHandShieldAnchor.addChildNode(root)
+        EnchantmentGlintShader.apply(to: leftHandShieldAnchor, enabled: isEnchantedGlintEnabled)
+    }
+
+    // MARK: - 3D Minecraft Elytra (겉날개)
+    private func updateElytraModel() {
+        elytraWingLeft.childNodes.forEach { $0.removeFromParentNode() }
+        elytraWingRight.childNodes.forEach { $0.removeFromParentNode() }
+        guard isElytraEquipped else { return }
+
+        let wingMat = SCNMaterial()
+        wingMat.diffuse.contents = NSColor(red: 0.22, green: 0.22, blue: 0.26, alpha: 1.0)
+        wingMat.lightingModel = .lambert
+
+        // Left wing: W=0.32, H=0.85, L=0.04
+        let wingGeom = SCNBox(width: 0.32, height: 0.85, length: 0.04, chamferRadius: 0.01)
+        wingGeom.materials = [wingMat]
+
+        let meshL = SCNNode(geometry: wingGeom)
+        meshL.position = SCNVector3(-0.16, -0.40, 0)
+        elytraWingLeft.position = SCNVector3(-0.02, 0.40, 0)
+        elytraWingLeft.addChildNode(meshL)
+
+        // Right wing
+        let meshR = SCNNode(geometry: wingGeom)
+        meshR.position = SCNVector3(0.16, -0.40, 0)
+        elytraWingRight.position = SCNVector3(0.02, 0.40, 0)
+        elytraWingRight.addChildNode(meshR)
     }
 
     public func applySkin(_ skin: SkinTexture) {
@@ -627,6 +759,26 @@ public final class MinecraftCharacterNode: SCNNode {
             return
         }
 
+        if isGliding {
+            // 겉날개 활공 비행: 날개를 양옆으로 활짝 펴고 수평 활공 자세!
+            elytraWingLeft.eulerAngles = SCNVector3(-0.25, 0.85, -0.45)
+            elytraWingRight.eulerAngles = SCNVector3(-0.25, -0.85, 0.45)
+
+            modelRoot.eulerAngles = SCNVector3(-CGFloat.pi / 2.3, 0, 0)
+            bodyAnchor.position = SCNVector3(0, 0.25, 0)
+
+            let flutter = sin(animTime * 15.0) * 0.05
+            rightArmJoint.eulerAngles = SCNVector3(0.35 + flutter, 0, 0.15)
+            leftArmJoint.eulerAngles = SCNVector3(0.35 + flutter, 0, -0.15)
+            rightLegJoint.eulerAngles = SCNVector3(0.1, 0, 0.05)
+            leftLegJoint.eulerAngles = SCNVector3(0.1, 0, -0.05)
+            return
+        } else {
+            // 지상에서는 등 뒤로 얌전히 접힘
+            elytraWingLeft.eulerAngles = SCNVector3(0.12, 0.15, -0.08)
+            elytraWingRight.eulerAngles = SCNVector3(0.12, -0.15, 0.08)
+        }
+
         if isFalling {
             // Falling: arms high up, legs slightly back
             let jitter = sin(animTime * 20.0) * 0.15
@@ -647,6 +799,11 @@ public final class MinecraftCharacterNode: SCNNode {
             // Body lowered down
             bodyAnchor.position = SCNVector3(0, -0.7, 0)
 
+            if isFishing {
+                let bobJitter = sin(animTime * 5.0) * 0.04
+                rightArmJoint.eulerAngles = SCNVector3(-CGFloat.pi / 3.2 + bobJitter, 0.2, 0.05)
+                leftArmJoint.eulerAngles = SCNVector3(-0.2, 0, -0.1)
+            } else
             if isWaving {
                 // Wave right hand while sitting
                 let wave = sin(animTime * 10.0) * 0.4
@@ -700,6 +857,17 @@ public final class MinecraftCharacterNode: SCNNode {
             rightLegJoint.eulerAngles = SCNVector3(sin(animTime * 12.0) * 0.3, 0, 0)
             leftLegJoint.eulerAngles = SCNVector3(-sin(animTime * 12.0) * 0.1, 0, 0)
             bodyAnchor.position = SCNVector3(0, stomp, 0)
+            return
+        }
+
+        if isPressingDown {
+            // 창문을 짓눌러 압축하는 자세
+            bodyAnchor.position = SCNVector3(0, -0.35, 0)
+            let pressJitter = sin(animTime * 30.0) * 0.04
+            rightArmJoint.eulerAngles = SCNVector3(0.75 + pressJitter, 0, 0.15)
+            leftArmJoint.eulerAngles = SCNVector3(0.75 + pressJitter, 0, -0.15)
+            rightLegJoint.eulerAngles = SCNVector3(0.2, 0, 0)
+            leftLegJoint.eulerAngles = SCNVector3(0.2, 0, 0)
             return
         }
 

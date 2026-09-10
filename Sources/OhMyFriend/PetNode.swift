@@ -26,6 +26,7 @@ public final class PetNode: SCNNode {
     public var walkSpeed: CGFloat = 0
     public var isRunning: Bool = false
     public var isSitting: Bool = false
+    public var wolfHealth: CGFloat = 1.0 // 0.0 ~ 1.0 (체력/호감도)
     public var isSleeping: Bool = false
 
     // Head LookAt
@@ -101,6 +102,12 @@ public final class PetNode: SCNNode {
         SCNTransaction.commit()
     }
 
+
+    public func feed() {
+        self.wolfHealth = 1.0
+        showOverheadEmoji("❤️❤️❤️", duration: 2.2)
+        SoundAndEffectsManager.shared.play(.heart)
+    }
     // MARK: - 3D Voxel Model Builders
     private func setupModel() {
         // Clear previous meshes
@@ -461,6 +468,12 @@ public final class PetNode: SCNNode {
             // Tail wags gently when sitting
             let wag = sin(animTime * 6.0) * 0.3
             tailJoint.eulerAngles.y = wag
+
+            // 원작 고증: 늑대 꼬리 각도는 체력에 비례
+            if kind == .wolf {
+                let basePitch = -0.45 + (wolfHealth * 1.15)
+                tailJoint.eulerAngles.x = basePitch
+            }
             return
         }
 
@@ -499,6 +512,11 @@ public final class PetNode: SCNNode {
             // Idle tail wagging
             let idleWag = sin(animTime * 3.5) * 0.2
             tailJoint.eulerAngles.y = idleWag
+
+            if kind == .wolf {
+                let basePitch = -0.45 + (wolfHealth * 1.15)
+                tailJoint.eulerAngles.x = basePitch
+            }
 
             if kind == .parrot {
                 wingLeft.eulerAngles.z = 0
