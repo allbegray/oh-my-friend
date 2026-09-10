@@ -52,46 +52,15 @@ public final class CharacterView: SCNView {
     }
 
     private func setupScene() {
-        backgroundColor = .clear
-        rendersContinuously = true
-        antialiasingMode = .none // crisp retro pixels
-
-        let scene = SCNScene()
+        let (scene, stage) = makeStage(cameraY: 2.0, cameraZ: 6.2, fov: 36.0, pitch: -0.06)
         self.scene = scene
+        configure(self)
 
         // 1. Add Character Node
         // Minecraft character height: ~3.2 units (Legs 1.2 + Torso 1.2 + Head 0.8)
         // Feet are at Y = 0
         characterNode.position = SCNVector3(0, 0, 0)
-        scene.rootNode.addChildNode(characterNode)
-
-        // 2. Camera: Positioned so character is centered nicely in 160x160 viewport
-        let cameraNode = SCNNode()
-        let camera = SCNCamera()
-        camera.usesOrthographicProjection = false
-        camera.fieldOfView = 36.0
-        cameraNode.camera = camera
-        // Center camera slightly above waist (Y = 1.6), looking slightly downward
-        cameraNode.position = SCNVector3(0, 2.0, 6.2)
-        cameraNode.eulerAngles = SCNVector3(-0.06, 0, 0)
-        scene.rootNode.addChildNode(cameraNode)
-
-        // 3. Lighting: Soft ambient + crisp directional light from top-front-right
-        let ambientNode = SCNNode()
-        let ambientLight = SCNLight()
-        ambientLight.type = .ambient
-        ambientLight.color = NSColor(white: 0.65, alpha: 1.0)
-        ambientNode.light = ambientLight
-        scene.rootNode.addChildNode(ambientNode)
-
-        let dirLightNode = SCNNode()
-        let dirLight = SCNLight()
-        dirLight.type = .directional
-        dirLight.color = NSColor(white: 0.75, alpha: 1.0)
-        dirLightNode.light = dirLight
-        dirLightNode.position = SCNVector3(3, 7, 5)
-        dirLightNode.eulerAngles = SCNVector3(-0.8, 0.5, 0)
-        scene.rootNode.addChildNode(dirLightNode)
+        stage.addChildNode(characterNode)
     }
 
     // MARK: - Mouse Drag & Interactivity

@@ -162,7 +162,7 @@ public final class PetNode: SCNNode {
 
     // 1. 🐺 마인크래프트 길들인 늑대/강아지 (Tamed Wolf)
     private func buildWolfModel() {
-        let furMat = makeLambert(color: NSColor(red: 0.85, green: 0.85, blue: 0.85, alpha: 1.0))
+        let furMat = makeFur(color: NSColor(red: 0.85, green: 0.85, blue: 0.85, alpha: 1.0))
         let darkFurMat = makeLambert(color: NSColor(red: 0.72, green: 0.72, blue: 0.72, alpha: 1.0))
         let noseMat = makeLambert(color: NSColor(red: 0.15, green: 0.15, blue: 0.15, alpha: 1.0))
         let collarMat = makeLambert(color: NSColor(red: 0.82, green: 0.12, blue: 0.12, alpha: 1.0)) // Red collar!
@@ -261,7 +261,7 @@ public final class PetNode: SCNNode {
 
     // 2. 🐱 턱시도 고양이 (Tuxedo Cat)
     private func buildCatModel() {
-        let blackMat = makeLambert(color: NSColor(red: 0.12, green: 0.12, blue: 0.12, alpha: 1.0))
+        let blackMat = makeFur(color: NSColor(red: 0.12, green: 0.12, blue: 0.12, alpha: 1.0))
         let whiteMat = makeLambert(color: NSColor(red: 0.95, green: 0.95, blue: 0.95, alpha: 1.0))
         let eyeMat = makeLambert(color: NSColor(red: 0.2, green: 0.85, blue: 0.2, alpha: 1.0)) // Green eyes
         let collarMat = makeLambert(color: NSColor(red: 0.85, green: 0.2, blue: 0.2, alpha: 1.0))
@@ -354,7 +354,7 @@ public final class PetNode: SCNNode {
 
     // 3. 🦜 붉은 앵무새 (Scarlet Parrot)
     private func buildParrotModel() {
-        let redMat = makeLambert(color: NSColor(red: 0.90, green: 0.12, blue: 0.12, alpha: 1.0))
+        let redMat = makeFur(color: NSColor(red: 0.90, green: 0.12, blue: 0.12, alpha: 1.0))
         let yellowMat = makeLambert(color: NSColor(red: 0.95, green: 0.85, blue: 0.10, alpha: 1.0))
         let blueMat = makeLambert(color: NSColor(red: 0.15, green: 0.40, blue: 0.90, alpha: 1.0))
         let clawMat = makeLambert(color: NSColor(red: 0.4, green: 0.4, blue: 0.4, alpha: 1.0))
@@ -444,7 +444,7 @@ public final class PetNode: SCNNode {
 
     // 4. 🐷 아기 돼지 (Pig)
     private func buildPigModel() {
-        let pinkMat = makeLambert(color: NSColor(red: 0.95, green: 0.65, blue: 0.65, alpha: 1.0))
+        let pinkMat = makeFur(color: NSColor(red: 0.95, green: 0.65, blue: 0.65, alpha: 1.0))
         let darkPinkMat = makeLambert(color: NSColor(red: 0.85, green: 0.52, blue: 0.52, alpha: 1.0))
         let eyeMat = makeLambert(color: NSColor(red: 0.15, green: 0.15, blue: 0.15, alpha: 1.0))
 
@@ -519,7 +519,7 @@ public final class PetNode: SCNNode {
     }
 
     private func buildHorseModel() {
-        let coatMat = makeLambert(color: NSColor(red: 0.55, green: 0.36, blue: 0.20, alpha: 1.0))
+        let coatMat = makeFur(color: NSColor(red: 0.55, green: 0.36, blue: 0.20, alpha: 1.0))
         let maneMat = makeLambert(color: NSColor(red: 0.25, green: 0.15, blue: 0.08, alpha: 1.0))
         let saddleMat = makeLambert(color: NSColor(red: 0.70, green: 0.25, blue: 0.15, alpha: 1.0))
         let hoofMat = makeLambert(color: NSColor(red: 0.20, green: 0.18, blue: 0.16, alpha: 1.0))
@@ -626,6 +626,25 @@ public final class PetNode: SCNNode {
     private func makeLambert(color: NSColor) -> SCNMaterial {
         let mat = SCNMaterial()
         mat.diffuse.contents = color
+        mat.lightingModel = .lambert
+        return mat
+    }
+
+    private func makeFur(color: NSColor, speckles: Int = 140) -> SCNMaterial {
+        let size = 64
+        let img = NSImage(size: NSSize(width: size, height: size))
+        img.lockFocus()
+        color.setFill()
+        NSRect(x: 0, y: 0, width: size, height: size).fill()
+        for _ in 0..<speckles {
+            let v = CGFloat.random(in: -0.06...0.03)
+            NSColor(red: max(0, color.redComponent + v), green: max(0, color.greenComponent + v), blue: max(0, color.blueComponent + v), alpha: 1.0).setFill()
+            NSRect(x: Int.random(in: 0..<size), y: Int.random(in: 0..<size), width: 1, height: 1).fill()
+        }
+        img.unlockFocus()
+        let mat = SCNMaterial()
+        mat.diffuse.contents = img
+        mat.diffuse.magnificationFilter = .nearest
         mat.lightingModel = .lambert
         return mat
     }

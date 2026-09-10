@@ -27,41 +27,13 @@ public final class EndermanView: SCNView {
     }
 
     private func setupScene() {
-        backgroundColor = .clear
-        rendersContinuously = true
-        antialiasingMode = .none
-
-        let scene = SCNScene()
+        let (scene, stage) = makeStage(cameraY: 1.6, cameraZ: 4.8, fov: 38.0, pitch: -0.06)
         self.scene = scene
+        configure(self)
 
+        // Enderman's tall body (Y = 1.6), feet at Y = 0
         endermanNode.position = SCNVector3(0, 0, 0)
-        scene.rootNode.addChildNode(endermanNode)
-
-        // Camera: centered on Enderman's tall body (Y = 1.6)
-        let cameraNode = SCNNode()
-        let camera = SCNCamera()
-        camera.fieldOfView = 38.0
-        cameraNode.camera = camera
-        cameraNode.position = SCNVector3(0, 1.6, 4.8)
-        cameraNode.eulerAngles = SCNVector3(-0.06, 0, 0)
-        scene.rootNode.addChildNode(cameraNode)
-
-        // Ambient & Directional Lighting
-        let ambientNode = SCNNode()
-        let ambientLight = SCNLight()
-        ambientLight.type = .ambient
-        ambientLight.color = NSColor(white: 0.65, alpha: 1.0)
-        ambientNode.light = ambientLight
-        scene.rootNode.addChildNode(ambientNode)
-
-        let dirLightNode = SCNNode()
-        let dirLight = SCNLight()
-        dirLight.type = .directional
-        dirLight.color = NSColor(white: 0.75, alpha: 1.0)
-        dirLightNode.light = dirLight
-        dirLightNode.position = SCNVector3(2, 6, 5)
-        dirLightNode.eulerAngles = SCNVector3(-0.7, 0.4, 0)
-        scene.rootNode.addChildNode(dirLightNode)
+        stage.addChildNode(endermanNode)
     }
 
     // MARK: - Mouse Interaction

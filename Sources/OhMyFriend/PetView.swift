@@ -28,41 +28,13 @@ public final class PetView: SCNView {
     }
 
     private func setupScene() {
-        backgroundColor = .clear
-        rendersContinuously = true
-        antialiasingMode = .none
-
-        let scene = SCNScene()
+        let (scene, stage) = makeStage(cameraY: 0.8, cameraZ: 3.8, fov: 36.0, pitch: -0.08)
         self.scene = scene
+        configure(self)
 
+        // Pet body centered (Y = 0.6), feet at Y = 0
         petNode.position = SCNVector3(0, 0, 0)
-        scene.rootNode.addChildNode(petNode)
-
-        // Camera: centered on pet body (Y = 0.6)
-        let cameraNode = SCNNode()
-        let camera = SCNCamera()
-        camera.fieldOfView = 36.0
-        cameraNode.camera = camera
-        cameraNode.position = SCNVector3(0, 0.8, 3.8)
-        cameraNode.eulerAngles = SCNVector3(-0.08, 0, 0)
-        scene.rootNode.addChildNode(cameraNode)
-
-        // Lighting
-        let ambientNode = SCNNode()
-        let ambientLight = SCNLight()
-        ambientLight.type = .ambient
-        ambientLight.color = NSColor(white: 0.70, alpha: 1.0)
-        ambientNode.light = ambientLight
-        scene.rootNode.addChildNode(ambientNode)
-
-        let dirLightNode = SCNNode()
-        let dirLight = SCNLight()
-        dirLight.type = .directional
-        dirLight.color = NSColor(white: 0.75, alpha: 1.0)
-        dirLightNode.light = dirLight
-        dirLightNode.position = SCNVector3(2, 5, 4)
-        dirLightNode.eulerAngles = SCNVector3(-0.7, 0.4, 0)
-        scene.rootNode.addChildNode(dirLightNode)
+        stage.addChildNode(petNode)
     }
 
     // MARK: - Mouse Events

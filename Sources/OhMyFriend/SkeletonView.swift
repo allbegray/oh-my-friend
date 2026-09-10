@@ -27,41 +27,13 @@ public final class SkeletonView: SCNView {
     }
 
     private func setupScene() {
-        backgroundColor = .clear
-        rendersContinuously = true
-        antialiasingMode = .none
-
-        let scene = SCNScene()
+        let (scene, stage) = makeStage(cameraY: 1.30, cameraZ: 4.2, fov: 36.0, pitch: -0.06)
         self.scene = scene
+        configure(self)
 
+        // Skeleton body centered, feet at Y = 0
         skeletonNode.position = SCNVector3(0, 0, 0)
-        scene.rootNode.addChildNode(skeletonNode)
-
-        // Camera: centered on skeleton body
-        let cameraNode = SCNNode()
-        let camera = SCNCamera()
-        camera.fieldOfView = 36.0
-        cameraNode.camera = camera
-        cameraNode.position = SCNVector3(0, 1.30, 4.2)
-        cameraNode.eulerAngles = SCNVector3(-0.06, 0, 0)
-        scene.rootNode.addChildNode(cameraNode)
-
-        // Lighting
-        let ambientNode = SCNNode()
-        let ambientLight = SCNLight()
-        ambientLight.type = .ambient
-        ambientLight.color = NSColor(white: 0.65, alpha: 1.0)
-        ambientNode.light = ambientLight
-        scene.rootNode.addChildNode(ambientNode)
-
-        let dirLightNode = SCNNode()
-        let dirLight = SCNLight()
-        dirLight.type = .directional
-        dirLight.color = NSColor(white: 0.75, alpha: 1.0)
-        dirLightNode.light = dirLight
-        dirLightNode.position = SCNVector3(2, 6, 5)
-        dirLightNode.eulerAngles = SCNVector3(-0.7, 0.4, 0)
-        scene.rootNode.addChildNode(dirLightNode)
+        stage.addChildNode(skeletonNode)
     }
 
     // MARK: - Mouse Interaction

@@ -27,41 +27,13 @@ public final class CreeperView: SCNView {
     }
 
     private func setupScene() {
-        backgroundColor = .clear
-        rendersContinuously = true
-        antialiasingMode = .none
-
-        let scene = SCNScene()
+        let (scene, stage) = makeStage(cameraY: 0.95, cameraZ: 3.8, fov: 36.0, pitch: -0.06)
         self.scene = scene
+        configure(self)
 
+        // Creeper body centered, feet at Y = 0
         creeperNode.position = SCNVector3(0, 0, 0)
-        scene.rootNode.addChildNode(creeperNode)
-
-        // Camera: centered on Creeper body
-        let cameraNode = SCNNode()
-        let camera = SCNCamera()
-        camera.fieldOfView = 36.0
-        cameraNode.camera = camera
-        cameraNode.position = SCNVector3(0, 0.95, 3.8)
-        cameraNode.eulerAngles = SCNVector3(-0.06, 0, 0)
-        scene.rootNode.addChildNode(cameraNode)
-
-        // Ambient & Directional Lighting
-        let ambientNode = SCNNode()
-        let ambientLight = SCNLight()
-        ambientLight.type = .ambient
-        ambientLight.color = NSColor(white: 0.70, alpha: 1.0)
-        ambientNode.light = ambientLight
-        scene.rootNode.addChildNode(ambientNode)
-
-        let dirLightNode = SCNNode()
-        let dirLight = SCNLight()
-        dirLight.type = .directional
-        dirLight.color = NSColor(white: 0.75, alpha: 1.0)
-        dirLightNode.light = dirLight
-        dirLightNode.position = SCNVector3(2, 5, 4)
-        dirLightNode.eulerAngles = SCNVector3(-0.7, 0.4, 0)
-        scene.rootNode.addChildNode(dirLightNode)
+        stage.addChildNode(creeperNode)
     }
 
     // MARK: - Mouse Interaction

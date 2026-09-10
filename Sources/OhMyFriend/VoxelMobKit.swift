@@ -314,6 +314,8 @@ public class MobSceneView: SCNView {
     public var onDragEnd: ((CGPoint) -> Void)?
     /// 현재 표시 중인 릭 (setSubject로 교체).
     public private(set) var subject: SCNNode?
+    /// setSubject가 릭을 붙이는 위치 (makeStage 반환).
+    private var stageNode: SCNNode!
     private var dragging = false
     private var lastPos: CGPoint = .zero
     private var lastTime: TimeInterval = 0
@@ -322,30 +324,11 @@ public class MobSceneView: SCNView {
     /// 투명 배경 + 조명 + 정면 카메라를 갖춘 뷰를 만든다.
     public override init(frame: NSRect, options: [String: Any]? = nil) {
         super.init(frame: frame, options: options)
-        backgroundColor = .clear
-        rendersContinuously = true
-        preferredFramesPerSecond = 60
-        antialiasingMode = .none
-        let scene = SCNScene()
+        let (scene, stage) = makeStage(cameraY: 1.0, cameraZ: 3.8, fov: 36.0, pitch: -0.06)
         self.scene = scene
-        let cam = SCNNode()
-        cam.camera = SCNCamera()
-        cam.camera?.fieldOfView = 36.0
-        cam.position = SCNVector3(0, 1.0, 3.8)
-        cam.eulerAngles = SCNVector3(-0.06, 0, 0)
-        scene.rootNode.addChildNode(cam)
-        let amb = SCNNode()
-        amb.light = SCNLight()
-        amb.light?.type = .ambient
-        amb.light?.color = NSColor(white: 0.70, alpha: 1.0)
-        scene.rootNode.addChildNode(amb)
-        let dir = SCNNode()
-        dir.light = SCNLight()
-        dir.light?.type = .directional
-        dir.light?.color = NSColor(white: 0.75, alpha: 1.0)
-        dir.position = SCNVector3(2, 5, 4)
-        dir.eulerAngles = SCNVector3(-0.7, 0.4, 0)
-        scene.rootNode.addChildNode(dir)
+        self.stageNode = stage
+        configure(self)
+        preferredFramesPerSecond = 60
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
@@ -355,7 +338,7 @@ public class MobSceneView: SCNView {
         subject?.removeFromParentNode()
         subject = node
         node.position = SCNVector3(0, 0, 0)
-        scene?.rootNode.addChildNode(node)
+        stageNode.addChildNode(node)
     }
 
     /// 드래그 시작점을 기록한다.
