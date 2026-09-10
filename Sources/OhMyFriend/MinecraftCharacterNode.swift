@@ -85,6 +85,7 @@ public final class MinecraftCharacterNode: SCNNode {
     public var backflipAngle: CGFloat = 0
     public var isEating: Bool = false
     public var isCheering: Bool = false
+    public var isNagging: Bool = false
 
     // Ladder climbing (사다리 등반)
     public var isClimbing: Bool = false {
@@ -628,6 +629,26 @@ public final class MinecraftCharacterNode: SCNNode {
             let legKick = sin(animTime * 14.0) * 0.2
             rightLegJoint.eulerAngles = SCNVector3(legKick, 0, 0)
             leftLegJoint.eulerAngles = SCNVector3(-legKick, 0, 0)
+            return
+        }
+
+        if isNagging {
+            // Nagging / Scolding motion:
+            // 1. Head looks up towards the top-right notification corner
+            headJoint.eulerAngles = SCNVector3(-0.35, 0.65, sin(animTime * 10.0) * 0.08)
+
+            // 2. Right arm points aggressively towards the top-right corner with angry shaking
+            let pointShake = sin(animTime * 18.0) * 0.12
+            rightArmJoint.eulerAngles = SCNVector3(-2.2 + pointShake, 0.45, 0.35)
+
+            // 3. Left hand on hip (scolding pose)
+            leftArmJoint.eulerAngles = SCNVector3(0.5, 0, -0.65)
+
+            // 4. Stomping feet angrily
+            let stomp = abs(sin(animTime * 12.0)) * 0.18
+            rightLegJoint.eulerAngles = SCNVector3(sin(animTime * 12.0) * 0.3, 0, 0)
+            leftLegJoint.eulerAngles = SCNVector3(-sin(animTime * 12.0) * 0.1, 0, 0)
+            bodyAnchor.position = SCNVector3(0, stomp, 0)
             return
         }
 

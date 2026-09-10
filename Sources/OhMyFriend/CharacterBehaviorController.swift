@@ -27,6 +27,7 @@ public final class CharacterBehaviorController {
         case dragged
         case landedCrouch(timeLeft: TimeInterval)
         case cheer(wpm: Double, timeLeft: TimeInterval, cheerCooldown: TimeInterval)
+        case nag(timeLeft: TimeInterval, phraseTimer: TimeInterval, phraseIndex: Int)
     }
 
     public private(set) var state: State = .idle(timeLeft: 2.0)
@@ -159,6 +160,22 @@ public final class CharacterBehaviorController {
         SoundAndEffectsManager.shared.play(.heart)
         TypingActivityMonitor.shared.simulateKeystrokes(count: 15)
         state = .cheer(wpm: 65.0, timeLeft: 3.5, cheerCooldown: 1.0)
+    }
+
+    public func triggerNag(characterNode: MinecraftCharacterNode) {
+        guard !isClimbing, !isTNTActive else { return }
+        NotificationCenterMonitor.shared.triggerSimulatedNag()
+        characterNode.isNagging = true
+        SoundAndEffectsManager.shared.play(.alert)
+        let phrases = [
+            "알림 좀 확인해! 💢",
+            "알림 쌓인 것 좀 봐... 📢",
+            "안 읽을 거면 지우기라도 해! 🧹",
+            "완전 읽씹 장인이네! 😤",
+            "언제 읽을 거야?! 🔔"
+        ]
+        characterNode.showOverheadEmoji(phrases[0], duration: 2.0)
+        state = .nag(timeLeft: 6.0, phraseTimer: 2.0, phraseIndex: 1)
     }
     public func handleCharacterClicked(physics: PhysicsEngine, characterNode: MinecraftCharacterNode) {
         SoundAndEffectsManager.shared.play(.heart)
@@ -529,8 +546,64 @@ public final class CharacterBehaviorController {
                 break
             }
         }
+
+        // 4.6. Notification Nag Check
+        let nagStatus = NotificationCenterMonitor.shared.checkNagStatus(screen: screen)
+        if nagStatus.shouldNag && !isClimbing && !isTNTActive {
+            switch state {
+            case .idle, .walk, .sit, .lookAround:
+                characterNode.isNagging = true
+                SoundAndEffectsManager.shared.play(.alert)
+                let phrases = [
+                    "알림 좀 확인해! 💢",
+                    "알림 쌓인 것 좀 봐... 📢",
+                    "안 읽을 거면 지우기라도 해! 🧹",
+                    "완전 읽씹 장인이네! 😤",
+                    "언제 읽을 거야?! 🔔"
+                ]
+                characterNode.showOverheadEmoji(phrases[0], duration: 2.0)
+                state = .nag(timeLeft: 6.0, phraseTimer: 2.0, phraseIndex: 1)
+            default:
+                break
+            }
+        }
         // 5. Finite State Machine
         switch state {
+        case .nag(var timeLeft, var phraseTimer, var phraseIndex):
+            timeLeft -= dt
+            phraseTimer -= dt
+            characterNode.walkSpeed = 0
+            characterNode.isNagging = true
+            characterNode.isCheering = false
+            characterNode.isSitting = false
+            characterNode.isSleeping = false
+            characterNode.isWaving = false
+            characterNode.isEating = false
+            characterNode.isPoking = false
+
+            if phraseTimer <= 0 {
+                phraseTimer = 2.0
+                let phrases = [
+                    "알림 좀 확인해! 💢",
+                    "알림 쌓인 것 좀 봐... 📢",
+                    "안 읽을 거면 지우기라도 해! 🧹",
+                    "완전 읽씹 장인이네! 😤",
+                    "언제 읽을 거야?! 🔔"
+                ]
+                let text = phrases[phraseIndex % phrases.count]
+                phraseIndex += 1
+                characterNode.showOverheadEmoji(text, duration: 1.8)
+                SoundAndEffectsManager.shared.play(.pop)
+            }
+
+            if timeLeft <= 0 {
+                characterNode.isNagging = false
+                NotificationCenterMonitor.shared.resetNagTrigger()
+                chooseNextState(physics: physics, platforms: platforms, screen: screen, cursorPos: cursorPos, characterNode: characterNode)
+            } else {
+                state = .nag(timeLeft: timeLeft, phraseTimer: phraseTimer, phraseIndex: phraseIndex)
+            }
+
         case .cheer(let currentWpm, var timeLeft, let cooldown):
             timeLeft -= dt
             characterNode.walkSpeed = 0

@@ -170,6 +170,8 @@ public final class AppController: NSObject, CharacterViewDelegate, NSMenuDelegat
             desc = "공중제비 도는 중! 🤸‍♂️"
         case .cheer(let wpm, _, _):
             desc = "코딩 신나게 응원 중! 🔥 (WPM: \(Int(wpm)))"
+        case .nag:
+            desc = "쌓인 알림 안 읽는다고 구박하는 중! 💢"
         case .tnt:
             if let remain = behavior.tntFuseRemaining {
                 desc = String(format: "🧨 TNT 폭발까지 %.1f초!", remain)
@@ -385,6 +387,10 @@ public final class AppController: NSObject, CharacterViewDelegate, NSMenuDelegat
         let cheerItem = NSMenuItem(title: "🎉 코딩 신나게 응원하기 (Cheer)", action: #selector(didSelectCheer), keyEquivalent: "c")
         cheerItem.target = self
         actMenu.addItem(cheerItem)
+
+        let nagItem = NSMenuItem(title: "💢 알림 안 읽는다고 구박하기 (Nag)", action: #selector(didSelectNag), keyEquivalent: "n")
+        nagItem.target = self
+        actMenu.addItem(nagItem)
         let actSubmenuItem = NSMenuItem(title: "✨ 재미있는 모션 실행", action: nil, keyEquivalent: "")
         actSubmenuItem.submenu = actMenu
         menu.addItem(actSubmenuItem)
@@ -492,6 +498,16 @@ public final class AppController: NSObject, CharacterViewDelegate, NSMenuDelegat
             permItem.target = self
             menu.addItem(permItem)
         }
+
+        // Notification Nag Toggle
+        let nagToggleItem = NSMenuItem(
+            title: "🔔 쌓인 알림 잔소리/구박 모드",
+            action: #selector(didToggleNotificationNag(_:)),
+            keyEquivalent: ""
+        )
+        nagToggleItem.target = self
+        nagToggleItem.state = NotificationCenterMonitor.shared.isEnabled ? .on : .off
+        menu.addItem(nagToggleItem)
 
         let attackItem = NSMenuItem(
             title: "🧨 TNT로 창 부수기",
@@ -854,6 +870,16 @@ public final class AppController: NSObject, CharacterViewDelegate, NSMenuDelegat
         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
             NSWorkspace.shared.open(url)
         }
+    }
+
+    @objc private func didSelectNag() {
+        behavior.triggerNag(characterNode: window.characterView.characterNode)
+    }
+
+    @objc private func didToggleNotificationNag(_ sender: NSMenuItem) {
+        NotificationCenterMonitor.shared.isEnabled.toggle()
+        sender.state = NotificationCenterMonitor.shared.isEnabled ? .on : .off
+        statusItem?.menu = buildContextMenu()
     }
 
     // MARK: - Ladder Descent (사다리 타고 창문 내려가기)
