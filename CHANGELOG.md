@@ -1,6 +1,17 @@
 이 문서는 Oh My Friend 프로젝트의 버전별 변경 사항 및 릴리스 이력을 관리합니다.
 # 변경 이력
 
+## [v0.39.1] - 2026-09-11
+
+### 수정
+- 🔏 **배포본 코드 서명 무효 문제 수정 (설치 불가)**: `scripts/build_app.sh` 가 실행 파일만 복사하고 번들 전체를 `codesign` 하지 않아, 배포본에 Mach-O 링커의 ad-hoc 서명만 남아 있었다. `_CodeSignature/CodeResources` 가 없고 Info.plist 도 서명에 묶이지 않아 `codesign --verify --strict` 가 `code has no resources but signature indicates they must be present` 로 실패했고(`Identifier` 도 번들 ID 가 아니라 실행 파일 이름), macOS 가 앱을 손상된 것으로 처리해 우클릭 → 열기로도 우회되지 않았다. 이제 빌드가 항상 번들 전체를 서명하고, 서명 검증에 실패하면 빌드를 중단한다.
+- 🛡️ **Hardened Runtime 상시 적용 + entitlements 도입**: `scripts/OhMyFriend.entitlements` 신설. Developer ID 인증서 유무와 무관하게 Hardened Runtime 을 켜서, 인증서 없는 로컬 빌드가 배포본과 같은 제약을 드러내 entitlement 누락을 배포 전에 잡는다. 필요한 권한은 `com.apple.security.automation.apple-events` 하나 — `WindowMinimizer` 의 AppleScript 폴백이 System Events 에 창 최소화를 요청하며, 이 entitlement 와 Info.plist 의 `NSAppleEventsUsageDescription` 이 모두 없으면 공증 후 그 경로만 조용히 실패한다.
+
+### 추가
+- 💿 **DMG 드래그 설치 배포**: `scripts/make_dmg.sh` 신설. 앱과 `/Applications` 심볼릭 링크를 담은 UDZO DMG 를 만들어, 이미지를 열고 앱을 Applications 로 끌어다 놓으면 설치가 끝난다. Developer ID 인증서가 있으면 DMG 자체도 서명하고, 공증 자격증명(`NOTARY_PROFILE` 또는 `NOTARY_APPLE_ID`+`NOTARY_TEAM_ID`+`NOTARY_PASSWORD`)이 있으면 `notarytool` 공증과 `stapler` 스테이플까지 자동 수행한다.
+- 🔐 **CI 서명·공증 파이프라인**: Developer ID 인증서 시크릿(`MACOS_CERTIFICATE_P12`, `MACOS_CERTIFICATE_PASSWORD`)이 있으면 키체인에 설치해 Developer ID 로 서명하고, 없으면 기존대로 ad-hoc 배포본을 만든다. 공증 결과는 DMG 에 스테이플되므로 오프라인에서도 검증된다. 자동 업데이트용 ZIP 은 `UpdateManager` 가 내려받는 형식이라 유지하되, 확장 속성을 보존하도록 `ditto` 로 생성한다(`ditto -xk` 와 대칭).
+- 검증: 서명 전/후 대조(`codesign --verify --strict` 실패 → `valid on disk`/`satisfies its Designated Requirement`, `Identifier=com.hong.ohmyfriend`, `Info.plist entries=12`, `Sealed Resources version=2`), Hardened Runtime 실기기 12개 체크(SceneKit 렌더 정상 + 다이아몬드 검 인챈트 광택의 런타임 Metal 셰이더 컴파일이 차단되지 않음 — 보라 픽셀 0→136px, 두 프레임 차 267px 로 `u_time` 진행까지 확인), DMG 왕복(생성→마운트→Applications 복사→서명 유효→실행), ZIP 왕복(`ditto`/`zip` 양쪽 서명 보존), macos-14 러너가 실제 생성한 DMG 를 내려받아 내용·서명·버전·실행 확인, 감정 표현 E2E 17/17 재통과.
+
 ## [v0.39.0] - 2026-09-11
 
 - 🙌 **감정 표현(Emote) 8종 추가**: `CharacterEmote` 레지스트리(이름·별칭·이모지·효과음·유지시간 + `applyEmotePose` 자세)를 신설하여 FSM·메뉴·자율 행동이 하나의 어휘를 공유.
