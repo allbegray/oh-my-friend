@@ -1,9 +1,9 @@
-이 문서는 Oh My Friend 프로젝트의 보안 정책, 네트워크 통신, 비밀 관리 및 코드 작성 보안 규칙을 안내합니다.
+이 문서는 Oh Mine Friend 프로젝트의 보안 정책, 네트워크 통신, 비밀 관리 및 코드 작성 보안 규칙을 안내합니다.
 
 # 보안 정책
 
 ## 인증/인가
-Oh My Friend는 순수 클라이언트 기반의 macOS 데스크톱 애플리케이션으로, 자체 사용자 계정 데이터베이스나 인가 서버를 두지 않습니다.
+Oh Mine Friend는 순수 클라이언트 기반의 macOS 데스크톱 애플리케이션으로, 자체 사용자 계정 데이터베이스나 인가 서버를 두지 않습니다.
 
 1. **외부 공개 API 통신**:
    - Mojang 공개 프로필 API, Minotar 및 Crafatar 스킨 CDN을 활용하며, 별도의 사용자 비밀번호나 유료 인증키를 요구하지 않는 공개 조회 방식으로 동작합니다.
@@ -34,6 +34,20 @@ Oh My Friend는 순수 클라이언트 기반의 macOS 데스크톱 애플리케
 - 설정값이나 민감한 정보가 필요한 경우 환경 변수(`ProcessInfo.processInfo.environment`) 또는 macOS 시스템 키체인(`Keychain`)을 활용합니다.
 - `.gitignore`를 통해 빌드 산출물, 개인 IDE 설정, 캐시 파일의 커밋을 철저히 차단합니다.
 
+## 앱 식별자와 이름 변경 정책
+
+번들 식별자(`com.hong.ohminefriend`)는 macOS 가 앱을 식별하는 영구 키다. 여기에 묶여 관리되는 것들은 다음과 같으며, 식별자를 바꾸면 전부 분리된다.
+
+| 묶여 있는 것 | 위치·관리 주체 | 코드로 이전 가능? |
+| :--- | :--- | :--- |
+| `UserDefaults` (밝기·날씨·발전 과제·스폰 나침반 등) | `~/Library/Preferences/<번들 ID>.plist` | 가능 — `LegacyMigration` 이 복사 |
+| 지원 폴더 (스킨 보관함) | `~/Library/Application Support/<앱 이름>/` | 가능 — `LegacyMigration` 이 이동 |
+| 접근성(AX) 권한, Apple Events 승인 | TCC 데이터베이스 (SIP 보호) | **불가** — 사용자가 직접 재승인 |
+
+- 그래서 v0.40.0 의 개명에서는 `LegacyMigration.swift` 가 `main.swift` 의 `applicationDidFinishLaunching` 최상단에서 **1회** 실행되어 설정과 지원 폴더를 옮긴다. `UserDefaults` 는 `dictionaryRepresentation()` 전체가 아니라 앱이 소유한 키만 화이트리스트로 옮긴다(비샌드박스 도메인에 섞여 있는 `NSWindow Frame ...` 등 시스템 항목을 끌어오지 않기 위함).
+- 접근성 권한만은 자동 이전이 불가능하므로, 식별자를 바꾸는 릴리스는 README 에 **재승인 필요**를 명시하고 릴리스 노트에도 적는다.
+- 앱 이름(`.app` 폴더명)을 바꾸는 릴리스는 구버전 업데이터가 옛 이름을 하드코딩해 찾으므로 **업데이트 경로가 끊긴다**. 그래서 `scripts/make_zip.sh` 의 `LEGACY_APP_NAME` 으로 옛 이름 사본을 전환 릴리스의 ZIP 에 동봉한다. 신버전 업데이터는 이름에 의존하지 않으므로 이후로는 필요 없다.
+
 ## 배포 바이너리 서명 및 공증
 배포물은 항상 **번들 전체가 코드 서명된 상태**로 만들어집니다. Mach-O 링커가 붙이는 ad-hoc 서명만으로는 `_CodeSignature/CodeResources` 가 없어 번들이 성립하지 않고(`code has no resources but signature indicates they must be present`), 그대로 배포하면 Gatekeeper 의 번들 검증이 실패합니다 — 이는 "서명을 신뢰할 수 없음"이 아니라 **서명 자체가 무효**한 상태라, macOS 가 앱을 손상된 것으로 처리해 우클릭 → 열기로도 우회되지 않습니다. `scripts/build_app.sh` 는 항상 번들 전체를 서명해 이 상태를 방지합니다.
 
@@ -46,7 +60,7 @@ Oh My Friend는 순수 클라이언트 기반의 macOS 데스크톱 애플리케
 | 인증서 없음(로컬 빌드) | ad-hoc + Hardened Runtime | X | "확인되지 않은 개발자" → 우클릭 → 열기 |
 
 - **Hardened Runtime 은 두 경로 모두에 적용**합니다. 인증서 없는 로컬 빌드가 배포본과 같은 제약을 드러내야 권한 누락을 미리 잡을 수 있기 때문입니다.
-- Hardened Runtime 아래에서 필요한 권한은 `scripts/OhMyFriend.entitlements` 에만 선언합니다. 현재 필요한 것은 `com.apple.security.automation.apple-events` 하나뿐입니다 — `WindowMinimizer` 의 AppleScript 폴백이 System Events 에 창 최소화를 요청하기 때문이며, 이 entitlement 와 Info.plist 의 `NSAppleEventsUsageDescription` 이 모두 없으면 공증 후 그 경로만 조용히 실패합니다.
+- Hardened Runtime 아래에서 필요한 권한은 `scripts/OhMineFriend.entitlements` 에만 선언합니다. 현재 필요한 것은 `com.apple.security.automation.apple-events` 하나뿐입니다 — `WindowMinimizer` 의 AppleScript 폴백이 System Events 에 창 최소화를 요청하기 때문이며, 이 entitlement 와 Info.plist 의 `NSAppleEventsUsageDescription` 이 모두 없으면 공증 후 그 경로만 조용히 실패합니다.
 - 접근성(AX) 권한과 화면상 창 좌표 조회는 비샌드박스 앱이므로 entitlement 대상이 아니며, 사용자 동의로만 부여됩니다.
 - CI 자격증명은 GitHub Secrets 로만 주입하며(`MACOS_CERTIFICATE_P12`, `MACOS_CERTIFICATE_PASSWORD`, `NOTARY_APPLE_ID`, `NOTARY_TEAM_ID`, `NOTARY_PASSWORD`), 값이 없으면 서명·공증 단계를 건너뛰고 ad-hoc 배포본을 만듭니다. 저장소에는 어떤 인증서·비밀번호도 커밋되지 않습니다.
 

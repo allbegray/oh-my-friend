@@ -137,7 +137,7 @@ public final class SkinStorageManager {
 
     private init() {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        self.storageDirectory = appSupport.appendingPathComponent("OhMyFriend/Skins", isDirectory: true)
+        self.storageDirectory = appSupport.appendingPathComponent("OhMineFriend/Skins", isDirectory: true)
         try? FileManager.default.createDirectory(at: storageDirectory, withIntermediateDirectories: true)
     }
 

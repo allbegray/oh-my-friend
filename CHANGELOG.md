@@ -1,6 +1,25 @@
 이 문서는 Oh My Friend 프로젝트의 버전별 변경 사항 및 릴리스 이력을 관리합니다.
 # 변경 이력
 
+> 📛 **v0.40.0 에서 프로젝트 이름이 Oh My Friend → Oh Mine Friend 로 바뀌었습니다.**
+> 저장소(`allbegray/oh-mine-friend`), 앱 이름(`OhMineFriend.app`), 번들 식별자(`com.hong.ohminefriend`), 배포 파일명이 모두 새 이름입니다.
+> 아래 v0.39.1 이전 항목의 이름·경로는 **당시 사실 그대로** 두었습니다(그때의 릴리스 파일명과 다운로드 URL 이 그 이름이었습니다).
+
+## [v0.40.0] - 2026-09-11
+
+### 변경
+- 📛 **프로젝트 전면 개명 (Oh My Friend → Oh Mine Friend)**: GitHub 저장소 `allbegray/oh-my-friend` → `allbegray/oh-mine-friend`, Swift 패키지·타깃·실행 파일 `OhMyFriend` → `OhMineFriend`, 소스 디렉터리 `Sources/OhMyFriend/` → `Sources/OhMineFriend/`, 앱 번들 `OhMyFriend.app` → `OhMineFriend.app`, 배포 파일명 `OhMineFriend-macOS-arm64.{zip,dmg}`, 표시 이름 **Oh Mine Friend**.
+- 🆔 **번들 식별자 변경**: `com.hong.ohmyfriend` → `com.hong.ohminefriend`. macOS 는 번들 식별자를 앱의 영구 식별자로 쓰므로, 같은 앱으로 취급되던 설정·권한·지원 폴더가 모두 분리된다 — 그래서 아래 이전 조치를 함께 넣었다.
+
+### 추가
+- 🔁 **기존 사용자 데이터 자동 이전 (`LegacyMigration.swift`)**: 첫 실행 시 옛 도메인(`com.hong.ohmyfriend`)의 앱 소유 키를 새 도메인으로 복사하고(밝기·3D 광원·날씨·크리퍼 다리 선호·발전 과제 16종·스폰 나침반), `~/Library/Application Support/OhMyFriend/` 를 `OhMineFriend/` 로 옮긴다(스킨 보관함 보존). 새 도메인에 이미 값이 있으면 덮어쓰지 않고, 폴더 이동이 실패하면 복사로 폴백해 원본을 남긴다. `dictionaryRepresentation()` 을 통째로 옮기지 않고 앱 소유 키만 화이트리스트로 고른다 — 비샌드박스 앱 도메인에는 `NSWindow Frame ...` 같은 시스템 항목이 섞여 있기 때문이다.
+- 🔄 **업데이트 추출을 이름 비의존으로 변경**: `UpdateManager` 가 ZIP 안에서 `OhMyFriend.app` 이라는 이름을 찾던 것을, 최상위 `.app` 번들 중 실행 파일이 실제로 존재하는 것을 고르도록 바꿨다. 앞으로 앱 이름을 또 바꿔도 자동 업데이트가 깨지지 않는다.
+- 🗜️ **`scripts/make_zip.sh` 신설**: 업데이트용 ZIP 생성을 전담. `LEGACY_APP_NAME` 을 주면 옛 이름(`OhMyFriend.app`) 사본을 ZIP 에 함께 넣어 **구버전 앱의 업데이터가 새 릴리스를 찾아갈 수 있게** 한다(구버전 업데이터는 옛 이름을 하드코딩해 찾는다). 전환 릴리스(v0.40.x)에만 쓰고 다음 릴리스에서 제거한다.
+
+### 수정
+- ⚠️ **접근성 권한은 코드로 이전할 수 없음**: TCC 가 권한을 번들 식별자로 묶고 SIP 로 보호하므로 사용자가 시스템 설정에서 한 번 다시 허용해야 한다(창 압축 최소화·타이핑 응원에 필요). README 에 안내를 넣었다.
+- 검증: 개명 후 번들 빌드·서명(`valid on disk`, `com.hong.ohminefriend`, `DisplayName=Oh Mine Friend`), DMG·ZIP 생성과 두 앱 사본 서명 유효성, ZIP 에서 **구버전 업데이터의 탐색 로직을 그대로 재현**해 `OhMyFriend.app` 을 찾아 교체·재실행까지 확인, 실사용 상태(발전 과제 8개·밝기·스킨 9종)를 대상으로 이전 동작 검증, 감정 표현 E2E 17/17 및 3초 스모크 테스트 통과.
+
 ## [v0.39.1] - 2026-09-11
 
 ### 수정

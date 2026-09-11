@@ -9,12 +9,12 @@ fi
 DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$DIR"
 
-echo "🔨 Building latest OhMyFriend..."
+echo "🔨 Building latest OhMineFriend..."
 ./scripts/build_app.sh
 
-echo "🔄 Restarting OhMyFriend..."
-killall OhMyFriend 2>/dev/null || true
+echo "🔄 Restarting OhMineFriend..."
+killall OhMineFriend 2>/dev/null || true
 sleep 0.5
 
-echo "✨ Launching OhMyFriend..."
-open OhMyFriend.app
+echo "✨ Launching OhMineFriend..."
+open OhMineFriend.app

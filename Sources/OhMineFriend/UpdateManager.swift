@@ -12,21 +12,21 @@ public struct GitHubReleaseInfo: Sendable {
     public let assetName: String?
 }
 
-/// Oh My Friend 자동 업데이트 전담 관리자
+/// Oh Mine Friend 자동 업데이트 전담 관리자
 public final class UpdateManager: @unchecked Sendable {
     public static let shared = UpdateManager()
 
-    /// 현재 앱의 번들 버전 (CFBundleShortVersionString 기준, 개발/CLI fallback: 0.39.1)
+    /// 현재 앱의 번들 버전 (CFBundleShortVersionString 기준, 개발/CLI fallback: 0.40.0)
     public static var currentVersion: String {
         if let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String,
            !v.isEmpty, v != "1.0.0" {
             return v
         }
-        return "0.39.1"
+        return "0.40.0"
     }
 
     /// GitHub 최신 릴리스 확인 엔드포인트
-    private let releasesAPIURL = URL(string: "https://api.github.com/repos/allbegray/oh-my-friend/releases/latest")!
+    private let releasesAPIURL = URL(string: "https://api.github.com/repos/allbegray/oh-mine-friend/releases/latest")!
 
     /// 현재 감지된 최신 릴리스 정보 (업데이트 가능 시 보관)
     public private(set) var availableUpdate: GitHubReleaseInfo?
@@ -81,7 +81,7 @@ public final class UpdateManager: @unchecked Sendable {
 
             var request = URLRequest(url: self.releasesAPIURL)
             request.setValue("application/vnd.github.v3+json", forHTTPHeaderField: "Accept")
-            request.setValue("OhMyFriend/\(Self.currentVersion) (Macintosh; macOS)", forHTTPHeaderField: "User-Agent")
+            request.setValue("OhMineFriend/\(Self.currentVersion) (Macintosh; macOS)", forHTTPHeaderField: "User-Agent")
 
             do {
                 let (data, response) = try await self.session.data(for: request)
@@ -105,7 +105,7 @@ public final class UpdateManager: @unchecked Sendable {
                 let title = json["name"] as? String ?? "v\(cleanVersion)"
                 let body = json["body"] as? String ?? ""
 
-                // 바이너리 Asset 탐색 (OhMyFriend-macOS-arm64.zip 또는 .zip)
+                // 바이너리 Asset 탐색 (OhMineFriend-macOS-arm64.zip 또는 .zip)
                 var downloadURL: URL?
                 var assetName: String?
                 if let assets = json["assets"] as? [[String: Any]] {
@@ -167,7 +167,7 @@ public final class UpdateManager: @unchecked Sendable {
     private func showUpToDateAlert() {
         let alert = NSAlert()
         alert.messageText = "최신 버전을 사용하고 있습니다"
-        alert.informativeText = "현재 설치된 Oh My Friend (v\(Self.currentVersion))가 가장 최신 버전입니다."
+        alert.informativeText = "현재 설치된 Oh Mine Friend (v\(Self.currentVersion))가 가장 최신 버전입니다."
         alert.alertStyle = .informational
         alert.addButton(withTitle: "확인")
         alert.runModal()
@@ -243,7 +243,7 @@ public final class UpdateManager: @unchecked Sendable {
 
         // 다운로드 안내 알림
         let progressAlert = NSAlert()
-        progressAlert.messageText = "Oh My Friend v\(release.version) 다운로드 중..."
+        progressAlert.messageText = "Oh Mine Friend v\(release.version) 다운로드 중..."
         progressAlert.informativeText = "최신 버전을 다운로드하여 설치를 준비하고 있습니다.\n완료되면 앱이 자동으로 재시작됩니다."
         progressAlert.alertStyle = .informational
         progressAlert.addButton(withTitle: "백그라운드에서 진행")
@@ -255,7 +255,7 @@ public final class UpdateManager: @unchecked Sendable {
         Task { [weak self] in
             guard let self = self else { return }
             do {
-                let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("OhMyFriendUpdate_\(UUID().uuidString)")
+                let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("OhMineFriendUpdate_\(UUID().uuidString)")
                 try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
 
                 let zipDest = tempDir.appendingPathComponent("update.zip")
@@ -276,11 +276,19 @@ public final class UpdateManager: @unchecked Sendable {
                     throw NSError(domain: "UpdateManager", code: -3, userInfo: [NSLocalizedDescriptionKey: "업데이트 압축 파일 해제에 실패했습니다."])
                 }
 
-                // 압축 해제된 폴더에서 OhMyFriend.app 검색
+                // 압축 해제된 폴더에서 앱 번들 검색.
+                //
+                // 특정 이름을 박아두지 않는다: 앱 이름을 바꾼 릴리스(예: Oh My Friend → Oh Mine Friend)
+                // 에서도 업데이트가 계속 동작해야 하기 때문이다. 최상위 항목 중 `.app` 번들 중
+                // 실행 파일이 실제로 있는 것을 고른다.
                 let fileManager = FileManager.default
                 let extractedItems = try fileManager.contentsOfDirectory(at: extractDir, includingPropertiesForKeys: nil)
-                guard let newAppBundle = extractedItems.first(where: { $0.lastPathComponent == "OhMyFriend.app" }) else {
-                    throw NSError(domain: "UpdateManager", code: -4, userInfo: [NSLocalizedDescriptionKey: "다운로드된 패키지에서 OhMyFriend.app을 찾을 수 없습니다."])
+                let appBundles = extractedItems.filter { $0.pathExtension == "app" }
+                guard let newAppBundle = appBundles.first(where: { bundle in
+                    guard let executable = Bundle(url: bundle)?.executableURL else { return false }
+                    return fileManager.isExecutableFile(atPath: executable.path)
+                }) ?? appBundles.first else {
+                    throw NSError(domain: "UpdateManager", code: -4, userInfo: [NSLocalizedDescriptionKey: "다운로드된 패키지에서 앱 번들(.app)을 찾을 수 없습니다."])
                 }
 
                 // 현재 실행 중인 앱의 번들 경로 파악

@@ -9,10 +9,10 @@ fi
 DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$DIR"
 
-echo "🔨 Building OhMyFriend..."
+echo "🔨 Building OhMineFriend..."
 
 mkdir -p .build/release
-APP_NAME="OhMyFriend"
+APP_NAME="OhMineFriend"
 APP_BUNDLE="${APP_NAME}.app"
 MACOS_DIR="${APP_BUNDLE}/Contents/MacOS"
 RESOURCES_DIR="${APP_BUNDLE}/Contents/Resources"
@@ -34,7 +34,7 @@ if ! swift build -c release; then
     if [ -d "$XCODE_SDK" ]; then
         SDK_FLAG="-sdk $XCODE_SDK"
     fi
-    swiftc -module-cache-path .build/module-cache $PLUGIN_FLAG $SDK_FLAG -O -target "${ARCH}-apple-macosx13.0" Sources/OhMyFriend/*.swift \
+    swiftc -module-cache-path .build/module-cache $PLUGIN_FLAG $SDK_FLAG -O -target "${ARCH}-apple-macosx13.0" Sources/OhMineFriend/*.swift \
         -o ".build/release/${APP_NAME}" \
         -framework AppKit -framework SceneKit -framework SwiftUI -framework CoreGraphics
     echo "✅ Direct compilation succeeded!"
@@ -58,13 +58,13 @@ cat << EOF > "${APP_BUNDLE}/Contents/Info.plist"
 <plist version="1.0">
 <dict>
     <key>CFBundleExecutable</key>
-    <string>OhMyFriend</string>
+    <string>OhMineFriend</string>
     <key>CFBundleIdentifier</key>
-    <string>com.hong.ohmyfriend</string>
+    <string>com.hong.ohminefriend</string>
     <key>CFBundleName</key>
-    <string>OhMyFriend</string>
+    <string>OhMineFriend</string>
     <key>CFBundleDisplayName</key>
-    <string>Oh My Friend</string>
+    <string>Oh Mine Friend</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
@@ -98,7 +98,7 @@ EOF
 # 그 인증서 + Hardened Runtime 으로 서명한다(공증 필수 요건).
 # 없으면 ad-hoc 으로 서명한다 — 무결성은 확보되지만 공증은 불가능하다.
 # ---------------------------------------------------------------
-ENTITLEMENTS="${DIR}/scripts/OhMyFriend.entitlements"
+ENTITLEMENTS="${DIR}/scripts/OhMineFriend.entitlements"
 SIGNING_IDENTITY="${SIGNING_IDENTITY:-}"
 
 if [ -z "${SIGNING_IDENTITY}" ]; then

@@ -3,7 +3,7 @@ set -e
 
 # 드래그 설치용 DMG 패키징.
 #
-# 결과물에는 OhMyFriend.app 과 /Applications 심볼릭 링크가 들어가, 사용자가 이미지를 열고
+# 결과물에는 OhMineFriend.app 과 /Applications 심볼릭 링크가 들어가, 사용자가 이미지를 열고
 # 앱을 Applications 로 끌어다 놓으면 설치가 끝난다.
 #
 # 서명·공증은 build_app.sh 가 만든 번들 서명 상태를 그대로 이어받는다:
@@ -21,10 +21,10 @@ fi
 DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$DIR"
 
-APP_NAME="OhMyFriend"
+APP_NAME="OhMineFriend"
 APP_BUNDLE="${APP_NAME}.app"
 DMG_NAME="${APP_NAME}-macOS-arm64.dmg"
-VOLUME_NAME="Oh My Friend"
+VOLUME_NAME="Oh Mine Friend"
 
 if [ ! -d "${APP_BUNDLE}" ]; then
     echo "❌ ${APP_BUNDLE} 이 없습니다. 먼저 ./scripts/build_app.sh 를 실행하세요." >&2

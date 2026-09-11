@@ -1,7 +1,7 @@
 이 문서는 AI 에이전트의 작업 지침, 프로젝트 아키텍처 컨텍스트, 빌드 및 실행 기록을 관리합니다.
 
 # 프로젝트 요약
-Oh My Friend는 AppKit과 SceneKit, SwiftUI를 기반으로 제작된 macOS 네이티브 데스크톱 컴패니언 애플리케이션입니다. 3D 마인크래프트 복셀 캐릭터가 화면 위에서 열려 있는 창문과 Dock을 발판 삼아 자율적으로 배회하고, 마우스 커서를 응시하며, 온라인 스킨 갤러리 및 Mojang API를 통한 실시간 스킨 다운로드를 지원합니다.
+Oh Mine Friend는 AppKit과 SceneKit, SwiftUI를 기반으로 제작된 macOS 네이티브 데스크톱 컴패니언 애플리케이션입니다. 3D 마인크래프트 복셀 캐릭터가 화면 위에서 열려 있는 창문과 Dock을 발판 삼아 자율적으로 배회하고, 마우스 커서를 응시하며, 온라인 스킨 갤러리 및 Mojang API를 통한 실시간 스킨 다운로드를 지원합니다.
 
 ## 빌드/테스트 방법
 
@@ -9,7 +9,7 @@ Oh My Friend는 AppKit과 SceneKit, SwiftUI를 기반으로 제작된 macOS 네�
 # 빠른 빌드 및 실행
 ./scripts/run.sh
 
-# 릴리스 번들 패키징 (OhMyFriend.app 생성)
+# 릴리스 번들 패키징 (OhMineFriend.app 생성)
 ./scripts/build_app.sh
 
 # 응용 프로그램 폴더 설치
@@ -20,7 +20,7 @@ swift build
 swift build -c release
 
 # 스모크 테스트 (백그라운드 실행 후 정상 종료 확인)
-./OhMyFriend.app/Contents/MacOS/OhMyFriend &
+./OhMineFriend.app/Contents/MacOS/OhMineFriend &
 PID=$!
 sleep 2
 kill $PID
@@ -35,8 +35,9 @@ kill $PID
 ## 서브시스템 구조
 
 ```
-Sources/OhMyFriend/
+Sources/OhMineFriend/
 ├── main.swift                          # 진입점 및 NSApplication 라이프사이클 관리 (.accessory 모드)
+├── LegacyMigration.swift               # 옛 이름(Oh My Friend) 시절 UserDefaults·스킨 보관함 1회 이전
 ├── AppController.swift                 # 60fps 메인 루프 조정자, 메뉴바 상태 아이콘 및 컨텍스트 메뉴 총괄
 ├── CharacterWindow.swift               # 투명 무테 플로팅 패널 (NSPanel, Space 전환 지원)
 ├── CharacterView.swift                 # SceneKit 3D 뷰, 마우스 드래그/던지기, 파일 드롭 처리
@@ -105,6 +106,7 @@ Sources/OhMyFriend/
 ## 실행 기록
 
 ### 2026-09-11
+- **[개명] 프로젝트 전면 개명 Oh My Friend → Oh Mine Friend(v0.40.0)**: GitHub 저장소(`allbegray/oh-mine-friend`), Swift 패키지·타깃·실행 파일(`OhMineFriend`), 소스 디렉터리(`Sources/OhMineFriend/`), 앱 번들(`OhMineFriend.app`), 번들 식별자(`com.hong.ohminefriend`), 배포 파일명(`OhMineFriend-macOS-arm64.{zip,dmg}`), 표시 이름(**Oh Mine Friend**)을 모두 새 이름으로 변경. 번들 식별자가 바뀌면 macOS 가 다른 앱으로 취급해 설정·지원 폴더·권한·업데이트가 모두 분리되므로, ① `LegacyMigration.swift` 로 첫 실행 시 옛 UserDefaults(앱 소유 키 화이트리스트: 밝기·3D 광원·날씨·크리퍼 다리·발전 과제·스폰 나침반)와 `~/Library/Application Support/OhMyFriend/`(스킨 보관함)를 이전, ② `UpdateManager` 의 ZIP 내 앱 탐색을 이름 비의존(최상위 `.app` 중 실행 파일 보유)으로 변경, ③ `scripts/make_zip.sh` + `LEGACY_APP_NAME` 으로 전환 릴리스 ZIP 에 옛 이름 사본 동봉(구버전 업데이터가 옛 이름을 하드코딩해 찾으므로), ④ 접근성 권한은 TCC·SIP 로 인해 코드 이전이 불가하므로 README 에 재승인 안내. 검증: 번들·DMG·ZIP 서명, 구버전 업데이터 탐색 로직 재현, 실사용 상태 이전, E2E 17체크.
 - **[배포] 코드 서명 정상화·DMG 드래그 설치 배포(v0.39.1)**: 배포본에 Mach-O 링커의 ad-hoc 서명만 남아 `_CodeSignature/CodeResources` 가 없던 문제(서명 검증 실패 → macOS 가 손상으로 처리, 우클릭 열기로도 우회 불가)를 수정. `build_app.sh` 가 항상 번들 전체를 서명하고 검증 실패 시 빌드를 중단하며, Developer ID 인증서 유무와 무관하게 Hardened Runtime 을 켠다. `scripts/OhMyFriend.entitlements` 신설(`com.apple.security.automation.apple-events` — `WindowMinimizer` 의 AppleScript 폴백용, Info.plist 에 `NSAppleEventsUsageDescription` 동반) 및 `scripts/make_dmg.sh`(앱 + `/Applications` 링크 UDZO DMG, 인증서가 있으면 DMG 서명·notarytool 공증·stapler 스테이플) 추가. CI 는 인증서 시크릿이 있으면 Developer ID 로 서명하고 DMG 를 함께 업로드하되 자동 업데이트용 ZIP(`ditto` 생성)은 유지. 검증: 서명 전/후 대조, Hardened Runtime 실기기 12체크(런타임 Metal 셰이더 컴파일 미차단 — 보라 광택 0→136px·프레임 차 267px), DMG·ZIP 왕복 서명 보존, macos-14 러너가 만든 DMG 실물 확인, 감정 표현 E2E 17체크 재통과.
 - **[감정 표현] 장식 모션 8종 추가(v0.39.0)**: `CharacterEmote` 레지스트리(이름·별칭·이모지·효과음·유지시간 + `MinecraftCharacterNode.applyEmotePose` 자세) 신설 — 박수 갈채·빙글빙글 회전·기지개 스트레칭·팔벌려뛰기·제자리 달리기·가부좌 명상·정중한 인사·물구나무서기. `.emote(kind:timeLeft:)` FSM 상태 + `triggerEmote` + 자유 배회 밴드 12% 편입, '✨ 재미있는 모션 실행'의 '🙌 감정 표현' 그룹 8종 노출, 상태바 문구 실시간 표시. TNT와 같은 자세 불변식 감시(FSM 이탈 시 노드 자세 정리) 및 드래그·낙하·등반·수면 전환 시 자세 해제, 감정 표현 중 커서 근접 인사(Wave) 차단. 허리 힌지 `waistBend`로 몸통·목·양어깨를 함께 옮겨 '절'·'기지개'·'달리기'에서 머리와 팔이 몸통을 따라간다. 검증: 헤드리스 FSM 드라이버 101체크×4회, 오프스크린 포즈 렌더 52체크(관절 투영으로 물구나무 Δ78px 뒤집힘·가부좌 41px 하강·절 머리 전방 1.04), 실제 번들 앱 접근성 E2E 17체크(메뉴 8종 확인→클릭→상태 문구 전이·복귀), `screencapture -l` 실시간 패널 캡처 5종 육안 확인, 번들 빌드 및 스모크 테스트 정상 통과.
 - **[설정] 날씨 모드 기본값 OFF**: 비·뇌우로 인한 시각적 방해를 최소화하기 위해 날씨 모드(`isWeatherEnabled`) 기본값을 OFF로 변경하고 `UserDefaults` 영속 저장 연동. 검증: 번들 빌드 및 스모크 테스트 정상 통과.

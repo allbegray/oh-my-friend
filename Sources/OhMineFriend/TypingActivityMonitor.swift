@@ -21,7 +21,7 @@ public final class TypingActivityMonitor {
     private var globalMonitor: Any?
     private var localMonitor: Any?
     private var keystrokeTimestamps: [TimeInterval] = []
-    private let queue = DispatchQueue(label: "com.hong.ohmyfriend.typing", qos: .userInteractive)
+    private let queue = DispatchQueue(label: "com.hong.ohminefriend.typing", qos: .userInteractive)
 
     private init() {
         startMonitoring()

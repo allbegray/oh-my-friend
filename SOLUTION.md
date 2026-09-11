@@ -173,3 +173,31 @@ codesign --verify --deep --strict OhMyFriend.app
 - 빌드 스크립트는 **서명 검증(`codesign --verify --strict`)을 통과하지 못하면 실패**해야 한다. `make_dmg.sh` 는 서명되지 않은 번들을 감싸는 것을 거부한다.
 - Hardened Runtime 은 인증서 유무와 무관하게 항상 켠다. 로컬 ad-hoc 빌드가 배포본과 같은 제약을 드러내야 entitlement 누락(예: Apple Events)을 배포 전에 잡을 수 있다.
 - 새 시스템 API 를 도입하면 `scripts/OhMyFriend.entitlements` 갱신이 필요한지 확인한다. 특히 런타임 Metal 셰이더 컴파일(SceneKit shader modifier), JIT, 다른 앱 제어(Apple Events)는 Hardened Runtime 의 영향을 받는다. 검증은 번들을 하드닝 서명한 뒤 실제 앱에서 해당 기능을 켜서 확인한다.
+
+---
+
+## [앱 이름·번들 식별자 변경으로 기존 사용자 데이터가 고아가 됨]
+
+### 증상
+앱 이름과 번들 식별자를 바꾸자 macOS 가 이를 다른 앱으로 취급했다. 기존 사용자에게서
+발전 과제 진행도·밝기·날씨 설정이 모두 초기화되고, 모아둔 스킨 보관함이 보이지 않으며,
+접근성 권한을 다시 허용하라는 요구가 떴다. 자동 업데이트도 "패키지에서 OhMyFriend.app 을
+찾을 수 없습니다" 로 실패했다.
+
+### 원인
+1. `UserDefaults` 는 번들 식별자로 도메인이 갈리므로 `com.hong.ohmyfriend` → `com.hong.ohminefriend` 로 바꾸면 새 도메인은 빈 상태다.
+2. 지원 폴더 경로에 앱 이름이 들어 있어(`~/Library/Application Support/OhMyFriend/Skins`) 새 이름의 앱은 옛 폴더를 보지 않는다.
+3. 접근성·Apple Events 권한은 TCC 가 번들 식별자를 키로 관리하며 SIP 로 보호되어 프로그램이 옮길 수 없다.
+4. 구버전 `UpdateManager` 가 ZIP 안에서 `lastPathComponent == "OhMyFriend.app"` 을 하드코딩해 찾고 있었다.
+
+### 해결
+1. **1회 이전 모듈(`LegacyMigration.swift`)**: `applicationDidFinishLaunching` 최상단에서 실행해 옛 도메인의 앱 소유 키를 새 도메인으로 복사하고, 지원 폴더를 이동(실패 시 복사 폴백)한다. 새 도메인에 이미 값이 있으면 덮어쓰지 않는다.
+2. **화이트리스트 방식**: `dictionaryRepresentation()` 을 통째로 복사하지 않고 앱이 소유한 키만 옮긴다. 비샌드박스 앱 도메인에는 `NSWindow Frame ...`·`MetaJStats...` 같은 시스템 항목이 섞여 있고, 발전 과제 키는 하드코딩 대신 `AdvancementID.allCases` 에서 파생시킨다.
+3. **업데이터를 이름 비의존으로**: ZIP 안에서 특정 이름을 찾는 대신 최상위 `.app` 번들 중 실행 파일이 존재하는 것을 고른다. 이러면 앞으로 이름을 또 바꿔도 업데이트가 깨지지 않는다.
+4. **전환 릴리스 호환**: 구버전 업데이터는 여전히 옛 이름을 찾으므로, `make_zip.sh` 의 `LEGACY_APP_NAME` 으로 옛 이름 사본을 ZIP 에 동봉한다. 신버전으로 한 번 넘어가면 더는 필요 없다.
+5. **재승인 안내**: 코드로 옮길 수 없는 접근성 권한만 README·릴리스 노트에 명시한다.
+
+### 재발 방지
+- 번들 식별자는 한 번 정하면 바꾸지 않는다. 정말 바꿔야 하면 ① 설정·지원 폴더 이전 코드, ② 업데이터 이름 비의존화, ③ 권한 재승인 안내를 **같은 릴리스에** 묶는다.
+- `LoginItem`·`NSUserDefaults`·`Keychain`·`TCC`·지원 폴더가 모두 번들 식별자(또는 앱 이름)에 묶인다는 점을 변경 범위 산정에 항상 포함한다.
+- 이전 로직은 "이미 이전함" 플래그로 1회만 실행해, 사용자가 지운 폴더가 매 실행마다 되살아나지 않게 한다.

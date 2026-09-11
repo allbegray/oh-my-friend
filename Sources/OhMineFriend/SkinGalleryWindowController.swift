@@ -15,7 +15,7 @@ public final class SkinGalleryWindowController: NSWindowController {
         )
         window.title = "마인크래프트 스킨 갤러리 & 다운로더"
         window.center()
-        window.setFrameAutosaveName("OhMyFriend_SkinGalleryWindow")
+        window.setFrameAutosaveName("OhMineFriend_SkinGalleryWindow")
         window.isReleasedWhenClosed = false
 
         super.init(window: window)

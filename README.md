@@ -1,6 +1,6 @@
-이 문서는 Oh My Friend 프로젝트의 소개, 시작 방법 및 주요 기능을 안내합니다.
+이 문서는 Oh Mine Friend 프로젝트의 소개, 시작 방법 및 주요 기능을 안내합니다.
 
-# Oh My Friend: 마인크래프트 스타일의 macOS 데스크톱 컴패니언 🎮⛏️
+# Oh Mine Friend: 마인크래프트 스타일의 macOS 데스크톱 컴패니언 🎮⛏️
 
 > 맥 화면 위를 스스로 돌아다니고, 창문에 걸터앉거나, 마우스 커서를 바라보고, Dock을 툭툭 건드리는 3D 복셀 친구!
 
@@ -13,23 +13,29 @@
   xcode-select --install
   ```
 
-- **설치 (권장 · DMG)**: [GitHub Releases](https://github.com/allbegray/oh-my-friend/releases/latest)에서 `OhMyFriend-macOS-arm64.dmg` 내려받기 → 이미지 열기 → **OhMyFriend.app 을 Applications 로 드래그**.
+- **설치 (권장 · DMG)**: [GitHub Releases](https://github.com/allbegray/oh-mine-friend/releases/latest)에서 `OhMineFriend-macOS-arm64.dmg` 내려받기 → 이미지 열기 → **OhMineFriend.app 을 Applications 로 드래그**.
   - 처음 실행할 때 *"확인되지 않은 개발자"* 경고가 뜨면 **앱을 Control-클릭(우클릭) → 열기 → 열기**를 한 번만 해주면 이후로는 뜨지 않습니다.
   - 그 경고조차 피하려면 터미널에서 한 줄:
     ```bash
-    xattr -cr /Applications/OhMyFriend.app
+    xattr -cr /Applications/OhMineFriend.app
     ```
-- **설치 (ZIP)**: `OhMyFriend-macOS-arm64.zip` 을 받아 압축을 풀고 `OhMyFriend.app` 을 Applications 로 이동. 최초 1회 위와 동일하게 `xattr -cr` 또는 우클릭 → 열기.
+- **설치 (ZIP)**: `OhMineFriend-macOS-arm64.zip` 을 받아 압축을 풀고 `OhMineFriend.app` 을 Applications 로 이동. 최초 1회 위와 동일하게 `xattr -cr` 또는 우클릭 → 열기.
   - 이 ZIP 은 앱 내 **자동 업데이트(`Cmd + U`)** 가 내려받는 형식이라 계속 함께 배포됩니다.
 
 > 앱은 **Developer ID 서명 + Hardened Runtime** 상태로 배포되며, 인증서가 없는 로컬 빌드는 동일한 구성의 **ad-hoc 서명**으로 만들어집니다. Apple 공증(notarization)은 Developer ID 인증서가 있는 환경에서 자동으로 수행됩니다 — 자세한 내용은 `SECURITY.md` 참고.
 
+> ⚠️ **Oh My Friend 에서 이름이 바뀌었습니다 (v0.40.0).** 번들 식별자가 `com.hong.ohmyfriend` → `com.hong.ohminefriend` 로 바뀌므로:
+> - **자동 업데이트는 그대로 동작합니다.** v0.40.0 ZIP 에는 구버전 업데이터가 찾는 옛 이름(`OhMyFriend.app`) 사본이 함께 들어 있고, 업데이트를 마치면 앱 내부는 새 이름·새 식별자로 교체됩니다. 다만 인플레이스 교체라 `/Applications` 의 **폴더 이름은 `OhMyFriend.app` 그대로** 남습니다 — 이름까지 정리하려면 DMG 로 한 번 다시 설치하세요.
+> - 밝기·날씨·발전 과제·스킨 보관함은 첫 실행 시 **자동으로 이전**됩니다(`LegacyMigration`). `~/Library/Application Support/OhMyFriend/Skins` 가 `OhMineFriend/Skins` 로 옮겨집니다.
+> - **접근성 권한은 다시 허용해야 합니다.** macOS 가 권한을 번들 식별자에 묶어 관리하고 SIP 로 보호하므로 코드로 이전할 수 없습니다 (창 압축 최소화·타이핑 응원에 필요).
+
 - **소스에서 실행**:
   ```bash
-  git clone https://github.com/allbegray/oh-my-friend.git && cd oh-my-friend
+  git clone https://github.com/allbegray/oh-mine-friend.git && cd oh-mine-friend
   ./scripts/run.sh      # 빌드 및 즉시 실행
-  ./scripts/build_app.sh   # OhMyFriend.app 생성 (서명 포함)
+  ./scripts/build_app.sh   # OhMineFriend.app 생성 (서명 포함)
   ./scripts/make_dmg.sh    # 드래그 설치용 DMG 생성
+  ./scripts/make_zip.sh    # 자동 업데이트용 ZIP 생성
   ./scripts/install.sh  # /Applications에 설치
   ```
 

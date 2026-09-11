@@ -52,7 +52,7 @@ public final class SkinDownloaderService {
         // 1. Primary Source: Official Mojang Profile API (Single Source of Truth)
         if let mojangProfileURL = URL(string: "https://api.mojang.com/users/profiles/minecraft/\(trimmed)") {
             var req = URLRequest(url: mojangProfileURL)
-            req.setValue("OhMyFriend/1.0 (Macintosh; Mac OS X)", forHTTPHeaderField: "User-Agent")
+            req.setValue("OhMineFriend/1.0 (Macintosh; Mac OS X)", forHTTPHeaderField: "User-Agent")
 
             do {
                 let (profileData, profileRes) = try await session.data(for: req)
@@ -70,7 +70,7 @@ public final class SkinDownloaderService {
                         // 1-A. Mojang Session Server -> Official textures.minecraft.net CDN
                         if let sessionURL = URL(string: "https://sessionserver.mojang.com/session/minecraft/profile/\(uuid)") {
                             var sessionReq = URLRequest(url: sessionURL)
-                            sessionReq.setValue("OhMyFriend/1.0 (Macintosh; Mac OS X)", forHTTPHeaderField: "User-Agent")
+                            sessionReq.setValue("OhMineFriend/1.0 (Macintosh; Mac OS X)", forHTTPHeaderField: "User-Agent")
 
                             if let (sessionData, sessionRes) = try? await session.data(for: sessionReq),
                                let sHttp = sessionRes as? HTTPURLResponse, sHttp.statusCode == 200,
@@ -158,7 +158,7 @@ public final class SkinDownloaderService {
         }
 
         var req = URLRequest(url: url)
-        req.setValue("OhMyFriend/1.0 (Macintosh; Mac OS X)", forHTTPHeaderField: "User-Agent")
+        req.setValue("OhMineFriend/1.0 (Macintosh; Mac OS X)", forHTTPHeaderField: "User-Agent")
 
         let (data, response): (Data, URLResponse)
         do {

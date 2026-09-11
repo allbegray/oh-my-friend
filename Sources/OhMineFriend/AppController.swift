@@ -733,7 +733,7 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
 
         if let button = item.button {
             button.image = makeMiniSteveIcon()
-            button.toolTip = "마인크래프트 데스크톱 친구 (Oh My Friend)"
+            button.toolTip = "마인크래프트 데스크톱 친구 (Oh Mine Friend)"
         }
 
         item.menu = buildContextMenu()
