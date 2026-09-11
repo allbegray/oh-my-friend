@@ -413,13 +413,13 @@ public final class PetNode: SCNNode {
         wingRight.geometry = wingGeom
         wingRight.position = SCNVector3(0.18, 0, 0)
 
-        // Long tail feathers
-        let tailGeom = SCNBox(width: 0.14, height: 0.50, length: 0.04, chamferRadius: 0)
+        // Long tail feathers — 꼬리 상단(뿌리)을 몸통 뒷면 하단에 부착 (덜 가파르고 바닥에 끌리지 않도록 각도·길이 최적화 |\)
+        let tailGeom = SCNBox(width: 0.14, height: 0.36, length: 0.04, chamferRadius: 0)
         tailGeom.materials = [blueMat]
         let tailMesh = SCNNode(geometry: tailGeom)
-        tailMesh.position = SCNVector3(0, -0.50, -0.16)
-        tailMesh.eulerAngles.x = -0.25
-        tailJoint.position = SCNVector3(0, 0.265, -0.160)
+        tailMesh.position = SCNVector3(0, -0.18, 0)
+        tailMesh.eulerAngles.x = 0.52
+        tailJoint.position = SCNVector3(0, -0.05, -0.15)
         tailJoint.addChildNode(tailMesh)
 
         // 2 Claws: W=0.08, H=0.22, L=0.08
@@ -699,10 +699,14 @@ public final class PetNode: SCNNode {
             let wag = sin(animTime * 6.0) * 0.3
             tailJoint.eulerAngles.y = wag
 
-            // 원작 고증: 늑대 꼬리 각도는 체력에 비례
+            // 원작 고증: 늑대 꼬리 각도는 체력에 비례 / 앵무새는 착석 시 꼬리 들림 방지
             if kind == .wolf {
                 let basePitch = -0.45 + (wolfHealth * 1.15)
                 tailJoint.eulerAngles.x = basePitch
+            } else if kind == .parrot {
+                tailJoint.eulerAngles.x = 0.30
+            } else {
+                tailJoint.eulerAngles.x = 0
             }
             return
         }
@@ -726,6 +730,9 @@ public final class PetNode: SCNNode {
             // Tail wags vigorously when walking/running!
             let tailWagSpeed = isRunning ? 22.0 : 14.0
             tailJoint.eulerAngles.y = sin(animTime * tailWagSpeed) * 0.45
+            if kind != .wolf {
+                tailJoint.eulerAngles.x = 0
+            }
 
             // Parrot flaps wings when moving!
             if kind == .parrot {
@@ -746,6 +753,8 @@ public final class PetNode: SCNNode {
             if kind == .wolf {
                 let basePitch = -0.45 + (wolfHealth * 1.15)
                 tailJoint.eulerAngles.x = basePitch
+            } else {
+                tailJoint.eulerAngles.x = 0
             }
 
             if kind == .parrot {
