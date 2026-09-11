@@ -30,6 +30,26 @@ public enum SlimeSize: CaseIterable {
         case .small: return 40
         }
     }
+
+    /// 원작 히트박스(2.08 / 1.04 / 0.52 블록)에 맞춘 복셀 한 변(블록).
+    public var cubeEdge: CGFloat {
+        switch self {
+        case .big: return 2.0
+        case .medium: return 1.0
+        case .small: return 0.5
+        }
+    }
+
+    /// 패널 높이 대비 슬라임이 차지하는 비율. 카메라는 전 몹이 공유하므로, 크기별로 릭을
+    /// 확대해 작은 슬라임도 겔 외피와 얼굴이 읽히게 한다. 큰 슬라임이 창을 거의 채우면
+    /// 화면에서 부담스러워(2026-09-11 제보) 세 크기를 같은 비율(≈0.85)로 줄였다.
+    public var panelFill: CGFloat {
+        switch self {
+        case .big: return 0.66
+        case .medium: return 0.59
+        case .small: return 0.56
+        }
+    }
 }
 
 public protocol SlimeWindowDelegate: AnyObject {
@@ -43,11 +63,12 @@ public final class SlimeWindow: EntityWindow {
     public private(set) var position: CGPoint
     public weak var slimeDelegate: SlimeWindowDelegate?
 
+    private let rig: SlimeRig
     private var hp: Int
     private var hopTimer: Timer?
     private var hopPhase: CGFloat = 0
     private var direction: CGFloat = 1
-    private var rig: CubeRig?
+    private var wasAirborne = false
     private var isDead = false
     private var lifeTimer: TimeInterval = 0
     private let maxLife: TimeInterval = 12.0
@@ -59,47 +80,56 @@ public final class SlimeWindow: EntityWindow {
         self.hp = size.hitPoints
         let s = size.panelSize
         let frame = NSRect(x: startPos.x - s / 2.0, y: startPos.y, width: s, height: s)
-        super.init(contentRect: frame, ignoresMouse: false)
-        let view = MobSceneView(frame: NSRect(origin: .zero, size: frame.size))
-        let cubeSize: CGFloat
-        switch size {
-        case .big: cubeSize = 1.2
-        case .medium: cubeSize = 0.85
-        case .small: cubeSize = 0.6
-        }
-        let rig = CubeRig(color: .rgb(0.25, 0.85, 0.35), size: cubeSize, alpha: 0.82)
-        view.setSubject(rig)
+        let rig = SlimeRig(size: size.cubeEdge)
+        let view = SlimeRig.viewTransform(fill: size.panelFill, edge: size.cubeEdge)
+        rig.scale = SCNVector3(view.scale, view.scale, view.scale)
         self.rig = rig
-        view.onTap = { [weak self] in
+        super.init(contentRect: frame, ignoresMouse: false)
+        let sceneView = MobSceneView(frame: NSRect(origin: .zero, size: frame.size))
+        sceneView.setCamera(pitch: SlimeRig.viewPitch, cameraY: view.cameraY)
+        sceneView.setSubject(rig)
+        sceneView.onTap = { [weak self] in
             guard let self = self else { return }
             self.slimeDelegate?.attackSlime(self)
         }
-        contentView = view
+        contentView = sceneView
     }
 
     public func spawn() {
         orderFrontRegardless()
         SoundAndEffectsManager.shared.play(.splash)
+        rig.bounce(0.6) // 등장과 함께 젤리가 한 번 출렁인다
         hopTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] t in
             guard let self = self else { t.invalidate(); return }
-            self.hopPhase += 1.0 / 60.0
-            if Int(self.hopPhase * 2.0) % 4 == 0 && Int(self.hopPhase * 60.0) % 60 == 0 {
-                self.direction = Bool.random() ? 1 : -1
-            }
-            let hopCycle = self.hopPhase.truncatingRemainder(dividingBy: 0.9)
-            let hopHeight: CGFloat = hopCycle < 0.45 ? sin(hopCycle / 0.45 * CGFloat.pi) * 26.0 : 0
-            if hopCycle < 0.45 {
-                self.position.x += self.direction * 55.0 / 60.0
-            }
-            let s = self.slimeSize.panelSize
-            self.setFrameOrigin(NSPoint(x: self.position.x - s / 2.0, y: self.position.y + hopHeight))
-            self.rig?.squash(hopCycle < 0.45 ? 0.05 : 0.45)
-            self.lifeTimer += 1.0 / 60.0
-            if self.lifeTimer >= self.maxLife {
-                self.despawnNaturally()
-            }
+            self.step()
         }
         RunLoop.main.add(hopTimer!, forMode: .common)
+    }
+
+    /// 한 프레임: 포물선 홉 + 젤리 변형(공중에서 늘어나고 착지에서 튕긴다).
+    private func step() {
+        hopPhase += 1.0 / 60.0
+        if Int(hopPhase * 2.0) % 4 == 0 && Int(hopPhase * 60.0) % 60 == 0 {
+            direction = Bool.random() ? 1 : -1
+        }
+        let hopCycle = hopPhase.truncatingRemainder(dividingBy: 0.9)
+        let airborne = hopCycle < 0.45
+        let hopHeight: CGFloat = airborne ? sin(hopCycle / 0.45 * CGFloat.pi) * 26.0 : 0
+        if airborne {
+            position.x += direction * 55.0 / 60.0
+        }
+        let s = slimeSize.panelSize
+        setFrameOrigin(NSPoint(x: position.x - s / 2.0, y: position.y + hopHeight))
+        rig.stretch(airborne ? 1.0 : 0.0)
+        if wasAirborne && !airborne {
+            rig.bounce(1.0) // 착지 충격 → 젤리 진동
+        }
+        wasAirborne = airborne
+        rig.update(dt: 1.0 / 60.0)
+        lifeTimer += 1.0 / 60.0
+        if lifeTimer >= maxLife {
+            despawnNaturally()
+        }
     }
 
     private func despawnNaturally() {
@@ -119,6 +149,8 @@ public final class SlimeWindow: EntityWindow {
     public func takeHit() {
         guard !isDead else { return }
         hp -= 1
+        rig.flash()
+        rig.bounce(1.4)
         if hp <= 0 {
             isDead = true
             hopTimer?.invalidate()
@@ -136,35 +168,5 @@ public final class SlimeWindow: EntityWindow {
         hopTimer?.invalidate()
         hopTimer = nil
         super.close()
-    }
-}
-
-private final class SlimeDrawView: NSView {
-    var squash: CGFloat = 1.0
-    var flash: CGFloat = 0
-
-    override func draw(_ dirtyRect: NSRect) {
-        guard let ctx = NSGraphicsContext.current?.cgContext else { return }
-        let w = bounds.width
-        let h = bounds.height
-        let bodyH = h * 0.72 / squash
-        let bodyW = w * 0.86 * squash
-        let bx = (w - bodyW) / 2.0
-        let by = (h - bodyH) / 2.0
-        let alpha: CGFloat = 0.82
-        if flash > 0 {
-            ctx.setFillColor(red: 1.0, green: 1.0, blue: 1.0, alpha: alpha)
-            flash = 0
-        } else {
-            ctx.setFillColor(red: 0.25, green: 0.85, blue: 0.35, alpha: alpha)
-        }
-        ctx.fill(CGRect(x: bx, y: by, width: bodyW, height: bodyH))
-        ctx.setFillColor(red: 0.45, green: 0.95, blue: 0.55, alpha: alpha)
-        ctx.fill(CGRect(x: bx + 4, y: by + bodyH - 8, width: bodyW - 8, height: 5))
-        ctx.setFillColor(red: 0.08, green: 0.12, blue: 0.10, alpha: 1.0)
-        let eyeSize = max(4, w * 0.1)
-        ctx.fill(CGRect(x: bx + bodyW * 0.22, y: by + bodyH * 0.45, width: eyeSize, height: eyeSize * 1.4))
-        ctx.fill(CGRect(x: bx + bodyW * 0.62, y: by + bodyH * 0.45, width: eyeSize, height: eyeSize * 1.4))
-        ctx.fill(CGRect(x: bx + bodyW * 0.35, y: by + bodyH * 0.2, width: bodyW * 0.3, height: 3))
     }
 }

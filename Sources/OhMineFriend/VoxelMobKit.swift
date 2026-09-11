@@ -252,57 +252,201 @@ public final class FlyerRig: SCNNode {
     }
 }
 
-// MARK: - 큐브 릭 (슬라임/마그마큐브형)
+// MARK: - 슬라임 릭 (반투명 겔 외피 + 불투명 코어)
 
-/// 큐브 복셀 릭: 반투명 큐브+눈, squash(_:) 스쿼시 점프 변형.
-public final class CubeRig: SCNNode {
-    /// 반투명 큐브 몸통.
-    public let cube = SCNNode()
-    /// 왼쪽 눈 (전면 +Z).
-    public let eyeL = SCNNode()
-    /// 오른쪽 눈 (전면 +Z).
-    public let eyeR = SCNNode()
+/// 슬라임 복셀 릭: 반투명 겔 외피 + 불투명 내부 코어(눈·입) + 젤리 감쇠 진동.
+///
+/// 원작 슬라임은 **얼굴이 코어에만** 있고 외피에는 무늬만 있는 이중 구조다 — 외피 너머로
+/// 코어가 비쳐 보이는 이 층이 젤리 깊이를 만든다(단일 반투명 큐브는 색 유리로 보인다).
+/// 충격은 `bounce(_:)`로 넣고 `update(dt:)`가 매 프레임 변형을 적용하며, 변형 축은 발(y=0)이라
+/// 바닥에 붙은 채 납작해진다.
+public final class SlimeRig: SCNNode {
+    /// 반투명 겔 외피 (한 변 = size).
+    public let shell = SCNNode()
+    /// 불투명 내부 코어 (한 변 = size * coreRatio, 전면 +Z에 눈·입).
+    public let core = SCNNode()
 
-    /// 큐브 릭을 만든다 (size는 한 변 길이, alpha는 투명도).
-    public init(color: VoxelColor, size: CGFloat = 1.0, alpha: CGFloat = 0.75) {
-        super.init()
-        let box = SCNBox(width: size, height: size, length: size, chamferRadius: 0)
-        let mat = voxelMaterial(color)
-        if case .rgb(let r, let g, let b) = color {
-            mat.diffuse.contents = NSColor(red: r, green: g, blue: b, alpha: alpha)
-            mat.transparency = alpha
+    /// 외피 대비 코어 비율. 원작은 0.94(8 대 8.5)로 겔이 종이처럼 얇다 — 0.88로 조금 두껍게
+    /// 잡아 겔 층이 읽히게 하고, 얼굴이 외피 밖으로 나오지 않는 여유(0.06)를 남긴다.
+    private static let coreRatio: CGFloat = 0.88
+    /// 감쇠 스프링 상수(진동 240 · 감쇠 7 → 감쇠비 ≈ 0.23, 서너 번 튕기고 잦아든다).
+    private static let stiffness: CGFloat = 240.0
+    private static let damping: CGFloat = 7.0
+
+    // MARK: - 3/4 시점
+    //
+    // 정면 카메라로 정육면체를 똑바로 보면 세 면이 겹쳐 **정사각형 한 장(2D)** 으로 보인다
+    // (팔다리가 있는 다른 몹은 앞뒤 부품이 어긋나 3D로 읽히지만 큐브에는 그 단서가 없다).
+    // 그래서 슬라임만 몸을 35° 돌리고 카메라를 위에서 내려다보게 해 앞·옆·윗면 세 면이
+    // 동시에 보이게 한다 — 윗면 능선(가까운 모서리가 가장 높은 6각 실루엣)이 3D 단서다.
+
+    /// 몸을 트는 각(rad). 얼굴은 왼쪽 3/4로 남아 정면성이 유지된다.
+    public static let viewYaw: CGFloat = 0.70
+    /// 내려다보는 각(rad, 음수 = 아래로). 윗면이 보일 만큼만 기울인다.
+    public static let viewPitch: CGFloat = -0.34
+
+    /// 돌린 큐브의 가로 실루엣 배율(cos+sin) — 앞면 폭 예측 등에 쓴다.
+    public static var widthFactor: CGFloat {
+        cos(viewYaw) + sin(viewYaw)
+    }
+
+    /// 실루엣이 한 변보다 커지는 배율 — 세로 기준(내려보기로 윗면이 더해진다).
+    public static var silhouetteFactor: CGFloat {
+        cos(viewPitch) + sin(-viewPitch) * widthFactor
+    }
+
+    /// 채움 비율 `fill`에 맞춘 릭 배율과, 큐브 중심을 화면 중앙에 두는 카메라 높이.
+    /// (돌리고 내려본 만큼 실루엣이 커지므로 그만큼 작게 잡는다.)
+    public static func viewTransform(fill: CGFloat, edge: CGFloat) -> (scale: CGFloat, cameraY: CGFloat) {
+        let worldEdge = fill * MobSceneView.visibleHeight / silhouetteFactor
+        let scale = worldEdge / max(0.1, edge)
+        let cameraY = worldEdge / 2.0 - sin(viewPitch) * MobSceneView.cameraZ
+        return (scale, cameraY)
+    }
+
+    /// 변형 노드: 발(y=0)을 축으로 스쿼시·스트레치를 적용한다.
+    private let deform = SCNNode()
+    private var jiggle: CGFloat = 0        // + 납작 / − 늘어남
+    private var jiggleVelocity: CGFloat = 0
+    private var stretchAmount: CGFloat = 0
+    private var flashTimer: TimeInterval = 0
+
+    /// 코어는 외피보다 덜 변형된다 — 겔이 코어를 감싸고 있다는 인상을 주면서,
+    /// 어떤 순간에도 코어가 외피 밖으로 삐져나오지 않는다(둘 다 중심을 공유한다).
+    private static let coreDeformScale: CGFloat = 0.7
+
+    private let shellMaterial: SCNMaterial
+    private let coreMaterial: SCNMaterial
+    private let eyeMaterial: SCNMaterial
+    private let mouthMaterial: SCNMaterial
+
+    /// 슬라임 릭을 만든다 (size는 복셀 한 변, 시드가 다르면 무늬가 달라진다).
+    public init(size: CGFloat, shellSeed: UInt32 = 31, coreSeed: UInt32 = 32) {
+        let edge = max(0.1, size)
+
+        // 겔 외피: 원작 슬라임 팔레트(123,206,106 계열)에 투명도를 실어 반투명 재질로 만든다.
+        let shellAlpha: CGFloat = 0.42
+        shellMaterial = MobTexture.material(width: 8, height: 8, seed: shellSeed) { _, _, r in
+            switch r {
+            case ..<0.34: return NSColor(red: 0.451, green: 0.761, blue: 0.384, alpha: shellAlpha)
+            case ..<0.67: return NSColor(red: 0.484, green: 0.808, blue: 0.418, alpha: shellAlpha)
+            default: return NSColor(red: 0.384, green: 0.714, blue: 0.290, alpha: shellAlpha)
+            }
         }
-        box.materials = [mat]
-        cube.geometry = box
-        cube.position = SCNVector3(0, size / 2.0, 0)
-        addChildNode(cube)
-        let eyeBox = SCNBox(width: size * 0.12, height: size * 0.12, length: 0.02, chamferRadius: 0)
-        let socket = SCNMaterial()
-        socket.diffuse.contents = NSColor(red: 0.12, green: 0.12, blue: 0.12, alpha: 1.0)
-        socket.lightingModel = .physicallyBased
-        socket.roughness.contents = 0.9
-        socket.metalness.contents = 0.0
-        eyeBox.materials = [socket]
-        eyeL.geometry = eyeBox
-        eyeR.geometry = eyeBox
-        eyeL.position = SCNVector3(-size * 0.13, size * 0.08, size / 2.0 + 0.01)
-        eyeR.position = SCNVector3(size * 0.13, size * 0.08, size / 2.0 + 0.01)
-        cube.addChildNode(eyeL)
-        cube.addChildNode(eyeR)
+        shellMaterial.roughness.contents = 0.35      // 젖은 겔 하이라이트
+        shellMaterial.writesToDepthBuffer = false    // 코어를 가리지 않고 그 위로 블렌딩만 한다
+        shellMaterial.blendMode = .alpha
+
+        // 내부 코어: 불투명하고 외피보다 한 톤 진한 무늬. 같은 시드를 쓰지 않아 무늬가 겹치지 않는다.
+        let coreEdge = edge * Self.coreRatio
+        coreMaterial = MobTexture.material(width: 8, height: 8, seed: coreSeed) { _, _, r in
+            switch r {
+            case ..<0.34: return NSColor(red: 0.353, green: 0.667, blue: 0.263, alpha: 1.0)
+            case ..<0.67: return NSColor(red: 0.318, green: 0.627, blue: 0.243, alpha: 1.0)
+            default: return NSColor(red: 0.286, green: 0.573, blue: 0.216, alpha: 1.0)
+            }
+        }
+        coreMaterial.roughness.contents = 0.85
+
+        // 얼굴(원작 배치): 눈은 8x8 얼굴 기준 2x2 두 개가 위쪽 1/4, 입은 아래쪽 가로 막대.
+        eyeMaterial = MobTexture.material(width: 2, height: 2, seed: 1) { _, _, _ in
+            NSColor(red: 0.039, green: 0.039, blue: 0.039, alpha: 1.0)
+        }
+        eyeMaterial.roughness.contents = 0.9
+        mouthMaterial = MobTexture.material(width: 2, height: 2, seed: 2) { _, _, _ in
+            NSColor(red: 0.086, green: 0.157, blue: 0.063, alpha: 1.0)
+        }
+        mouthMaterial.roughness.contents = 0.9
+
+        super.init()
+
+        let shellBox = SCNBox(width: edge, height: edge, length: edge, chamferRadius: 0)
+        shellBox.materials = [shellMaterial]
+        shell.geometry = shellBox
+        shell.position = SCNVector3(0, edge / 2.0, 0)
+
+        let coreBox = SCNBox(width: coreEdge, height: coreEdge, length: coreEdge, chamferRadius: 0)
+        coreBox.materials = [coreMaterial]
+        core.geometry = coreBox
+
+        let faceDepth = coreEdge * 0.02
+        // 코어 얼굴(겔 안쪽): 외피 너머로 비쳐 보이는 깊이를 만든다.
+        addFace(to: core, extent: coreEdge, z: coreEdge / 2.0 + faceDepth / 2.0, depth: faceDepth)
+        // 외피 얼굴(겔 표면): 원작처럼 겔 바깥면에도 같은 얼굴이 있어, 반투명 외피에 씻기지 않고
+        // 또렷하게 보인다. 코어 얼굴이 그 뒤에 겹쳐 보여 얼굴이 겔 속에 잠긴 것처럼 읽힌다.
+        addFace(to: shell, extent: coreEdge, z: edge / 2.0 + faceDepth / 2.0, depth: faceDepth)
+
+        shell.addChildNode(core)
+        deform.addChildNode(shell)
+        deform.eulerAngles.y = Self.viewYaw
+        addChildNode(deform)
+    }
+
+    /// 얼굴 노드(겔 표면 겹 + 코어 겹, 각 눈 2 + 입 1) — 연출·검증에서 참조한다.
+    public private(set) var faceNodes: [SCNNode] = []
+
+    /// 얼굴(눈 2개 + 입 1개)을 노드 앞면(+Z)에 붙인다. 비율은 원작 8x8 얼굴 기준
+    /// (눈 2x2가 위쪽 1/4, 입은 아래쪽 가로 막대).
+    private func addFace(to node: SCNNode, extent: CGFloat, z: CGFloat, depth: CGFloat) {
+        let eyeBox = SCNBox(width: extent * 0.25, height: extent * 0.25, length: depth, chamferRadius: 0)
+        eyeBox.materials = [eyeMaterial]
+        for side in [-1.0, 1.0] as [CGFloat] {
+            let eye = SCNNode(geometry: eyeBox)
+            eye.position = SCNVector3(side * extent * 0.3125, extent * 0.125, z)
+            node.addChildNode(eye)
+            faceNodes.append(eye)
+        }
+        let mouthBox = SCNBox(width: extent * 0.75, height: extent * 0.125, length: depth, chamferRadius: 0)
+        mouthBox.materials = [mouthMaterial]
+        let mouth = SCNNode(geometry: mouthBox)
+        mouth.position = SCNVector3(0, -extent * 0.3125, z)
+        node.addChildNode(mouth)
+        faceNodes.append(mouth)
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
-    /// 스쿼시 변형: s=0 정상, s=1 최대 납작 (XZ 팽창 + Y 압축).
-    public func squash(_ s: CGFloat) {
-        let c = max(0, min(1, s))
-        cube.scale = SCNVector3(1 + 0.25 * c, 1 - 0.25 * c, 1 + 0.25 * c)
+    /// 착지·피격 충격: 감쇠 진동을 되튀게 한다 (1.0 ≈ 10% 납작, 1.4 ≈ 15%).
+    public func bounce(_ amount: CGFloat) {
+        jiggleVelocity += amount * 10.0
     }
 
-    /// 씬에 추가한다 (scale은 전체 축소/확대 배율).
-    public func addTo(_ scene: SCNScene, scale: CGFloat = 1.0) {
-        self.scale = SCNVector3(scale, scale, scale)
-        scene.rootNode.addChildNode(self)
+    /// 공중 체공 늘어남 (0 = 지면, 1 = 최대).
+    public func stretch(_ amount: CGFloat) {
+        stretchAmount = max(0, min(1, amount))
+    }
+
+    /// 피격 백색 섬광 (0.12초).
+    public func flash() {
+        flashTimer = 0.12
+        setEmission(NSColor.white)
+    }
+
+    /// 스프링 감쇠와 섬광 복구를 진행하고 변형을 적용한다.
+    public func update(dt: TimeInterval) {
+        let step = CGFloat(min(max(dt, 0), 1.0 / 30.0))
+        jiggleVelocity += (-Self.stiffness * jiggle - Self.damping * jiggleVelocity) * step
+        jiggle = max(-0.6, min(0.6, jiggle + jiggleVelocity * step))
+
+        if flashTimer > 0 {
+            flashTimer -= dt
+            if flashTimer <= 0 { setEmission(NSColor.black) }
+        }
+
+        let tall = 1 - 0.30 * jiggle + 0.14 * stretchAmount
+        let wide = 1 + 0.22 * jiggle - 0.07 * stretchAmount
+        deform.scale = SCNVector3(wide, tall, wide)
+        // 충격에 몸이 살짝 비틀린다 (젤리 비틀림 — 진동과 함께 잦아든다)
+        deform.eulerAngles.y = Self.viewYaw + jiggle * 0.12
+
+        let k = Self.coreDeformScale
+        core.scale = SCNVector3(1 + (wide - 1) * k, 1 + (tall - 1) * k, 1 + (wide - 1) * k)
+    }
+
+    private func setEmission(_ color: NSColor) {
+        for material in [shellMaterial, coreMaterial, eyeMaterial, mouthMaterial] {
+            material.emission.contents = color
+        }
     }
 }
 
@@ -310,6 +454,23 @@ public final class CubeRig: SCNNode {
 
 /// 투명 배경 + 정면 고정 카메라의 60fps 몹 뷰 (클릭/드래그를 클로저로 전달).
 public class MobSceneView: SCNView {
+    /// 기본 정면 카메라 (모든 몹 뷰가 공유): 높이 1.0 · 거리 3.8 · 화각 36°.
+    public static let cameraY: CGFloat = 1.0
+    public static let cameraZ: CGFloat = 3.8
+    public static let fov: CGFloat = 36.0
+    public static let pitch: CGFloat = -0.06
+    /// 이 카메라가 세로로 담는 월드 길이 (**중심 평면** 기준) — 3/4 시점 배율 계산에 쓴다.
+    public static var visibleHeight: CGFloat {
+        2.0 * cameraZ * tan(fov / 2.0 * .pi / 180.0)
+    }
+
+    /// 정면 고정 카메라를 조정한다 — 슬라임처럼 3/4 시점(위에서 내려다보기)이 필요한 뷰가 쓴다.
+    public func setCamera(pitch: CGFloat, cameraY: CGFloat, cameraZ: CGFloat = MobSceneView.cameraZ) {
+        guard let cameraNode = scene?.rootNode.childNode(withName: "stageCamera", recursively: false) else { return }
+        cameraNode.position = SCNVector3(0, cameraY, cameraZ)
+        cameraNode.eulerAngles = SCNVector3(pitch, 0, 0)
+    }
+
     /// 클릭(드래그 아닌 mouseUp) 시 호출된다.
     public var onTap: (() -> Void)?
     /// 드래그 중 화면 좌표가 전달된다.
@@ -328,7 +489,12 @@ public class MobSceneView: SCNView {
     /// 투명 배경 + 조명 + 정면 카메라를 갖춘 뷰를 만든다.
     public override init(frame: NSRect, options: [String: Any]? = nil) {
         super.init(frame: frame, options: options)
-        let (scene, stage) = makeStage(cameraY: 1.0, cameraZ: 3.8, fov: 36.0, pitch: -0.06)
+        let (scene, stage) = makeStage(
+            cameraY: Self.cameraY,
+            cameraZ: Self.cameraZ,
+            fov: Self.fov,
+            pitch: Self.pitch
+        )
         self.scene = scene
         self.stageNode = stage
         configure(self)

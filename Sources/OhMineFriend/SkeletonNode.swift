@@ -246,6 +246,10 @@ public final class SkeletonNode: SCNNode {
         sNode.position = SCNVector3(0, 0, 0.30)
         bowNode.addChildNode(sNode)
 
+        // 팔다리는 위아래(+Y 로컬), 시위는 뒤(-Z 로컬 = 궁수 쪽), 그립이 전방.
+        // 조준 자세에서 팔 관절이 -π/2.2 만큼 앞으로 젖혀지므로, 보정 없이는 활이 90° 눕어
+        // 시위가 머리 위(+Y)를 향하고 팔다리가 앞뒤로 벌어진다. x +π/2 로 세워 바로잡는다.
+        bowNode.eulerAngles = SCNVector3(CGFloat.pi / 2, 0, 0)
         bowNode.position = SCNVector3(0, -0.35, 0.15)
     }
 
