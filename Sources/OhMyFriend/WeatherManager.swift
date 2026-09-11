@@ -8,7 +8,15 @@ public enum WeatherState {
 
 public final class WeatherManager {
     public static let shared = WeatherManager()
-    public var isEnabled: Bool = true
+    private static let enabledKey = "isWeatherEnabled"
+    public var isEnabled: Bool {
+        get {
+            return UserDefaults.standard.bool(forKey: Self.enabledKey)
+        }
+        set {
+            UserDefaults.standard.set(newValue, forKey: Self.enabledKey)
+        }
+    }
     public private(set) var state: WeatherState = .clear
 
     private var stateTimer: TimeInterval = 0
