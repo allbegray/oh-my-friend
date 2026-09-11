@@ -598,9 +598,11 @@ public final class PetNode: SCNNode {
         let tailGeom = SCNBox(width: 0.14, height: 0.65, length: 0.14, chamferRadius: 0)
         tailGeom.materials = [maneMat]
         let tailMesh = SCNNode(geometry: tailGeom)
-        // 긴 축을 아래로 돌리고(π) 꼬리 상단(뿌리)이 엉덩이 뒤쪽에 물리도록 아래로 내린다.
-        tailMesh.position = SCNVector3(0, 0.54, 0.05)
-        tailMesh.eulerAngles.x = CGFloat.pi
+        // 말 꼬리는 뿌리가 엉덩이 위뒷면에, 끝이 아래·뒤로 늘어진다 — 수직 세움(π)은
+        // 몸 위로 삐져나온 수직 기둥처럼 보였다. +Y축을 앞으로 기울이면(+α) 아래쪽 끝이
+        // 뒤로 빠져 뿌리→끝이 아래+뒤가 된다(α=0.60 → 수직 대비 뒤 기울기 34°).
+        tailMesh.eulerAngles.x = 0.60
+        tailMesh.position = SCNVector3(0, -0.254, -0.244)
         tailJoint.position = SCNVector3(0, 0.286, -0.460)
         tailJoint.addChildNode(tailMesh)
 
