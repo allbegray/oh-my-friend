@@ -1,6 +1,8 @@
 .DS_Store
 /.build
 /OhMyFriend.app
+/OhMyFriend-macOS-arm64.dmg
+/OhMyFriend-macOS-arm64.zip
 *.xcodeproj
 *.xcworkspace
 xcuserdata/

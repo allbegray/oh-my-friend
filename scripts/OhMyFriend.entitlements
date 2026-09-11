@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!--
+      Hardened Runtime(공증 필수 요건) 아래에서 필요한 권한만 선언한다.
+      비샌드박스 앱이므로 파일·네트워크·화면 접근에는 권한이 필요 없고,
+      사용자 동의로 부여되는 접근성(AX) 권한도 entitlement 대상이 아니다.
+
+      Apple Events 만 예외다: WindowMinimizer 의 AppleScript 폴백
+      ("System Events" 에게 창 최소화를 지시)은 다른 앱에 Apple 이벤트를 보내므로
+      hardened runtime 에서 이 entitlement 와 Info.plist 의
+      NSAppleEventsUsageDescription 이 모두 있어야 동작한다.
+      없으면 공증 후 그 폴백 경로만 조용히 실패한다.
+    -->
+    <key>com.apple.security.automation.apple-events</key>
+    <true/>
+</dict>
+</plist>

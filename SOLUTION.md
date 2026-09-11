@@ -128,3 +128,41 @@ binary operator '-' cannot be applied to operands of type 'Float' and 'CGFloat'
 
 ### 재발 방지
 - 모든 전투 대상 엔티티는 피격 처리 선두에 `isAlive` 유효성 가드를 배치하고, 사망 트리거 시 상대방의 Aggro 및 타격 FSM 상태를 상호 동기화하여 즉각 해제합니다.
+
+---
+
+## [배포한 .app 이 Gatekeeper 에서 '손상됨'으로 판정]
+
+### 증상
+릴리스에서 내려받은 `OhMyFriend.app` 을 그대로 열면 *"손상되었기 때문에 열 수 없습니다. 휴지통으로 이동"* 경고가 뜬다. 터미널에서 확인하면:
+
+```bash
+$ codesign --verify --strict OhMyFriend.app
+OhMyFriend.app: code has no resources but signature indicates they must be present
+
+$ codesign -dv --verbose=2 OhMyFriend.app
+Identifier=OhMyFriend          # 번들 ID(com.hong.ohmyfriend)가 아니라 실행 파일 이름
+Info.plist=not bound           # Info.plist 가 서명에 묶이지 않음
+```
+
+### 원인
+`scripts/build_app.sh` 가 실행 파일만 복사하고 **번들 전체를 `codesign` 하지 않았다**. Swift/Clang 링커가 Mach-O 에 붙이는 ad-hoc 서명(`flags=0x20002(adhoc,linker-signed)`)만 존재하는 상태라, 번들에 `_CodeSignature/CodeResources` 가 없고 Info.plist 도 서명에 묶이지 않는다. macOS 는 이 서명을 "리소스가 실려 있어야 하는데 없다"고 해석해 번들 검증에 실패하고, 결과를 **손상됨**으로 분류한다.
+
+'손상됨' 경고는 "확인되지 않은 개발자" 경고와 질적으로 다르다 — 전자는 **열기 버튼 자체가 없고 휴지통 이동만 제안**하며, 우클릭 → 열기로도 우회되지 않는다. 사용자는 `xattr -cr` 을 직접 실행해야 했다.
+
+### 해결
+`build_app.sh` 에서 번들 전체를 항상 서명한다. Developer ID 인증서가 있으면 그 인증서 + Hardened Runtime 으로, 없으면 ad-hoc 으로 서명한다(둘 다 `--options runtime` 적용).
+
+```bash
+codesign --force --options runtime \
+    --entitlements scripts/OhMyFriend.entitlements \
+    --sign - OhMyFriend.app
+codesign --verify --deep --strict OhMyFriend.app
+```
+
+서명 후 `Identifier=com.hong.ohmyfriend`, `Info.plist entries=12`, `Sealed Resources version=2` 가 되고 `valid on disk` 를 만족한다. `restrict`/`--deep` 은 서명 시 쓰지 않는다(중첩 번들이 없으므로 불필요하고, Apple 이 `--deep` 서명을 권장하지 않는다).
+
+### 재발 방지
+- 빌드 스크립트는 **서명 검증(`codesign --verify --strict`)을 통과하지 못하면 실패**해야 한다. `make_dmg.sh` 는 서명되지 않은 번들을 감싸는 것을 거부한다.
+- Hardened Runtime 은 인증서 유무와 무관하게 항상 켠다. 로컬 ad-hoc 빌드가 배포본과 같은 제약을 드러내야 entitlement 누락(예: Apple Events)을 배포 전에 잡을 수 있다.
+- 새 시스템 API 를 도입하면 `scripts/OhMyFriend.entitlements` 갱신이 필요한지 확인한다. 특히 런타임 Metal 셰이더 컴파일(SceneKit shader modifier), JIT, 다른 앱 제어(Apple Events)는 Hardened Runtime 의 영향을 받는다. 검증은 번들을 하드닝 서명한 뒤 실제 앱에서 해당 기능을 켜서 확인한다.

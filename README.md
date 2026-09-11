@@ -12,11 +12,24 @@
   ```bash
   xcode-select --install
   ```
-- **바로 실행**: [GitHub Releases](https://github.com/allbegray/oh-my-friend/releases)에서 `OhMyFriend-macOS-arm64.zip` → `/Applications` 이동 → 최초 1회 `xattr -cr /Applications/OhMyFriend.app` → 실행
+
+- **설치 (권장 · DMG)**: [GitHub Releases](https://github.com/allbegray/oh-my-friend/releases/latest)에서 `OhMyFriend-macOS-arm64.dmg` 내려받기 → 이미지 열기 → **OhMyFriend.app 을 Applications 로 드래그**.
+  - 처음 실행할 때 *"확인되지 않은 개발자"* 경고가 뜨면 **앱을 Control-클릭(우클릭) → 열기 → 열기**를 한 번만 해주면 이후로는 뜨지 않습니다.
+  - 그 경고조차 피하려면 터미널에서 한 줄:
+    ```bash
+    xattr -cr /Applications/OhMyFriend.app
+    ```
+- **설치 (ZIP)**: `OhMyFriend-macOS-arm64.zip` 을 받아 압축을 풀고 `OhMyFriend.app` 을 Applications 로 이동. 최초 1회 위와 동일하게 `xattr -cr` 또는 우클릭 → 열기.
+  - 이 ZIP 은 앱 내 **자동 업데이트(`Cmd + U`)** 가 내려받는 형식이라 계속 함께 배포됩니다.
+
+> 앱은 **Developer ID 서명 + Hardened Runtime** 상태로 배포되며, 인증서가 없는 로컬 빌드는 동일한 구성의 **ad-hoc 서명**으로 만들어집니다. Apple 공증(notarization)은 Developer ID 인증서가 있는 환경에서 자동으로 수행됩니다 — 자세한 내용은 `SECURITY.md` 참고.
+
 - **소스에서 실행**:
   ```bash
   git clone https://github.com/allbegray/oh-my-friend.git && cd oh-my-friend
   ./scripts/run.sh      # 빌드 및 즉시 실행
+  ./scripts/build_app.sh   # OhMyFriend.app 생성 (서명 포함)
+  ./scripts/make_dmg.sh    # 드래그 설치용 DMG 생성
   ./scripts/install.sh  # /Applications에 설치
   ```
 

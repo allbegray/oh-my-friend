@@ -34,6 +34,22 @@ Oh My Friend는 순수 클라이언트 기반의 macOS 데스크톱 애플리케
 - 설정값이나 민감한 정보가 필요한 경우 환경 변수(`ProcessInfo.processInfo.environment`) 또는 macOS 시스템 키체인(`Keychain`)을 활용합니다.
 - `.gitignore`를 통해 빌드 산출물, 개인 IDE 설정, 캐시 파일의 커밋을 철저히 차단합니다.
 
+## 배포 바이너리 서명 및 공증
+배포물은 항상 **번들 전체가 코드 서명된 상태**로 만들어집니다. Mach-O 링커가 붙이는 ad-hoc 서명만으로는 `_CodeSignature/CodeResources` 가 없어 번들이 성립하지 않고(`code has no resources but signature indicates they must be present`), 그대로 배포하면 Gatekeeper 가 앱을 **손상됨**으로 판정해 "손상되었기 때문에 열 수 없습니다" 경고가 뜹니다. `scripts/build_app.sh` 는 항상 번들 전체를 서명해 이 상태를 방지합니다.
+
+서명 수준은 환경에 따라 자동으로 결정됩니다.
+
+| 환경 | 서명 | 공증 | 사용자 최초 실행 |
+| :--- | :--- | :--- | :--- |
+| Developer ID 인증서 + 공증 자격증명 | Developer ID Application + Hardened Runtime | O | 경고 없음 |
+| Developer ID 인증서만 | Developer ID Application + Hardened Runtime | X | "확인되지 않은 개발자" → 우클릭 → 열기 |
+| 인증서 없음(로컬 빌드) | ad-hoc + Hardened Runtime | X | "확인되지 않은 개발자" → 우클릭 → 열기 |
+
+- **Hardened Runtime 은 두 경로 모두에 적용**합니다. 인증서 없는 로컬 빌드가 배포본과 같은 제약을 드러내야 권한 누락을 미리 잡을 수 있기 때문입니다.
+- Hardened Runtime 아래에서 필요한 권한은 `scripts/OhMyFriend.entitlements` 에만 선언합니다. 현재 필요한 것은 `com.apple.security.automation.apple-events` 하나뿐입니다 — `WindowMinimizer` 의 AppleScript 폴백이 System Events 에 창 최소화를 요청하기 때문이며, 이 entitlement 와 Info.plist 의 `NSAppleEventsUsageDescription` 이 모두 없으면 공증 후 그 경로만 조용히 실패합니다.
+- 접근성(AX) 권한과 화면상 창 좌표 조회는 비샌드박스 앱이므로 entitlement 대상이 아니며, 사용자 동의로만 부여됩니다.
+- CI 자격증명은 GitHub Secrets 로만 주입하며(`MACOS_CERTIFICATE_P12`, `MACOS_CERTIFICATE_PASSWORD`, `NOTARY_APPLE_ID`, `NOTARY_TEAM_ID`, `NOTARY_PASSWORD`), 값이 없으면 서명·공증 단계를 건너뛰고 ad-hoc 배포본을 만듭니다. 저장소에는 어떤 인증서·비밀번호도 커밋되지 않습니다.
+
 ## 취약점 보고
 - 보안 취약점이나 잠재적 위험이 발견된 경우, 공개 이슈(Public Issue) 대신 GitHub 저장소의 **Private Vulnerability Reporting**을 이용해 비공개로 제보해 주시기 바랍니다.
 - 제보 접수 후 48시간 이내에 분석 및 패치 일정을 안내합니다.
