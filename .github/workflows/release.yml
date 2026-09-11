@@ -19,6 +19,15 @@ jobs:
     name: Build and Package (macOS arm64)
     runs-on: macos-14
 
+    # secrets 컨텍스트는 step 의 if: 에서 쓸 수 없다(GitHub 표현식 컨텍스트 제약).
+    # job 수준 env 로 끌어올려 env.X != '' 로 판정한다.
+    env:
+      MACOS_CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+      MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+      NOTARY_APPLE_ID: ${{ secrets.NOTARY_APPLE_ID }}
+      NOTARY_TEAM_ID: ${{ secrets.NOTARY_TEAM_ID }}
+      NOTARY_PASSWORD: ${{ secrets.NOTARY_PASSWORD }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -32,10 +41,7 @@ jobs:
       # Developer ID Application 인증서가 시크릿에 있으면 키체인에 설치한다.
       # 없으면 build_app.sh 가 ad-hoc 으로 서명하고, DMG 는 공증 없이 만들어진다.
       - name: Import Developer ID certificate
-        if: ${{ secrets.MACOS_CERTIFICATE_P12 != '' }}
-        env:
-          CERT_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
-          CERT_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+        if: env.MACOS_CERTIFICATE_P12 != ''
         run: |
           set -euo pipefail
           KEYCHAIN=build.keychain
@@ -43,8 +49,8 @@ jobs:
           security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
           security set-keychain-settings -lut 3600 "$KEYCHAIN"
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
-          echo "$CERT_P12" | base64 --decode > /tmp/cert.p12
-          security import /tmp/cert.p12 -k "$KEYCHAIN" -P "$CERT_PASSWORD" \
+          echo "$MACOS_CERTIFICATE_P12" | base64 --decode > /tmp/cert.p12
+          security import /tmp/cert.p12 -k "$KEYCHAIN" -P "$MACOS_CERTIFICATE_PASSWORD" \
             -T /usr/bin/codesign -T /usr/bin/security
           security set-key-partition-list -S apple-tool:,apple:,codesign: \
             -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" >/dev/null
@@ -54,10 +60,6 @@ jobs:
           security find-identity -v -p codesigning
 
       - name: Build Application Bundle
-        env:
-          NOTARY_APPLE_ID: ${{ secrets.NOTARY_APPLE_ID }}
-          NOTARY_TEAM_ID: ${{ secrets.NOTARY_TEAM_ID }}
-          NOTARY_PASSWORD: ${{ secrets.NOTARY_PASSWORD }}
         run: |
           chmod +x ./scripts/build_app.sh
           ./scripts/build_app.sh
@@ -71,10 +73,6 @@ jobs:
           echo "ZIP_NAME=${ZIP_NAME}" >> $GITHUB_ENV
 
       - name: Create DMG (드래그 설치용)
-        env:
-          NOTARY_APPLE_ID: ${{ secrets.NOTARY_APPLE_ID }}
-          NOTARY_TEAM_ID: ${{ secrets.NOTARY_TEAM_ID }}
-          NOTARY_PASSWORD: ${{ secrets.NOTARY_PASSWORD }}
         run: |
           chmod +x ./scripts/make_dmg.sh
           ./scripts/make_dmg.sh
