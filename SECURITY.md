@@ -35,7 +35,7 @@ Oh My Friend는 순수 클라이언트 기반의 macOS 데스크톱 애플리케
 - `.gitignore`를 통해 빌드 산출물, 개인 IDE 설정, 캐시 파일의 커밋을 철저히 차단합니다.
 
 ## 배포 바이너리 서명 및 공증
-배포물은 항상 **번들 전체가 코드 서명된 상태**로 만들어집니다. Mach-O 링커가 붙이는 ad-hoc 서명만으로는 `_CodeSignature/CodeResources` 가 없어 번들이 성립하지 않고(`code has no resources but signature indicates they must be present`), 그대로 배포하면 Gatekeeper 가 앱을 **손상됨**으로 판정해 "손상되었기 때문에 열 수 없습니다" 경고가 뜹니다. `scripts/build_app.sh` 는 항상 번들 전체를 서명해 이 상태를 방지합니다.
+배포물은 항상 **번들 전체가 코드 서명된 상태**로 만들어집니다. Mach-O 링커가 붙이는 ad-hoc 서명만으로는 `_CodeSignature/CodeResources` 가 없어 번들이 성립하지 않고(`code has no resources but signature indicates they must be present`), 그대로 배포하면 Gatekeeper 의 번들 검증이 실패합니다 — 이는 "서명을 신뢰할 수 없음"이 아니라 **서명 자체가 무효**한 상태라, macOS 가 앱을 손상된 것으로 처리해 우클릭 → 열기로도 우회되지 않습니다. `scripts/build_app.sh` 는 항상 번들 전체를 서명해 이 상태를 방지합니다.
 
 서명 수준은 환경에 따라 자동으로 결정됩니다.
 

@@ -131,10 +131,10 @@ binary operator '-' cannot be applied to operands of type 'Float' and 'CGFloat'
 
 ---
 
-## [배포한 .app 이 Gatekeeper 에서 '손상됨'으로 판정]
+## [배포한 .app 의 코드 서명이 무효해 Gatekeeper 검증 실패]
 
 ### 증상
-릴리스에서 내려받은 `OhMyFriend.app` 을 그대로 열면 *"손상되었기 때문에 열 수 없습니다. 휴지통으로 이동"* 경고가 뜬다. 터미널에서 확인하면:
+릴리스에서 내려받은 `OhMyFriend.app` 의 코드 서명이 무효 상태여서, 사용자가 앱을 그대로 열 수 없었다. 터미널에서 확인하면:
 
 ```bash
 $ codesign --verify --strict OhMyFriend.app
@@ -143,12 +143,19 @@ OhMyFriend.app: code has no resources but signature indicates they must be prese
 $ codesign -dv --verbose=2 OhMyFriend.app
 Identifier=OhMyFriend          # 번들 ID(com.hong.ohmyfriend)가 아니라 실행 파일 이름
 Info.plist=not bound           # Info.plist 가 서명에 묶이지 않음
+
+$ spctl --assess --type execute --verbose=4 OhMyFriend.app
+OhMyFriend.app: code has no resources but signature indicates they must be present
 ```
 
-### 원인
-`scripts/build_app.sh` 가 실행 파일만 복사하고 **번들 전체를 `codesign` 하지 않았다**. Swift/Clang 링커가 Mach-O 에 붙이는 ad-hoc 서명(`flags=0x20002(adhoc,linker-signed)`)만 존재하는 상태라, 번들에 `_CodeSignature/CodeResources` 가 없고 Info.plist 도 서명에 묶이지 않는다. macOS 는 이 서명을 "리소스가 실려 있어야 하는데 없다"고 해석해 번들 검증에 실패하고, 결과를 **손상됨**으로 분류한다.
+(`spctl` 은 서명을 "신뢰할 수 없음"이 아니라 **구조가 깨졌음**으로 보고한다. 서명이 무효한 앱은 macOS 가 *"손상되었기 때문에 열 수 없습니다"* 로 처리하며, 이 경고에는 열기 버튼이 없고 휴지통 이동만 제안된다 — Apple 문서 기준 동작이며, 이 저장소에서는 `codesign`/`spctl` 출력으로 서명 무효까지를 직접 확인했다. 실제 사용자 화면의 경고 문구는 격리된 다운로드 환경이 필요해 재현하지 못했다.)
 
-'손상됨' 경고는 "확인되지 않은 개발자" 경고와 질적으로 다르다 — 전자는 **열기 버튼 자체가 없고 휴지통 이동만 제안**하며, 우클릭 → 열기로도 우회되지 않는다. 사용자는 `xattr -cr` 을 직접 실행해야 했다.
+이 때문에 README 는 사용자에게 `xattr -cr` 을 직접 실행하도록 안내해야 했다.
+
+### 원인
+`scripts/build_app.sh` 가 실행 파일만 복사하고 **번들 전체를 `codesign` 하지 않았다**. Swift/Clang 링커가 Mach-O 에 붙이는 ad-hoc 서명(`flags=0x20002(adhoc,linker-signed)`)만 존재하는 상태라, 번들에 `_CodeSignature/CodeResources` 가 없고 Info.plist 도 서명에 묶이지 않는다. macOS 는 이 서명을 "리소스가 실려 있어야 하는데 없다"고 해석해 번들 검증에 실패하고, 결과를 손상으로 분류한다.
+
+서명 무효는 "확인되지 않은 개발자"와 질적으로 다르다. 후자는 서명이 유효하되 신뢰할 수 없는 경우라 우클릭 → 열기로 사용자가 승인할 수 있지만, 전자는 검증 자체가 실패한 상태라 그 우회가 통하지 않는다.
 
 ### 해결
 `build_app.sh` 에서 번들 전체를 항상 서명한다. Developer ID 인증서가 있으면 그 인증서 + Hardened Runtime 으로, 없으면 ad-hoc 으로 서명한다(둘 다 `--options runtime` 적용).
