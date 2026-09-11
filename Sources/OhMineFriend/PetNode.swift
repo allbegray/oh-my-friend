@@ -515,17 +515,17 @@ public final class PetNode: SCNNode {
         let hoofMat = makeLambert(color: NSColor(red: 0.20, green: 0.18, blue: 0.16, alpha: 1.0))
         let eyeMat = makeLambert(color: NSColor(red: 0.10, green: 0.10, blue: 0.10, alpha: 1.0))
 
-        let bodyGeom = SCNBox(width: 0.60, height: 0.65, length: 1.15, chamferRadius: 0)
+        let bodyGeom = SCNBox(width: 0.60, height: 0.65, length: 1.65, chamferRadius: 0)
         bodyGeom.materials = [coatMat]
         bodyAnchor.geometry = bodyGeom
         bodyAnchor.position = SCNVector3(0, 0.95, 0)
 
-        let blanketGeom = SCNBox(width: 0.66, height: 0.14, length: 0.70, chamferRadius: 0)
+        let blanketGeom = SCNBox(width: 0.66, height: 0.14, length: 0.80, chamferRadius: 0)
         blanketGeom.materials = [saddleMat]
         let blanket = SCNNode(geometry: blanketGeom)
         blanket.position = SCNVector3(0, 0.34, -0.05)
         bodyAnchor.addChildNode(blanket)
-        let seatGeom = SCNBox(width: 0.34, height: 0.12, length: 0.40, chamferRadius: 0)
+        let seatGeom = SCNBox(width: 0.34, height: 0.12, length: 0.46, chamferRadius: 0)
         seatGeom.materials = [maneMat]
         let seat = SCNNode(geometry: seatGeom)
         seat.position = SCNVector3(0, 0.44, -0.05)
@@ -534,17 +534,17 @@ public final class PetNode: SCNNode {
         let neckGeom = SCNBox(width: 0.34, height: 0.62, length: 0.34, chamferRadius: 0)
         neckGeom.materials = [coatMat]
         let neck = SCNNode(geometry: neckGeom)
-        neck.position = SCNVector3(0, 0.42, 0.62)
+        neck.position = SCNVector3(0, 0.42, 0.82)
         neck.eulerAngles.x = -0.35
         bodyAnchor.addChildNode(neck)
         let maneGeom = SCNBox(width: 0.12, height: 0.60, length: 0.14, chamferRadius: 0)
         maneGeom.materials = [maneMat]
         let mane = SCNNode(geometry: maneGeom)
-        mane.position = SCNVector3(0, 0.48, 0.44)
+        mane.position = SCNVector3(0, 0.48, 0.62)
         mane.eulerAngles.x = -0.35
         bodyAnchor.addChildNode(mane)
 
-        headJoint.position = SCNVector3(0, 0.62, 0.78)
+        headJoint.position = SCNVector3(0, 0.62, 0.98)
         let headGeom = SCNBox(width: 0.36, height: 0.42, length: 0.55, chamferRadius: 0)
         headGeom.materials = [coatMat]
         let headMesh = SCNNode(geometry: headGeom)
@@ -570,10 +570,10 @@ public final class PetNode: SCNNode {
 
         let legGeom = SCNBox(width: 0.18, height: 0.70, length: 0.18, chamferRadius: 0)
         legGeom.materials = [coatMat]
-        buildLeg(legFL, geom: legGeom, x: -0.20, y: -0.32, z: 0.40)
-        buildLeg(legFR, geom: legGeom, x: 0.20, y: -0.32, z: 0.40)
-        buildLeg(legBL, geom: legGeom, x: -0.20, y: -0.32, z: -0.40)
-        buildLeg(legBR, geom: legGeom, x: 0.20, y: -0.32, z: -0.40)
+        buildLeg(legFL, geom: legGeom, x: -0.20, y: -0.32, z: 0.55)
+        buildLeg(legFR, geom: legGeom, x: 0.20, y: -0.32, z: 0.55)
+        buildLeg(legBL, geom: legGeom, x: -0.20, y: -0.32, z: -0.55)
+        buildLeg(legBR, geom: legGeom, x: 0.20, y: -0.32, z: -0.55)
         let hoofGeom = SCNBox(width: 0.20, height: 0.12, length: 0.20, chamferRadius: 0)
         hoofGeom.materials = [hoofMat]
         let whiteMarkMat = makeLambert(color: NSColor(red: 0.93, green: 0.93, blue: 0.90, alpha: 1.0))
@@ -601,11 +601,11 @@ public final class PetNode: SCNNode {
         // 말 꼬리는 뿌리가 엉덩이 위뒷면에, 끝이 아래·뒤로 늘어진다 — 수직 세움(π)은
         // 몸 위로 삐져나온 수직 기둥처럼 보였다. +Y축을 앞으로 기울이면(+α) 아래쪽 끝이
         // 뒤로 빠져 뿌리→끝이 아래+뒤가 된다(α=0.60 → 수직 대비 뒤 기울기 34°).
+        // 몸통 길이 1.65(뒷면 z −0.825)에 맞춰 뿌리를 새 엉덩이에 매립한다.
         tailMesh.eulerAngles.x = 0.60
-        tailMesh.position = SCNVector3(0, -0.254, -0.244)
-        tailJoint.position = SCNVector3(0, 0.286, -0.460)
+        tailMesh.position = SCNVector3(0, -0.268, -0.184)
+        tailJoint.position = SCNVector3(0, 0.300, -0.780)
         tailJoint.addChildNode(tailMesh)
-
         wingLeft.isHidden = true
         wingRight.isHidden = true
     }
