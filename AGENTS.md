@@ -112,10 +112,11 @@ Sources/OhMyFriend/
 ├── EntityKit.swift                     # 배회·타격·쿨다운·토글 순수 타입 + 슬롯
 ├── PlayerState.swift                   # 플레이어 재화·버프·강화 13필드
 ├── MenuBuilder.swift                   # 메뉴 구축 521줄 분리(선언적 entries)
-└── MobDirector.swift                   # 앰비언트 몹 자동 스폰 6종 분리
+├── MobDirector.swift                   # 앰비언트 몹 자동 스폰 6종 분리
 ├── MenuSearch.swift                    # 검색 내장 메뉴(3대 대형 메뉴 실시간 필터)
 ├── VoxelMobKit.swift                   # 3D 복셀 릭 4종 + SceneKit 몹 뷰
-```
+├── StageBrightness.swift               # 화면 밝기 프리셋 및 광원 효과 on/off 중앙 관리자
+└── UpdateManager.swift                 # GitHub Releases 연동 자동 업데이트 및 인플레이스 교체/재시작
 ```
 
 - **렌더링 & 애니메이션 파이프라인**: `CharacterView` 내부의 `SCNScene`에서 `MinecraftCharacterNode`가 관절 피벗(목, 어깨, 골반)을 기반으로 회전 및 위치를 실시간 보간합니다.
@@ -126,6 +127,7 @@ Sources/OhMyFriend/
 ## 실행 기록
 
 ### 2026-09-11
+- **[자동 업데이트 기능 구축]**: `UpdateManager.swift` 신규 도입. GitHub Releases API(`api.github.com/.../releases/latest`)와 연동하여 최신 버전 및 바이너리(`OhMyFriend-macOS-arm64.zip`) 자동 감지. 시맨틱 버전 비교(isVersion greaterThan)로 업데이트 여부 판별. 백그라운드 다운로드(`URLSession`), macOS 내장 `ditto -xk` 압축 해제, 독립 셸 스크립트를 통한 무중단 인플레이스 교체/격리해제(`xattr -cr`)/재실행 파이프라인 구현. 메뉴바 및 ⚙️ 설정에 `🔄 업데이트 확인 (v\(version))...` 항목(단축키 Cmd+U) 배치 및 앱 시작 3초 후 조용한 백그라운드 확인 연동. `build_app.sh`의 `CFBundleShortVersionString` 동적 주입 연동. 검증: 번들 빌드, API 통신 확인 및 스모크 테스트 정상 통과.
 - **[전투 AI 버그 수정] 쓰러진 스켈레톤 계속 타격 오류 수정**: 스켈레톤 및 몹에 생존 판정 플래그(`isAlive`) 도입. 쓰러짐(사망 진행 중, `hp <= 0` 또는 `.dying`) 시 `guard isAlive`로 추가 피격 차단, 주인공의 Aggro 타이머(`skeletonAggroTimer = 0`), 무기 공격 모션 해제, 돌격 중단(`behavior.stopCharging()`)을 즉시 연동하여 쓰러진 몹을 계속 타격하며 사망 타이머가 리셋되던 문제 완전 해결. 크리퍼·엔더맨에도 동일 생존 가드 적용. 검증: 번들 빌드 및 스모크 테스트 정상 통과.
 - **[스켈레톤 좌우 버벅임 완화 및 100% 밝기 기준 승격]**: 스켈레톤의 `turnCooldown`(1.5초) 도입, 낮 시간대 창문 그늘(`currentShade`) 내부 순찰 가드, 햇빛 도피(`fleeingSun`) 후 그늘 진입 시 불필요한 역방향 반전 버그 수정으로 초고속 좌우 진동 현상 해결. 기존 150%("매우 밝게") 광량을 새로운 100%("보통", 기본값) 기준으로 승격(`effectiveLvl = lvl * 1.50`)하여 충분한 기본 시인성 확보. 검증: 번들 빌드 및 스모크 테스트 정상 통과.
 - **[전투 AI] 스켈레톤 화살 피격 시 적극적 공격(Aggro) 모드**: 스켈레톤의 화살에 피격(또는 방패 방어) 시 즉시 비무장 상태에서 다이아몬드 검 발도 + 분노 돌격 대사 출력 + 8초간 Aggro 모드 가동. 220pt/s 고속 스프린트 돌격(`State.charge`), 고저차 도약 점프, 사정거리(110pt) 내 0.22초 쿨다운의 빠른 연속 칼질로 스켈레톤 격퇴 시까지 맹렬히 추격. 검증: 번들 빌드 및 스모크 테스트 정상 통과.

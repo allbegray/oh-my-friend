@@ -150,6 +150,19 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
 
         // 6. Default companion: tuxedo cat on every launch
         summonPet(kind: .cat)
+
+        // 7. Background Auto-Update Check (앱 시작 3초 후 조용히 확인)
+        UpdateManager.shared.onUpdateStatusChanged = { [weak self] release in
+            DispatchQueue.main.async {
+                self?.rebuildContextMenu()
+                if let r = release {
+                    self?.window.characterView.characterNode.showOverheadEmoji("🚀 새 버전(v\(r.version)) 출시!", duration: 3.5)
+                }
+            }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+            UpdateManager.shared.checkForUpdates(manual: false)
+        }
     }
 
     // MARK: - Game Loop
@@ -1087,6 +1100,14 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
             y: mainScreen.visibleFrame.minY + 20
         )
         physics.velocity = .zero
+    }
+
+    @objc func didSelectCheckForUpdates() {
+        UpdateManager.shared.checkForUpdates(manual: true)
+    }
+
+    public func rebuildContextMenu() {
+        self.statusItem?.menu = buildContextMenu()
     }
 
     @objc func didSelectQuit() {

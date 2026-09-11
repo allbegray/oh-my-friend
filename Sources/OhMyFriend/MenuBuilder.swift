@@ -582,6 +582,22 @@ struct MenuBuilder {
         nagToggleItem.state = NotificationCenterMonitor.shared.isEnabled ? .on : .off
         settingsMenu.addItem(nagToggleItem)
 
+        // Update Check in Settings Menu
+        settingsMenu.addItem(NSMenuItem.separator())
+        let updateTitle: String
+        if let update = UpdateManager.shared.availableUpdate {
+            updateTitle = "🚀 새 버전(v\(update.version)) 업데이트 가능!"
+        } else {
+            updateTitle = "🔄 업데이트 확인 (v\(UpdateManager.currentVersion))..."
+        }
+        let settingsUpdateItem = NSMenuItem(
+            title: updateTitle,
+            action: #selector(AppController.didSelectCheckForUpdates),
+            keyEquivalent: ""
+        )
+        settingsUpdateItem.target = app
+        settingsMenu.addItem(settingsUpdateItem)
+
         // Creeper Spawning Toggle
         let creeperToggleItem = NSMenuItem(
             title: "👾 가끔 크리퍼 출현 모드",
@@ -621,6 +637,15 @@ struct MenuBuilder {
         app.attackMenuItem = attackItem
         advancedMenu.addItem(attackItem)
         menu.addItem(NSMenuItem.separator())
+
+        // 5. Update Check in Root Menu
+        let rootUpdateItem = NSMenuItem(
+            title: updateTitle,
+            action: #selector(AppController.didSelectCheckForUpdates),
+            keyEquivalent: "u"
+        )
+        rootUpdateItem.target = app
+        menu.addItem(rootUpdateItem)
 
         // 6. Quit
         let quitItem = NSMenuItem(
