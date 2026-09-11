@@ -240,9 +240,8 @@ public final class PetNode: SCNNode {
         let tailGeom = SCNBox(width: 0.12, height: 0.40, length: 0.12, chamferRadius: 0)
         tailGeom.materials = [furMat]
         let tailMesh = SCNNode(geometry: tailGeom)
-        tailMesh.position = SCNVector3(0, 0.16, -0.16)
-        tailMesh.eulerAngles.x = CGFloat.pi / 4.0 // 45 deg up!
-        tailJoint.position = SCNVector3(0, 0.15, -0.42)
+        tailMesh.eulerAngles.x = -CGFloat.pi / 4.0 // 45 deg, 뒤로 뻗는다
+        tailJoint.position = SCNVector3(0, 0.131, -0.520)
         tailJoint.addChildNode(tailMesh)
 
         wingLeft.isHidden = true
@@ -329,13 +328,14 @@ public final class PetNode: SCNNode {
         buildLeg(legBL, geom: legGeom, x: -0.14, y: -0.20, z: -0.24)
         buildLeg(legBR, geom: legGeom, x: 0.14, y: -0.20, z: -0.24)
 
-        // Long swishing tail
+        // Long swishing tail — 뿌리(아래쪽 끝)를 엉덩이 뒤면에 붙인다.
+        // euler.x 부호는 뒤(+Y)로 뻗는 방향이다. 양수면 꼬리가 앞(등 중앙)으로 기울어
+        // 엉덩이 밖으로 도려낸 부분이 공중에 뜬 막대로 보인다.
         let tailGeom = SCNBox(width: 0.08, height: 0.55, length: 0.08, chamferRadius: 0)
         tailGeom.materials = [blackMat]
         let tailMesh = SCNNode(geometry: tailGeom)
-        tailMesh.position = SCNVector3(0, 0.1375, -0.238)
-        tailMesh.eulerAngles.x = CGFloat.pi / 3.0
-        tailJoint.position = SCNVector3(0, 0.10, -0.30)
+        tailMesh.eulerAngles.x = -CGFloat.pi / 4.0
+        tailJoint.position = SCNVector3(0, 0.194, -0.381)
         tailJoint.addChildNode(tailMesh)
 
         wingLeft.isHidden = true
@@ -417,9 +417,9 @@ public final class PetNode: SCNNode {
         let tailGeom = SCNBox(width: 0.14, height: 0.50, length: 0.04, chamferRadius: 0)
         tailGeom.materials = [blueMat]
         let tailMesh = SCNNode(geometry: tailGeom)
-        tailMesh.position = SCNVector3(0, -0.22, -0.16)
-        tailMesh.eulerAngles.x = 0.25
-        tailJoint.position = SCNVector3(0, -0.10, -0.12)
+        tailMesh.position = SCNVector3(0, -0.50, -0.16)
+        tailMesh.eulerAngles.x = -0.25
+        tailJoint.position = SCNVector3(0, 0.265, -0.160)
         tailJoint.addChildNode(tailMesh)
 
         // 2 Claws: W=0.08, H=0.22, L=0.08
@@ -500,8 +500,8 @@ public final class PetNode: SCNNode {
         let tailGeom = SCNBox(width: 0.08, height: 0.12, length: 0.08, chamferRadius: 0)
         tailGeom.materials = [darkPinkMat]
         let tailMesh = SCNNode(geometry: tailGeom)
-        tailMesh.position = SCNVector3(0, 0.08, -0.06)
-        tailJoint.position = SCNVector3(0, 0.10, -0.44)
+        tailMesh.position = SCNVector3(0, 0.06, -0.04)
+        tailJoint.position = SCNVector3(0, 0.095, -0.440)
         tailJoint.addChildNode(tailMesh)
 
         wingLeft.isHidden = true
@@ -598,8 +598,10 @@ public final class PetNode: SCNNode {
         let tailGeom = SCNBox(width: 0.14, height: 0.65, length: 0.14, chamferRadius: 0)
         tailGeom.materials = [maneMat]
         let tailMesh = SCNNode(geometry: tailGeom)
-        tailMesh.position = SCNVector3(0, -0.25, -0.08)
-        tailJoint.position = SCNVector3(0, 0.10, -0.58)
+        // 긴 축을 아래로 돌리고(π) 꼬리 상단(뿌리)이 엉덩이 뒤쪽에 물리도록 아래로 내린다.
+        tailMesh.position = SCNVector3(0, 0.54, 0.05)
+        tailMesh.eulerAngles.x = CGFloat.pi
+        tailJoint.position = SCNVector3(0, 0.286, -0.460)
         tailJoint.addChildNode(tailMesh)
 
         wingLeft.isHidden = true
