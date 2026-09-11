@@ -110,3 +110,21 @@ binary operator '-' cannot be applied to operands of type 'Float' and 'CGFloat'
 
 ### 재발 방지
 - 물리적 좌표 제약(Clamping)이 존재하는 컴포넌트와 FSM 판단 로직 간에는 마진 값을 최소 10~15pt 이상 여유 있게 일치시키고, 모든 이동 FSM 상태에는 정체 감지(Anti-stuck guard)를 필수로 포함합니다.
+
+---
+
+## [사망 진행 중인 몹(스켈레톤) 지속 타격 및 넉백 무한 루프]
+
+### 증상
+스켈레톤의 HP가 0이 되어 쓰러지는 사망 애니메이션 진행 중에도 캐릭터의 Aggro 모드가 꺼지지 않아 계속 칼질을 가하고, 몹의 피격 플래시와 넉백 타이머가 리셋되어 완전히 사라지지 않는 현상 발생.
+
+### 원인
+1. `SkeletonWindow.takeHit()`에 체력 고갈 시 즉시 공격을 차단하는 생존 플래그(`isAlive`) 가드가 누락되어 있었음.
+2. 플레이어의 스켈레톤 추격 Aggro 타이머(`skeletonAggroTimer`) 및 돌격 상태가 몹의 사망 시점에 즉시 리셋되지 않아 타격 모션이 잔류함.
+
+### 해결
+1. 스켈레톤 및 적대적 몹에 `isAlive` 프로퍼티 도입, `hp <= 0` 또는 `.dying` 진입 시 `guard isAlive`로 추가 피격을 완전 차단.
+2. 몹 사망 진입 즉시 캐릭터 컨트롤러의 `skeletonAggroTimer = 0`, 무기 공격 모션 해제, 돌격 중단(`behavior.stopCharging()`)을 연동.
+
+### 재발 방지
+- 모든 전투 대상 엔티티는 피격 처리 선두에 `isAlive` 유효성 가드를 배치하고, 사망 트리거 시 상대방의 Aggro 및 타격 FSM 상태를 상호 동기화하여 즉각 해제합니다.
