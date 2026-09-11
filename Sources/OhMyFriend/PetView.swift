@@ -35,6 +35,7 @@ public final class PetView: SCNView {
         // Pet body centered (Y = 0.6), feet at Y = 0
         petNode.position = SCNVector3(0, 0, 0)
         stage.addChildNode(petNode)
+        StageBrightness.apply(to: scene)
     }
 
     // MARK: - Mouse Events

@@ -218,7 +218,8 @@ struct MenuBuilder {
         // 5. Fun Interactions Submenu: 주제별 5개 그룹(몹 13 + 농장 15 + 펫 12 + 액션 15 + 전투 8 = 63).
         let mobEntries: [ExtraMenuEntry] = [
             ExtraMenuEntry({ "🏹 스켈레톤 소환 (Spawn Skeleton)" }, { [weak app] in app?.didSelectSpawnSkeleton() }),
-            ExtraMenuEntry({ "💥 크리퍼 소환 (Spawn Creeper)" }, { [weak app] in app?.didSelectSpawnCreeper() }, keyEquivalent: "k"),
+            ExtraMenuEntry({ "💥 4족 크리퍼 소환 (4-Legged)" }, { [weak app] in app?.didSelectSpawnQuadCreeper() }, keyEquivalent: "k"),
+            ExtraMenuEntry({ "💥 2족 크리퍼 소환 (2-Legged)" }, { [weak app] in app?.didSelectSpawnBipedCreeper() }),
             ExtraMenuEntry({ "👁️ 엔더맨 소환 (Spawn Enderman)" }, { [weak app] in app?.didSelectSpawnEnderman() }, keyEquivalent: "e"),
             ExtraMenuEntry({ "🟢 슬라임 소환 (Spawn Slime)" }, { [weak app] in app?.didSelectSpawnSlime() }),
             ExtraMenuEntry({ "🐺 야생 늑대 부르기 (Wild Wolf)" }, { [weak app] in app?.didSelectSpawnWildWolf() }),
@@ -440,6 +441,48 @@ struct MenuBuilder {
         weatherItem.state = WeatherManager.shared.isEnabled ? .on : .off
         settingsMenu.addItem(weatherItem)
 
+        // Creeper Form Submenu
+        let creeperFormMenu = NSMenu()
+        let quadItem = NSMenuItem(
+            title: "4족 크리퍼 (원작)",
+            action: #selector(AppController.didSelectCreeperLegPreference(_:)),
+            keyEquivalent: ""
+        )
+        quadItem.target = app
+        quadItem.representedObject = CreeperLegType.quadruped.rawValue
+        if app.preferredCreeperLegType == .quadruped {
+            quadItem.state = .on
+        }
+        creeperFormMenu.addItem(quadItem)
+
+        let bipedItem = NSMenuItem(
+            title: "2족 크리퍼 (직립)",
+            action: #selector(AppController.didSelectCreeperLegPreference(_:)),
+            keyEquivalent: ""
+        )
+        bipedItem.target = app
+        bipedItem.representedObject = CreeperLegType.biped.rawValue
+        if app.preferredCreeperLegType == .biped {
+            bipedItem.state = .on
+        }
+        creeperFormMenu.addItem(bipedItem)
+
+        let randomItem = NSMenuItem(
+            title: "🎲 무작위 (50:50 Random)",
+            action: #selector(AppController.didSelectCreeperLegPreference(_:)),
+            keyEquivalent: ""
+        )
+        randomItem.target = app
+        randomItem.representedObject = "random"
+        if app.preferredCreeperLegType == nil {
+            randomItem.state = .on
+        }
+        creeperFormMenu.addItem(randomItem)
+
+        let creeperFormSubmenuItem = NSMenuItem(title: "💥 크리퍼 형태 선택", action: nil, keyEquivalent: "")
+        creeperFormSubmenuItem.submenu = creeperFormMenu
+        settingsMenu.addItem(creeperFormSubmenuItem)
+
 
         // Skeleton Spawning Toggle
         let skelToggleItem = NSMenuItem(
@@ -497,6 +540,35 @@ struct MenuBuilder {
         powerModeItem.target = app
         powerModeItem.state = app.isPowerModeEnabled ? .on : .off
         settingsMenu.addItem(powerModeItem)
+
+        // Granular Brightness Submenu
+        let brightnessMenu = NSMenu()
+        for preset in StageBrightness.presets {
+            let bItem = NSMenuItem(
+                title: preset.title,
+                action: #selector(AppController.didSelectBrightnessLevel(_:)),
+                keyEquivalent: ""
+            )
+            bItem.target = app
+            bItem.representedObject = preset.level
+            if abs(StageBrightness.level - preset.level) < 0.01 {
+                bItem.state = .on
+            }
+            brightnessMenu.addItem(bItem)
+        }
+        let brightnessSubmenuItem = NSMenuItem(title: "💡 화면 밝기 조절 (Brightness)", action: nil, keyEquivalent: "")
+        brightnessSubmenuItem.submenu = brightnessMenu
+        settingsMenu.addItem(brightnessSubmenuItem)
+
+        // 3D Lighting Effect Toggle (기본값: OFF)
+        let lightingToggleItem = NSMenuItem(
+            title: "✨ 3D 입체 광원 효과",
+            action: #selector(AppController.didToggleLightingEffect(_:)),
+            keyEquivalent: ""
+        )
+        lightingToggleItem.target = app
+        lightingToggleItem.state = StageBrightness.isLightingEffectEnabled ? .on : .off
+        settingsMenu.addItem(lightingToggleItem)
 
         // L4. Battery Hunger Toggle
         let batteryToggleItem = NSMenuItem(

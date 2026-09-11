@@ -15,6 +15,17 @@ public final class EndermanBehaviorController {
     public private(set) var hp: Int = 4
     public var isDespawned: Bool = false
 
+    /// 엔더맨 생존 여부 (사망 진행 중일 때는 false)
+    public var isAlive: Bool {
+        if isDespawned || hp <= 0 { return false }
+        switch state {
+        case .dying:
+            return false
+        default:
+            return true
+        }
+    }
+
     public var isEnraged: Bool {
         if case .enraged = state { return true }
         return false
@@ -172,13 +183,14 @@ public final class EndermanBehaviorController {
         screen: NSScreen,
         onDefeated: @escaping () -> Void
     ) {
-        guard !isDespawned else { return }
+        guard isAlive else { return }
 
         hp -= damage
         let dx = endermanPhysics.position.x - playerPos.x
         let knockbackDir: CGFloat = dx >= 0 ? 1.0 : -1.0
 
         if hp <= 0 {
+            hp = 0
             endermanNode.showOverheadEmoji("🔮 엔더 진주 획득!", duration: 2.5)
             SoundAndEffectsManager.shared.play(.heart)
             state = .dying(timer: 0.85)

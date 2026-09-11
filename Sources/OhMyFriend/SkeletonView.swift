@@ -34,6 +34,7 @@ public final class SkeletonView: SCNView {
         // Skeleton body centered, feet at Y = 0
         skeletonNode.position = SCNVector3(0, 0, 0)
         stage.addChildNode(skeletonNode)
+        StageBrightness.apply(to: scene)
     }
 
     // MARK: - Mouse Interaction

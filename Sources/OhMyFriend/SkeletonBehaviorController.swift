@@ -15,10 +15,23 @@ public final class SkeletonBehaviorController {
     public private(set) var hp: Int = 3
     public var isDespawned: Bool = false
 
+    /// 스켈레톤이 생존해 있는지 여부 (쓰러지거나 사망 진행 중일 때는 false)
+    public var isAlive: Bool {
+        if isDespawned || hp <= 0 { return false }
+        switch state {
+        case .dying:
+            return false
+        default:
+            return true
+        }
+    }
+
     private let walkSpeed: CGFloat = 50.0
     private let fleeSpeed: CGFloat = 85.0
     private let aimDistance: CGFloat = 340.0
     private var aimCooldown: TimeInterval = 4.0
+    private var sunPanicCooldown: TimeInterval = 0
+    private var turnCooldown: TimeInterval = 0
 
     public init() {}
 
@@ -34,6 +47,13 @@ public final class SkeletonBehaviorController {
     ) {
         guard !isDespawned else { return }
 
+        if sunPanicCooldown > 0 {
+            sunPanicCooldown -= Double(dt)
+        }
+        if turnCooldown > 0 {
+            turnCooldown -= Double(dt)
+        }
+
         let skelPos = skeletonPhysics.position
         let dxToPlayer = playerPos.x - skelPos.x
         let distToPlayer = hypot(dxToPlayer, playerPos.y - skelPos.y)
@@ -44,28 +64,43 @@ public final class SkeletonBehaviorController {
         let isDaytime = currentHour >= 6 && currentHour < 18
 
         // 창문 그늘 아래에 있는지 검사 (스켈레톤 머리 위로 창문이 덮고 있는지)
-        let isUnderShade = platforms.contains { p in
+        let currentShade = platforms.first { p in
             guard case .window = p.kind, let bottom = p.yBottom else { return false }
-            return bottom > skelPos.y && skelPos.x >= (p.xMin - 20) && skelPos.x <= (p.xMax + 20)
+            return bottom > skelPos.y && skelPos.x >= (p.xMin - 15) && skelPos.x <= (p.xMax + 15)
         }
+        let isUnderShade = currentShade != nil
 
         let shouldBurnInSun = isDaytime && !isUnderShade
         skeletonNode.isBurning = shouldBurnInSun
 
-        // 햇빛에 불타는 경우 그늘로 피신 우선!
-        if shouldBurnInSun {
+        // 햇빛에 불타는 경우 그늘로 피신 (단, 그늘이 없을 때는 벽에 계속 비비지 않도록 쿨다운 적용)
+        if shouldBurnInSun && sunPanicCooldown <= 0 {
             if case .fleeingSun = state {} else if case .dying = state {} else {
-                skeletonNode.showOverheadEmoji("🔥 치이익! 햇빛이다!", duration: 1.5)
-                SoundAndEffectsManager.shared.play(.ignite)
-                // 가장 가까운 창문 그늘 X좌표 탐색
+                // 머리 위로 덮어주는 실제 창문 그늘 탐색
                 let nearestShade = platforms.first { p in
-                    guard case .window = p.kind else { return false }
-                    return p.yBottom != nil
+                    guard case .window = p.kind, let bottom = p.yBottom else { return false }
+                    return bottom > skelPos.y
                 }
-                let targetX = nearestShade?.xMin ?? (screen.frame.minX + 80)
-                state = .fleeingSun(targetShadeX: targetX, timer: 4.0)
+                if let shade = nearestShade {
+                    skeletonNode.showOverheadEmoji("🔥 치이익! 그늘로!", duration: 1.5)
+                    SoundAndEffectsManager.shared.play(.ignite)
+                    let targetX = (shade.xMin + shade.xMax) / 2.0
+                    turnCooldown = 1.5
+                    state = .fleeingSun(targetShadeX: targetX, timer: 6.0)
+                } else {
+                    // 창문 그늘이 전혀 없으면 화면 중앙 방향으로 패닉 질주
+                    skeletonNode.showOverheadEmoji("🔥 으악! 그늘이 없어!", duration: 1.5)
+                    SoundAndEffectsManager.shared.play(.ignite)
+                    sunPanicCooldown = 8.0
+                    turnCooldown = 2.0
+                    let fleeDir: CGFloat = skeletonPhysics.position.x > screen.frame.midX ? -1.0 : 1.0
+                    state = .roaming(direction: fleeDir, timer: 3.5)
+                }
             }
         }
+
+        let leftEdge = screen.frame.minX + 45.0
+        let rightEdge = screen.frame.maxX - 45.0
 
         switch state {
         case .roaming(var dir, var timer):
@@ -73,16 +108,40 @@ public final class SkeletonBehaviorController {
             aimCooldown -= Double(dt)
             skeletonNode.isAiming = false
             skeletonNode.walkSpeed = walkSpeed
-            skeletonNode.modelRoot.eulerAngles.y = dir > 0 ? (CGFloat.pi / 2.0) : (-CGFloat.pi / 2.0)
 
-            skeletonPhysics.position.x += dir * walkSpeed * dt
-
-            // 화면 가장자리 반전
-            if skeletonPhysics.position.x <= screen.frame.minX + 40 && dir < 0 {
-                dir = 1.0
-            } else if skeletonPhysics.position.x >= screen.frame.maxX - 40 && dir > 0 {
-                dir = -1.0
+            // 낮 시간대 그늘 안에 있으면 그늘 밖으로 뛰어나가지 않고 그늘 내부를 순찰
+            if isDaytime, let shade = currentShade {
+                sunPanicCooldown = 4.0
+                let shadeMinX = shade.xMin + 20.0
+                let shadeMaxX = shade.xMax - 20.0
+                if shadeMaxX > shadeMinX {
+                    if skeletonPhysics.position.x <= shadeMinX && dir < 0 {
+                        dir = 1.0
+                        turnCooldown = 1.5
+                        timer = Double.random(in: 2.5...4.5)
+                    } else if skeletonPhysics.position.x >= shadeMaxX && dir > 0 {
+                        dir = -1.0
+                        turnCooldown = 1.5
+                        timer = Double.random(in: 2.5...4.5)
+                    }
+                }
             }
+
+            // 화면 가장자리 반전 및 벽 충돌 방어
+            if skeletonPhysics.position.x <= leftEdge {
+                skeletonPhysics.position.x = leftEdge
+                dir = 1.0
+                turnCooldown = 1.5
+                if timer < 2.0 { timer = Double.random(in: 2.5...4.5) }
+            } else if skeletonPhysics.position.x >= rightEdge {
+                skeletonPhysics.position.x = rightEdge
+                dir = -1.0
+                turnCooldown = 1.5
+                if timer < 2.0 { timer = Double.random(in: 2.5...4.5) }
+            }
+
+            skeletonNode.modelRoot.eulerAngles.y = dir > 0 ? (CGFloat.pi / 2.0) : (-CGFloat.pi / 2.0)
+            skeletonPhysics.position.x += dir * walkSpeed * dt
 
             // 플레이어가 조준 사정거리(340pt) 이내에 있고 쿨다운 완료 시 조준 돌입!
             if distToPlayer < aimDistance && aimCooldown <= 0 {
@@ -95,8 +154,22 @@ public final class SkeletonBehaviorController {
             }
 
             if timer <= 0 {
-                timer = Double.random(in: 2.0...4.5)
-                dir = Bool.random() ? 1.0 : -1.0
+                timer = Double.random(in: 2.5...5.0)
+                if turnCooldown <= 0 {
+                    if skeletonPhysics.position.x <= screen.frame.minX + 90.0 {
+                        dir = 1.0
+                        turnCooldown = 1.5
+                    } else if skeletonPhysics.position.x >= screen.frame.maxX - 90.0 {
+                        dir = -1.0
+                        turnCooldown = 1.5
+                    } else {
+                        let newDir = Bool.random() ? 1.0 : -1.0
+                        if newDir != dir {
+                            dir = newDir
+                            turnCooldown = 1.5
+                        }
+                    }
+                }
             }
             state = .roaming(direction: dir, timer: timer)
 
@@ -117,7 +190,8 @@ public final class SkeletonBehaviorController {
                 let arrowStart = CGPoint(x: skelPos.x, y: skelPos.y + 35)
                 onShootArrow(arrowStart, targetPos)
 
-                state = .roaming(direction: -dirToPlayer, timer: 2.5)
+                turnCooldown = 2.0
+                state = .roaming(direction: -dirToPlayer, timer: 2.8)
             } else {
                 state = .aiming(playerPos: playerPos, chargeTimer: chargeTimer)
             }
@@ -127,13 +201,33 @@ public final class SkeletonBehaviorController {
             skeletonNode.isAiming = false
             skeletonNode.walkSpeed = fleeSpeed
 
-            let dir: CGFloat = targetX >= skelPos.x ? 1.0 : -1.0
+            var dir: CGFloat = targetX >= skelPos.x ? 1.0 : -1.0
+
+            // 벽 충돌 가드: 화면 끝에 닿으면 즉시 튕겨서 반대편으로 방향 전환
+            var hitWall = false
+            if skeletonPhysics.position.x <= leftEdge {
+                skeletonPhysics.position.x = leftEdge
+                dir = 1.0
+                hitWall = true
+            } else if skeletonPhysics.position.x >= rightEdge {
+                skeletonPhysics.position.x = rightEdge
+                dir = -1.0
+                hitWall = true
+            }
+
             skeletonNode.modelRoot.eulerAngles.y = dir > 0 ? (CGFloat.pi / 2.0) : (-CGFloat.pi / 2.0)
             skeletonPhysics.position.x += dir * fleeSpeed * dt
 
-            // 그늘에 안착했거나 타이머 만료 시
-            if isUnderShade || timer <= 0 {
-                state = .roaming(direction: dir, timer: 3.0)
+            // 그늘에 안착했거나 타깃에 도달 시: 억지로 반대방향(-dir)으로 돌려 햇빛으로 나가지 않고 그늘 안에서 안정적으로 배회
+            let reachedTarget = abs(skelPos.x - targetX) < 35.0
+            if isUnderShade || reachedTarget {
+                sunPanicCooldown = 4.0
+                turnCooldown = 1.5
+                state = .roaming(direction: dir, timer: Double.random(in: 3.0...5.0))
+            } else if hitWall || timer <= 0 {
+                sunPanicCooldown = 4.0
+                turnCooldown = 1.5
+                state = .roaming(direction: -dir, timer: Double.random(in: 2.5...4.0))
             } else {
                 state = .fleeingSun(targetShadeX: targetX, timer: timer)
             }
@@ -171,13 +265,14 @@ public final class SkeletonBehaviorController {
         skeletonNode: SkeletonNode,
         onDefeated: @escaping () -> Void
     ) {
-        guard !isDespawned else { return }
+        guard isAlive else { return }
 
         hp -= damage
         let dx = skeletonPhysics.position.x - playerPos.x
         let knockbackDir: CGFloat = dx >= 0 ? 1.0 : -1.0
 
         if hp <= 0 {
+            hp = 0
             let loots = ["🦴 뼈다귀 획득!", "➡️ 화살 획득!", "🏹 낡은 활 획득!"]
             skeletonNode.showOverheadEmoji(loots.randomElement() ?? loots[0], duration: 2.2)
             SoundAndEffectsManager.shared.play(.pop)

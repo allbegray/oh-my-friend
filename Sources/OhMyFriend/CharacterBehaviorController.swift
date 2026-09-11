@@ -33,6 +33,7 @@ public final class CharacterBehaviorController {
         case throwTrident(timeLeft: TimeInterval)
         case jukebox(timeLeft: TimeInterval, beatTimer: TimeInterval)
         case drinkMilk(timeLeft: TimeInterval)
+        case charge(targetX: CGFloat, speed: CGFloat, duration: TimeInterval)
     }
 
     public private(set) var state: State = .idle(timeLeft: 2.0)
@@ -730,6 +731,31 @@ public final class CharacterBehaviorController {
                 state = .drinkMilk(timeLeft: timeLeft)
             }
 
+        case .charge(let targetX, let speed, var duration):
+            characterNode.isSitting = false
+            characterNode.isPoking = false
+            characterNode.isWaving = false
+            characterNode.isSneaking = false
+            characterNode.isSleeping = false
+            characterNode.isEating = false
+            characterNode.walkSpeed = 1.6
+
+            let dx = targetX - physics.position.x
+            let dir: CGFloat = dx >= 0 ? 1.0 : -1.0
+            let targetBodyYaw: CGFloat = dir > 0 ? (CGFloat.pi / 2.0) : (-CGFloat.pi / 2.0)
+            characterNode.modelRoot.eulerAngles.y = targetBodyYaw
+
+            let step = dir * speed * CGFloat(dt)
+            physics.position.x += step
+            duration -= dt
+
+            let reached = dir > 0 ? (physics.position.x >= targetX) : (physics.position.x <= targetX)
+            if reached || duration <= 0 {
+                chooseNextState(physics: physics, platforms: platforms, screen: screen, cursorPos: cursorPos, characterNode: characterNode)
+            } else {
+                state = .charge(targetX: targetX, speed: speed, duration: duration)
+            }
+
         case .nag(var timeLeft, var phraseTimer, var phraseIndex):
             timeLeft -= dt
             phraseTimer -= dt
@@ -1240,6 +1266,35 @@ public final class CharacterBehaviorController {
             } else {
                 state = .idle(timeLeft: 2.0)
             }
+        }
+    }
+
+    /// 적대적 몹(크리퍼, 스켈레톤 등)과 근접 충돌 시 반대 방향으로 즉시 후퇴
+    public func recoilFromHostile(awayFrom hostileX: CGFloat, physics: PhysicsEngine, characterNode: MinecraftCharacterNode) {
+        let fleeDir: CGFloat = physics.position.x >= hostileX ? 1.0 : -1.0
+        let targetX = physics.position.x + fleeDir * 120.0
+        state = .walk(
+            direction: fleeDir,
+            targetX: targetX,
+            duration: 0,
+            lastX: physics.position.x,
+            stuckTime: 0
+        )
+        characterNode.modelRoot.eulerAngles.y = fleeDir > 0 ? (CGFloat.pi / 2.0) : (-CGFloat.pi / 2.0)
+    }
+
+    /// 적대적 몹을 향해 빠른 속도로 돌격
+    public func chargeAt(targetX: CGFloat, speed: CGFloat = 220.0, duration: TimeInterval = 0.5, physics: PhysicsEngine, characterNode: MinecraftCharacterNode) {
+        state = .charge(targetX: targetX, speed: speed, duration: duration)
+        let dir: CGFloat = targetX >= physics.position.x ? 1.0 : -1.0
+        characterNode.modelRoot.eulerAngles.y = dir > 0 ? (CGFloat.pi / 2.0) : (-CGFloat.pi / 2.0)
+        characterNode.walkSpeed = 1.6
+    }
+
+    /// 돌격 중단 및 기본 대기 상태로 복귀
+    public func stopCharging() {
+        if case .charge = state {
+            state = .idle(timeLeft: 0.8)
         }
     }
 

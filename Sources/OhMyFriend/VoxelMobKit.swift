@@ -343,6 +343,9 @@ public class MobSceneView: SCNView {
         subject = node
         node.position = SCNVector3(0, 0, 0)
         stageNode.addChildNode(node)
+        if let scene = scene {
+            StageBrightness.apply(to: scene)
+        }
     }
 
     /// 드래그 시작점을 기록한다.

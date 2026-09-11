@@ -34,6 +34,7 @@ public final class EndermanView: SCNView {
         // Enderman's tall body (Y = 1.6), feet at Y = 0
         endermanNode.position = SCNVector3(0, 0, 0)
         stage.addChildNode(endermanNode)
+        StageBrightness.apply(to: scene)
     }
 
     // MARK: - Mouse Interaction

@@ -42,6 +42,22 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
     private var creeperBehavior: CreeperBehaviorController?
     var isCreeperSpawnEnabled: Bool = true
     var creeperSpawnInterval: TimeInterval = 120.0 // Occasional spawn every ~2 min
+    var preferredCreeperLegType: CreeperLegType? {
+        get {
+            guard let raw = UserDefaults.standard.string(forKey: "preferredCreeperLegType") else {
+                return nil // 기본값: 무작위 (4족/2족 50:50)
+            }
+            if raw == "random" { return nil }
+            return CreeperLegType(rawValue: raw)
+        }
+        set {
+            if let val = newValue {
+                UserDefaults.standard.set(val.rawValue, forKey: "preferredCreeperLegType")
+            } else {
+                UserDefaults.standard.set("random", forKey: "preferredCreeperLegType")
+            }
+        }
+    }
     let player = PlayerState()
 
     // Enderman Entity (엔더맨 출현 & 시선 마주침)
@@ -58,6 +74,7 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
     var isSkeletonSpawnEnabled: Bool = true
     var skeletonSpawnInterval: TimeInterval = 140.0
     private var activeArrows: [ArrowEntityWindow] = []
+    private var skeletonAggroTimer: TimeInterval = 0
     private var activeTridents: [TridentEntityWindow] = []
 
     // L2. Skin Filter & L3. Glint & L4. Battery
@@ -234,10 +251,33 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
             cw.creeperView.creeperNode.update(deltaTime: CGFloat(dt))
             cw.setFeetPosition(x: cPhys.position.x, y: cPhys.position.y)
 
-            // Auto-attack if player has weapon equipped and Creeper gets dangerously close (< 100pt)
+            // Solid collision & Hostile engagement (크리퍼 충돌·밀침 및 무기/도주 반응)
             let dist = hypot(cPhys.position.x - physics.position.x, cPhys.position.y - physics.position.y)
-            if dist < 100.0 && !cBehav.isDespawned && player.playerAttackTimer <= 0 {
-                attackCreeperWithCurrentWeapon()
+            let dy = abs(physics.position.y - cPhys.position.y)
+            let dx = physics.position.x - cPhys.position.x
+            let solidRadius: CGFloat = 52.0
+
+            if dy < 45.0 && abs(dx) < solidRadius && cBehav.isAlive {
+                let overlap = solidRadius - abs(dx)
+                let pushDir: CGFloat = dx >= 0 ? 1.0 : -1.0
+                physics.position.x += pushDir * (overlap * 0.5)
+                cPhys.position.x -= pushDir * (overlap * 0.5)
+
+                let currentWeapon = window.characterView.characterNode.currentHeldItem
+                let isWeapon = (currentWeapon == .diamondSword || currentWeapon == .axe || currentWeapon == .trident || currentWeapon == .diamondPickaxe || currentWeapon == .bow)
+
+                if isWeapon && player.playerAttackTimer <= 0 {
+                    attackCreeperWithCurrentWeapon()
+                } else if !isWeapon {
+                    behavior.recoilFromHostile(awayFrom: cPhys.position.x, physics: physics, characterNode: window.characterView.characterNode)
+                    window.characterView.characterNode.showOverheadEmoji("😱 으악! 크리퍼다!", duration: 1.2)
+                }
+            } else if dist < 100.0 && cBehav.isAlive && player.playerAttackTimer <= 0 {
+                let currentWeapon = window.characterView.characterNode.currentHeldItem
+                let isWeapon = (currentWeapon == .diamondSword || currentWeapon == .axe || currentWeapon == .trident || currentWeapon == .diamondPickaxe || currentWeapon == .bow)
+                if isWeapon {
+                    attackCreeperWithCurrentWeapon()
+                }
             }
         }
 
@@ -305,20 +345,21 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
 
             // Auto-attack if player has weapon and Enderman charges dangerously close
             let dist = hypot(ePhys.position.x - physics.position.x, ePhys.position.y - physics.position.y)
-            if dist < 110.0 && !eBehav.isDespawned && eBehav.isEnraged && player.playerAttackTimer <= 0 {
+            if dist < 110.0 && eBehav.isAlive && eBehav.isEnraged && player.playerAttackTimer <= 0 {
                 attackEndermanWithCurrentWeapon()
             }
         }
 
         // 4.8. Update Skeleton Entity
         if let sw = skeletonWindow, let sPhys = skeletonPhysics, let sBehav = skeletonBehavior {
+            let skelScreen = ScreenEnvironment.shared.screen(for: sPhys.position)
             sBehav.update(
                 deltaTime: CGFloat(dt),
                 skeletonPhysics: sPhys,
                 skeletonNode: sw.skeletonView.skeletonNode,
                 playerPos: physics.position,
                 platforms: cachedPlatforms,
-                screen: screen,
+                screen: skelScreen,
                 onShootArrow: { [weak self] startPos, targetPos in
                     self?.launchArrowFromSkeleton(from: startPos, to: targetPos)
                 },
@@ -326,14 +367,66 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
                     self?.handleSkeletonDefeated()
                 }
             )
-            sPhys.update(deltaTime: CGFloat(dt), platforms: cachedPlatforms, screen: screen)
+            sPhys.update(deltaTime: CGFloat(dt), platforms: cachedPlatforms, screen: skelScreen)
             sw.skeletonView.skeletonNode.update(deltaTime: CGFloat(dt))
             sw.setFeetPosition(x: sPhys.position.x, y: sPhys.position.y)
 
-            // Auto-attack if player has weapon and Skeleton is within 100pt
+            // Solid collision & Hostile engagement (스켈레톤 충돌·밀침 및 무기/도주 반응)
             let dist = hypot(sPhys.position.x - physics.position.x, sPhys.position.y - physics.position.y)
-            if dist < 100.0 && !sBehav.isDespawned && player.playerAttackTimer <= 0 {
-                attackSkeletonWithCurrentWeapon()
+            let dy = abs(physics.position.y - sPhys.position.y)
+            let dx = physics.position.x - sPhys.position.x
+            let solidRadius: CGFloat = 52.0
+
+            // 🏹 스켈레톤 화살 피격 시 적극적 공격/추격 모드 (Aggro)
+            if skeletonAggroTimer > 0 && sBehav.isAlive {
+                skeletonAggroTimer -= dt
+
+                let char = window.characterView.characterNode
+                let currentWeapon = char.currentHeldItem
+                let isWeapon = (currentWeapon == .diamondSword || currentWeapon == .axe || currentWeapon == .trident || currentWeapon == .diamondPickaxe || currentWeapon == .bow)
+                if !isWeapon {
+                    char.currentHeldItem = .diamondSword
+                }
+
+                // 스켈레톤을 향해 빠른 속도(220pt/s)로 맹렬히 돌격
+                if abs(dx) > 35.0 {
+                    behavior.chargeAt(targetX: sPhys.position.x, speed: 220.0, duration: 0.3, physics: physics, characterNode: char)
+                }
+
+                // 스켈레톤이 높은 곳에 있으면 점프 돌격
+                if sPhys.position.y > physics.position.y + 25.0 {
+                    physics.jump(impulse: 380)
+                }
+
+                // 사정거리(110pt) 내 진입 시 빠른 연속 타격 (쿨다운 0.22초)
+                if dist < 110.0 && player.playerAttackTimer <= 0 {
+                    attackSkeletonWithCurrentWeapon()
+                    player.playerAttackTimer = 0.22
+                }
+            } else if !sBehav.isAlive && skeletonAggroTimer > 0 {
+                skeletonAggroTimer = 0
+                behavior.stopCharging()
+            } else if dy < 45.0 && abs(dx) < solidRadius && sBehav.isAlive {
+                let overlap = solidRadius - abs(dx)
+                let pushDir: CGFloat = dx >= 0 ? 1.0 : -1.0
+                physics.position.x += pushDir * (overlap * 0.5)
+                sPhys.position.x -= pushDir * (overlap * 0.5)
+
+                let currentWeapon = window.characterView.characterNode.currentHeldItem
+                let isWeapon = (currentWeapon == .diamondSword || currentWeapon == .axe || currentWeapon == .trident || currentWeapon == .diamondPickaxe || currentWeapon == .bow)
+
+                if isWeapon && player.playerAttackTimer <= 0 {
+                    attackSkeletonWithCurrentWeapon()
+                } else if !isWeapon {
+                    behavior.recoilFromHostile(awayFrom: sPhys.position.x, physics: physics, characterNode: window.characterView.characterNode)
+                    window.characterView.characterNode.showOverheadEmoji("💀 으악! 스켈레톤이다!", duration: 1.2)
+                }
+            } else if dist < 100.0 && sBehav.isAlive && player.playerAttackTimer <= 0 {
+                let currentWeapon = window.characterView.characterNode.currentHeldItem
+                let isWeapon = (currentWeapon == .diamondSword || currentWeapon == .axe || currentWeapon == .trident || currentWeapon == .diamondPickaxe || currentWeapon == .bow)
+                if isWeapon {
+                    attackSkeletonWithCurrentWeapon()
+                }
             }
         }
 
@@ -485,6 +578,8 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
             desc = "주크박스 리듬 타며 댄스 중 🎶"
         case .drinkMilk:
             desc = "우유 꿀꺽 정화 중 🥛"
+        case .charge:
+            desc = "적대적 몹을 향해 맹렬히 돌격 중! ⚔️"
         case .climb(_, _, let isUp):
             desc = isUp ? "🪜 사다리 타고 창문 올라가는 중" : "🪜 사다리 타고 창문 내려가는 중"
         case .fall:
@@ -748,6 +843,75 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
         }
         statusItem?.menu = buildContextMenu()
         SoundAndEffectsManager.shared.play(.pop)
+    }
+
+    @objc func didSelectBrightnessLevel(_ sender: NSMenuItem) {
+        if let lvl = sender.representedObject as? Double {
+            setStageBrightness(lvl, sender: sender)
+        }
+    }
+
+    @objc func didSetBrightnessDark(_ sender: NSMenuItem) {
+        setStageBrightness(StageBrightness.dark, sender: sender)
+    }
+
+    @objc func didSetBrightnessNormal(_ sender: NSMenuItem) {
+        setStageBrightness(StageBrightness.normal, sender: sender)
+    }
+
+    @objc func didSetBrightnessBright(_ sender: NSMenuItem) {
+        setStageBrightness(StageBrightness.bright, sender: sender)
+    }
+
+    private func setStageBrightness(_ preset: Double, sender: NSMenuItem) {
+        StageBrightness.level = preset
+        sender.state = .on
+        statusItem?.menu = buildContextMenu()
+        SoundAndEffectsManager.shared.play(.pop)
+        applyStageBrightnessToAllViews()
+    }
+
+    @objc func didToggleLightingEffect(_ sender: NSMenuItem) {
+        StageBrightness.isLightingEffectEnabled.toggle()
+        sender.state = StageBrightness.isLightingEffectEnabled ? .on : .off
+        statusItem?.menu = buildContextMenu()
+        SoundAndEffectsManager.shared.play(.pop)
+        applyStageBrightnessToAllViews()
+        let desc = StageBrightness.isLightingEffectEnabled ? "✨ 3D 입체 광원 효과 켜짐" : "🧱 클래식 복셀 광원 (기본)"
+        window.characterView.characterNode.showOverheadEmoji(desc, duration: 2.0)
+    }
+
+    private func applyStageBrightnessToAllViews() {
+        if let scene = window.characterView.scene {
+            StageBrightness.apply(to: scene)
+        }
+        for buddy in buddyWindows {
+            if let scene = buddy.characterView.scene {
+                StageBrightness.apply(to: scene)
+            }
+        }
+        if let scene = petWindow?.petView.scene {
+            StageBrightness.apply(to: scene)
+        }
+        if let scene = wildWolfWindow?.petView.scene {
+            StageBrightness.apply(to: scene)
+        }
+        if let scene = wildHorseWindow?.petView.scene {
+            StageBrightness.apply(to: scene)
+        }
+        if let scene = babyPetWindow?.petView.scene {
+            StageBrightness.apply(to: scene)
+        }
+        if let scene = creeperWindow?.creeperView.scene {
+            StageBrightness.apply(to: scene)
+        }
+        if let scene = endermanWindow?.endermanView.scene {
+            StageBrightness.apply(to: scene)
+        }
+        if let scene = skeletonWindow?.skeletonView.scene {
+            StageBrightness.apply(to: scene)
+        }
+        StageBrightness.applyToAll()
     }
     @objc func didSelectBehaviorMode(_ sender: NSMenuItem) {
         guard let mode = sender.representedObject as? BehaviorMode else { return }
@@ -1187,9 +1351,12 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
     }
 
     // MARK: - Creeper Combat & Spawning (크리퍼 전투 및 소환)
-    public func spawnCreeper() {
-        guard creeperWindow == nil else { return }
-        let cw = CreeperWindow()
+    public func spawnCreeper(legType requestedType: CreeperLegType? = nil) {
+        if creeperWindow != nil {
+            despawnCreeper()
+        }
+        let resolvedType: CreeperLegType = requestedType ?? preferredCreeperLegType ?? (Bool.random() ? .quadruped : .biped)
+        let cw = CreeperWindow(legType: resolvedType)
         cw.creeperView.creeperDelegate = self
         self.creeperWindow = cw
 
@@ -1202,18 +1369,33 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
 
         cw.setFeetPosition(x: spawnX, y: physics.position.y)
         cw.orderFrontRegardless()
-        cw.creeperView.creeperNode.showOverheadEmoji("👾 나타났다!", duration: 1.8)
+
+        if resolvedType == .biped {
+            cw.creeperView.creeperNode.showOverheadEmoji("👾 2족 크리퍼 출현!", duration: 1.8)
+        } else {
+            cw.creeperView.creeperNode.showOverheadEmoji("👾 나타났다!", duration: 1.8)
+        }
         SoundAndEffectsManager.shared.play(.alert)
 
         // 플레이어 살기 감지 대사 출력
-        let warningQuotes = [
-            "등골이 서늘한데...? 살기가 느껴져! 😨",
-            "불길한 기운이 감돈다... 크리퍼인가?! ⚠️",
-            "뒤에서 바스락거리는 소리가 들렸어! 💢",
-            "크리퍼 냄새가 나는데... 어디지?! 👃",
-            "잠깐... 불길한 시선이 느껴져! 👀",
-            "살기 감지! 무기 들 준비 해! ⚔️"
-        ]
+        let warningQuotes: [String]
+        if resolvedType == .biped {
+            warningQuotes = [
+                "저 크리퍼... 왜 두 발로 걷고 있어?! 😱",
+                "2족 보행 크리퍼다! 뭔가 기괴해! 💥",
+                "두 발로 성큼성큼 다가온다! 조심해! 👀",
+                "저주받은 2족 크리퍼 출현?! 무기 들어! ⚔️"
+            ]
+        } else {
+            warningQuotes = [
+                "등골이 서늘한데...? 살기가 느껴져! 😨",
+                "불길한 기운이 감돈다... 크리퍼인가?! ⚠️",
+                "뒤에서 바스락거리는 소리가 들렸어! 💢",
+                "크리퍼 냄새가 나는데... 어디지?! 👃",
+                "잠깐... 불길한 시선이 느껴져! 👀",
+                "살기 감지! 무기 들 준비 해! ⚔️"
+            ]
+        }
         let quote = warningQuotes.randomElement() ?? warningQuotes[0]
         window.characterView.characterNode.showOverheadEmoji(quote, duration: 3.0)
 
@@ -1242,7 +1424,7 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
         guard let cw = creeperWindow,
               let cPhys = creeperPhysics,
               let cBehav = creeperBehavior,
-              !cBehav.isDespawned else { return }
+              cBehav.isAlive else { return }
 
         // Face towards Creeper
         let dx = cPhys.position.x - physics.position.x
@@ -1287,6 +1469,10 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
                 self?.handleCreeperDefeated(with: weapon)
             }
         )
+
+        if !cBehav.isAlive {
+            window.characterView.characterNode.isAttackingWeapon = false
+        }
     }
 
     private func handleCreeperExploded(at blastPos: CGPoint) {
@@ -1341,6 +1527,25 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
 
     @objc func didSelectSpawnCreeper() {
         spawnCreeper()
+    }
+
+    @objc func didSelectSpawnQuadCreeper() {
+        spawnCreeper(legType: .quadruped)
+    }
+
+    @objc func didSelectSpawnBipedCreeper() {
+        spawnCreeper(legType: .biped)
+    }
+
+    @objc func didSelectCreeperLegPreference(_ sender: NSMenuItem) {
+        if let raw = sender.representedObject as? String {
+            if raw == "random" {
+                preferredCreeperLegType = nil
+            } else if let type = CreeperLegType(rawValue: raw) {
+                preferredCreeperLegType = type
+            }
+        }
+        statusItem?.menu = buildContextMenu()
     }
 
     @objc func didToggleCreeperSpawn(_ sender: NSMenuItem) {
@@ -1403,7 +1608,7 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
         guard let ew = endermanWindow,
               let ePhys = endermanPhysics,
               let eBehav = endermanBehavior,
-              !eBehav.isDespawned else { return }
+              eBehav.isAlive else { return }
 
         let screen = ScreenEnvironment.shared.screen(for: physics.position)
         let dx = ePhys.position.x - physics.position.x
@@ -1431,6 +1636,10 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
                 self?.handleEndermanDefeated()
             }
         )
+
+        if !eBehav.isAlive {
+            window.characterView.characterNode.isAttackingWeapon = false
+        }
     }
 
     // MARK: - Skeleton Archer & Combat (스켈레톤 활 쏘기 & 전투)
@@ -1453,6 +1662,7 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
     }
 
     public func despawnSkeleton() {
+        skeletonAggroTimer = 0
         skeletonWindow?.orderOut(nil)
         skeletonWindow = nil
         skeletonPhysics = nil
@@ -1472,23 +1682,46 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
                 guard let self = self else { return }
                 let char = self.window.characterView.characterNode
                 if isDeflected {
-                    char.showOverheadEmoji("🛡️ 챙-! 화살 방어!", duration: 2.0)
+                    char.showOverheadEmoji("🛡️ 챙-! 화살 방어! 돌격-! ⚔️", duration: 1.8)
                     SoundAndEffectsManager.shared.play(.pop)
                 } else {
-                    char.showOverheadEmoji("💥 아야!", duration: 1.5)
-                    self.physics.launch(vx: (self.physics.position.x >= startPos.x ? 120 : -120), vy: 80)
+                    char.showOverheadEmoji("💢 감히 날 쏴?! 돌격-! ⚔️", duration: 1.8)
+                    self.physics.launch(vx: (self.physics.position.x >= startPos.x ? 70 : -70), vy: 40)
                 }
+
+                // 화살 피격 시 적극적 공격/추격 모드 발동
+                self.triggerAggressiveSkeletonAttack()
             }
         )
         activeArrows.append(arrow)
         arrow.launch()
     }
 
+    /// 스켈레톤 화살 피격 시 다이아몬드 검 장착 및 고속 돌격 개시
+    private func triggerAggressiveSkeletonAttack() {
+        guard let sPhys = skeletonPhysics, let sBehav = skeletonBehavior, sBehav.isAlive else { return }
+
+        let char = window.characterView.characterNode
+        // 1. 비무장 시 다이아몬드 검 즉시 발도
+        let currentWeapon = char.currentHeldItem
+        let isWeapon = (currentWeapon == .diamondSword || currentWeapon == .axe || currentWeapon == .trident || currentWeapon == .diamondPickaxe || currentWeapon == .bow)
+        if !isWeapon {
+            char.currentHeldItem = .diamondSword
+        }
+
+        // 2. 적극적 공격 타이머 활성화 (8초 동안 맹렬히 추격)
+        skeletonAggroTimer = 8.0
+        SoundAndEffectsManager.shared.play(.whoosh)
+
+        // 3. 즉시 스켈레톤 방향으로 돌격 개시
+        behavior.chargeAt(targetX: sPhys.position.x, speed: 220.0, duration: 0.8, physics: physics, characterNode: char)
+    }
+
     public func attackSkeletonWithCurrentWeapon() {
         guard let sw = skeletonWindow,
               let sPhys = skeletonPhysics,
               let sBehav = skeletonBehavior,
-              !sBehav.isDespawned else { return }
+              sBehav.isAlive else { return }
 
         let dx = sPhys.position.x - physics.position.x
         window.characterView.characterNode.modelRoot.eulerAngles.y = dx >= 0 ? (CGFloat.pi / 2.0) : (-CGFloat.pi / 2.0)
@@ -1514,9 +1747,17 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
                 self?.handleSkeletonDefeated()
             }
         )
+
+        // 스켈레톤이 이번 타격으로 쓰러진 경우 즉시 공격 및 추격 상태 중단
+        if !sBehav.isAlive {
+            skeletonAggroTimer = 0
+            window.characterView.characterNode.isAttackingWeapon = false
+            behavior.stopCharging()
+        }
     }
 
     private func handleSkeletonDefeated() {
+        skeletonAggroTimer = 0
         player.playerXP += 5
         player.playerEmeralds += 1
         AdvancementManager.shared.unlock(.skeletonKill)

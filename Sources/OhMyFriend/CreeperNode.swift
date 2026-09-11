@@ -2,14 +2,28 @@ import AppKit
 import SceneKit
 import CoreGraphics
 
+public enum CreeperLegType: String, CaseIterable {
+    case quadruped = "quadruped" // 4족 크리퍼 (원작 고증)
+    case biped = "biped"         // 2족 크리퍼 (직립 보행)
+
+    public var displayName: String {
+        switch self {
+        case .quadruped: return "4족 크리퍼 (원작)"
+        case .biped: return "2족 크리퍼 (직립)"
+        }
+    }
+}
+
 public final class CreeperNode: SCNNode {
+    public let legType: CreeperLegType
+
     // Joint Hierarchy
     public let modelRoot = SCNNode()
     public let bodyAnchor = SCNNode()
     public let headNode = SCNNode()
 
-    public let legFL = SCNNode() // Front Left
-    public let legFR = SCNNode() // Front Right
+    public let legFL = SCNNode() // Front Left (2족: Left Leg)
+    public let legFR = SCNNode() // Front Right (2족: Right Leg)
     public let legBL = SCNNode() // Back Left
     public let legBR = SCNNode() // Back Right
 
@@ -34,12 +48,17 @@ public final class CreeperNode: SCNNode {
     private let whiteFlashMat = SCNMaterial()
     private let redHurtMat = SCNMaterial()
 
-    public override init() {
+    public init(legType: CreeperLegType = .quadruped) {
+        self.legType = legType
         super.init()
         setupMaterials()
         setupHierarchy()
         setupModel()
         setupEmojiBillboard()
+    }
+
+    public override convenience init() {
+        self.init(legType: .quadruped)
     }
 
     required init?(coder: NSCoder) {
@@ -94,8 +113,10 @@ public final class CreeperNode: SCNNode {
         bodyAnchor.addChildNode(headNode)
         bodyAnchor.addChildNode(legFL)
         bodyAnchor.addChildNode(legFR)
-        bodyAnchor.addChildNode(legBL)
-        bodyAnchor.addChildNode(legBR)
+        if legType == .quadruped {
+            bodyAnchor.addChildNode(legBL)
+            bodyAnchor.addChildNode(legBR)
+        }
     }
 
     private func setupEmojiBillboard() {
@@ -199,14 +220,23 @@ public final class CreeperNode: SCNNode {
         headNode.addChildNode(cornerL)
         headNode.addChildNode(cornerR)
 
-        // 3. 4 Stumpy Legs: W=0.18, H=0.38, L=0.18
-        let legBox = SCNBox(width: 0.18, height: 0.38, length: 0.18, chamferRadius: 0)
-        legBox.materials = [greenMat]
+        // 3. Legs: 4 Stumpy Legs (quadruped) or 2 Sturdy Legs (biped)
+        if legType == .quadruped {
+            let legBox = SCNBox(width: 0.18, height: 0.38, length: 0.18, chamferRadius: 0)
+            legBox.materials = [greenMat]
 
-        buildLeg(legFL, geom: legBox, x: -0.12, y: -0.38, z: 0.14)
-        buildLeg(legFR, geom: legBox, x: 0.12, y: -0.38, z: 0.14)
-        buildLeg(legBL, geom: legBox, x: -0.12, y: -0.38, z: -0.14)
-        buildLeg(legBR, geom: legBox, x: 0.12, y: -0.38, z: -0.14)
+            buildLeg(legFL, geom: legBox, x: -0.12, y: -0.38, z: 0.14)
+            buildLeg(legFR, geom: legBox, x: 0.12, y: -0.38, z: 0.14)
+            buildLeg(legBL, geom: legBox, x: -0.12, y: -0.38, z: -0.14)
+            buildLeg(legBR, geom: legBox, x: 0.12, y: -0.38, z: -0.14)
+        } else {
+            // 2족 직립 다리: 몸통 중심 Z=0 정렬, 안정적인 접지 폭 (L=0.22)
+            let legBox = SCNBox(width: 0.18, height: 0.38, length: 0.22, chamferRadius: 0)
+            legBox.materials = [greenMat]
+
+            buildLeg(legFL, geom: legBox, x: -0.11, y: -0.38, z: 0.0)
+            buildLeg(legFR, geom: legBox, x: 0.11, y: -0.38, z: 0.0)
+        }
     }
 
     private func buildLeg(_ legNode: SCNNode, geom: SCNBox, x: CGFloat, y: CGFloat, z: CGFloat) {
@@ -264,23 +294,40 @@ public final class CreeperNode: SCNNode {
             }
         }
 
-        // 4. Creeper 4-Leg Shuffle Walk
+        // 4. Creeper Walk Animation
         let isMoving = abs(walkSpeed) > 5.0
         if isMoving {
             let cycle = sin(animTime * 11.0)
-            legFL.eulerAngles.x = cycle * 0.45
-            legBR.eulerAngles.x = cycle * 0.45
-            legFR.eulerAngles.x = -cycle * 0.45
-            legBL.eulerAngles.x = -cycle * 0.45
+            if legType == .quadruped {
+                legFL.eulerAngles.x = cycle * 0.45
+                legBR.eulerAngles.x = cycle * 0.45
+                legFR.eulerAngles.x = -cycle * 0.45
+                legBL.eulerAngles.x = -cycle * 0.45
 
-            // Creepy subtle head bobbing
-            headNode.eulerAngles.y = sin(animTime * 5.0) * 0.12
-            headNode.eulerAngles.x = abs(cycle) * 0.06
+                // Creepy subtle head bobbing
+                headNode.eulerAngles.y = sin(animTime * 5.0) * 0.12
+                headNode.eulerAngles.x = abs(cycle) * 0.06
+                bodyAnchor.eulerAngles.z = 0
+                bodyAnchor.eulerAngles.x = 0
+            } else {
+                // 2족 직립 보행: 좌우 다리 교대 스윙 및 상체 뒤뚱거림
+                legFL.eulerAngles.x = cycle * 0.52
+                legFR.eulerAngles.x = -cycle * 0.52
+
+                // 유머러스한 2족 직립 뒤뚱거림(sway) 및 전진 기울기
+                bodyAnchor.eulerAngles.z = sin(animTime * 5.5) * 0.05
+                bodyAnchor.eulerAngles.x = 0.06
+
+                headNode.eulerAngles.y = sin(animTime * 5.5) * 0.10
+                headNode.eulerAngles.x = -0.04 + abs(cycle) * 0.04
+            }
         } else {
             legFL.eulerAngles.x = 0
             legFR.eulerAngles.x = 0
             legBL.eulerAngles.x = 0
             legBR.eulerAngles.x = 0
+            bodyAnchor.eulerAngles.z = 0
+            bodyAnchor.eulerAngles.x = 0
             headNode.eulerAngles = SCNVector3Zero
         }
     }

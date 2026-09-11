@@ -23,7 +23,18 @@ if ! swift build -c release; then
     echo "⚠️ 'swift build' encountered an environment/CommandLineTools manifest link issue."
     echo "🔄 Switching to fallback: Compiling directly with swiftc..."
     ARCH="$(uname -m)"
-    swiftc -O -target "${ARCH}-apple-macosx13.0" Sources/OhMyFriend/*.swift \
+    mkdir -p .build/module-cache
+    PLUGIN_FLAG=""
+    SDK_FLAG=""
+    XCODE_PLUGINS="/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins"
+    XCODE_SDK="/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk"
+    if [ -d "$XCODE_PLUGINS" ]; then
+        PLUGIN_FLAG="-plugin-path $XCODE_PLUGINS"
+    fi
+    if [ -d "$XCODE_SDK" ]; then
+        SDK_FLAG="-sdk $XCODE_SDK"
+    fi
+    swiftc -module-cache-path .build/module-cache $PLUGIN_FLAG $SDK_FLAG -O -target "${ARCH}-apple-macosx13.0" Sources/OhMyFriend/*.swift \
         -o ".build/release/${APP_NAME}" \
         -framework AppKit -framework SceneKit -framework SwiftUI -framework CoreGraphics
     echo "✅ Direct compilation succeeded!"

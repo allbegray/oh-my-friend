@@ -17,6 +17,17 @@ public final class CreeperBehaviorController {
     public private(set) var hp: Int = 3
     public var isDespawned: Bool = false
 
+    /// 크리퍼 생존 여부 (폭발했거나 사망 진행 중일 때는 false)
+    public var isAlive: Bool {
+        if isDespawned || hp <= 0 { return false }
+        switch state {
+        case .dying, .exploded:
+            return false
+        default:
+            return true
+        }
+    }
+
     private let stalkSpeed: CGFloat = 55.0
     private let fuseDuration: TimeInterval = 2.8 // 2.8s fuse before boom
     private let attackProximity: CGFloat = 120.0
@@ -178,7 +189,7 @@ public final class CreeperBehaviorController {
         creeperNode: CreeperNode,
         onDefeated: @escaping () -> Void
     ) {
-        guard !isDespawned else { return }
+        guard isAlive else { return }
 
         hp -= damage
         let dx = creeperPhysics.position.x - playerPos.x
@@ -198,6 +209,7 @@ public final class CreeperBehaviorController {
 
         if hp <= 0 {
             // Creeper defeated!
+            hp = 0
             creeperNode.isHissing = false
             creeperNode.showOverheadEmoji(chooseLootEmoji(weapon: weapon), duration: 2.0)
             SoundAndEffectsManager.shared.play(.pop)

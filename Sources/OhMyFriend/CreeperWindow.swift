@@ -6,9 +6,9 @@ public final class CreeperWindow: EntityWindow {
 
     private let baseSize: CGFloat = 130.0
 
-    public init() {
+    public init(legType: CreeperLegType = .quadruped) {
         let frame = NSRect(x: 300, y: 200, width: baseSize, height: baseSize)
-        self.creeperView = CreeperView(frame: NSRect(origin: .zero, size: frame.size))
+        self.creeperView = CreeperView(frame: NSRect(origin: .zero, size: frame.size), legType: legType)
 
         super.init(contentRect: frame, ignoresMouse: false)
 

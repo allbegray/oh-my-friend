@@ -44,6 +44,9 @@ public final class CharacterView: SCNView {
         super.init(frame: frame, options: nil)
         setupScene()
         characterNode.applySkin(skin)
+        if let scene = scene {
+            StageBrightness.apply(to: scene)
+        }
         registerForDraggedTypes([.fileURL])
     }
 

@@ -10,16 +10,21 @@ public protocol CreeperViewDelegate: AnyObject {
 
 public final class CreeperView: SCNView {
     public weak var creeperDelegate: CreeperViewDelegate?
-    public let creeperNode = CreeperNode()
+    public let creeperNode: CreeperNode
 
     private var isDragging: Bool = false
     private var lastDragPos: CGPoint = .zero
     private var lastDragTime: TimeInterval = 0
     private var dragVelocity: CGPoint = .zero
 
-    public override init(frame: NSRect, options: [String: Any]? = nil) {
+    public init(frame: NSRect, options: [String: Any]? = nil, legType: CreeperLegType = .quadruped) {
+        self.creeperNode = CreeperNode(legType: legType)
         super.init(frame: frame, options: options)
         setupScene()
+    }
+
+    public override convenience init(frame: NSRect, options: [String: Any]? = nil) {
+        self.init(frame: frame, options: options, legType: .quadruped)
     }
 
     required init?(coder: NSCoder) {
@@ -34,6 +39,7 @@ public final class CreeperView: SCNView {
         // Creeper body centered, feet at Y = 0
         creeperNode.position = SCNVector3(0, 0, 0)
         stage.addChildNode(creeperNode)
+        StageBrightness.apply(to: scene)
     }
 
     // MARK: - Mouse Interaction
