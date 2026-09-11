@@ -22,4 +22,31 @@ public class EntityWindow: NSPanel {
         ignoresMouseEvents = ignoresMouse
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
     }
+
+    public var autoDismissDuration: TimeInterval = 12.0
+    private var autoDismissTimer: Timer?
+
+    public func scheduleAutoDismiss(after duration: TimeInterval = 12.0, onDismiss: (() -> Void)? = nil) {
+        autoDismissTimer?.invalidate()
+        let t = Timer.scheduledTimer(withTimeInterval: duration, repeats: false) { [weak self] _ in
+            guard let self = self else { return }
+            onDismiss?()
+            self.close()
+        }
+        RunLoop.main.add(t, forMode: .common)
+        self.autoDismissTimer = t
+    }
+
+    open override func orderFrontRegardless() {
+        super.orderFrontRegardless()
+        if autoDismissDuration > 0 && autoDismissTimer == nil {
+            scheduleAutoDismiss(after: autoDismissDuration)
+        }
+    }
+
+    open override func close() {
+        autoDismissTimer?.invalidate()
+        autoDismissTimer = nil
+        super.close()
+    }
 }

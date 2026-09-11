@@ -23,6 +23,7 @@ public final class BrewStandWindow: EntityWindow {
     public func place() {
         orderFrontRegardless()
         SoundAndEffectsManager.shared.play(.pop)
+        scheduleAutoDismiss(after: 14.0)
     }
 
     public override func mouseDown(with event: NSEvent) {

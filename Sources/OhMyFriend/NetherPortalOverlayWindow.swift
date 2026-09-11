@@ -25,6 +25,7 @@ public final class NetherPortalOverlayWindow: EntityWindow {
 
     public func open() {
         orderFrontRegardless()
+        scheduleAutoDismiss(after: 12.0)
         swirlTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 30.0, repeats: true) { [weak self] t in
             guard let self = self else { t.invalidate(); return }
             self.swirlPhase += 0.12

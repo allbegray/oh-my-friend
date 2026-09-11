@@ -22,7 +22,7 @@ public final class UpdateManager: @unchecked Sendable {
            !v.isEmpty, v != "1.0.0" {
             return v
         }
-        return "0.35.0"
+        return "0.37.0"
     }
 
     /// GitHub 최신 릴리스 확인 엔드포인트

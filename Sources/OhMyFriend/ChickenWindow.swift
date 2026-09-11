@@ -21,7 +21,9 @@ public final class ChickenWindow: EntityWindow {
     private var phase: TimeInterval = 0
     private var dir: CGFloat = 1
     private var layTimer: TimeInterval = 0
-    private let layInterval: TimeInterval = 20.0
+    private let layInterval: TimeInterval = 5.0
+    private var lifeTimer: TimeInterval = 0
+    private let maxLife: TimeInterval = 12.0
     private let maxEggs = 3
     private var eggs: [EggWindow] = []
     private var chicks: [ChickenWindow] = []
@@ -88,6 +90,11 @@ public final class ChickenWindow: EntityWindow {
         wanderTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] t in
             guard let self = self else { t.invalidate(); return }
             self.phase += 1.0 / 60.0
+            self.lifeTimer += 1.0 / 60.0
+            if self.lifeTimer >= self.maxLife {
+                self.close()
+                return
+            }
             if Int(self.phase) % 4 == 0 && Int(self.phase * 60.0) % 60 == 0 {
                 self.dir = Bool.random() ? 1 : -1
             }
@@ -118,6 +125,10 @@ public final class ChickenWindow: EntityWindow {
             egg.close()
         }
         eggs.removeAll()
+        for chick in chicks {
+            chick.close()
+        }
+        chicks.removeAll()
         super.close()
     }
 
@@ -170,6 +181,10 @@ public final class EggWindow: EntityWindow {
     public func place() {
         orderFrontRegardless()
         SoundAndEffectsManager.shared.play(.pop)
+        scheduleAutoDismiss(after: 8.0) { [weak self] in
+            guard let self = self else { return }
+            self.onTap(self)
+        }
     }
 
     public override func mouseDown(with event: NSEvent) {

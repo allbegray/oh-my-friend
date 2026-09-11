@@ -2,9 +2,9 @@ import AppKit
 import CoreGraphics
 
 public final class ChestEntityWindow: EntityWindow {
-    private let floorPos: CGPoint
+    public let floorPos: CGPoint
     private let onOpened: () -> Void
-    private var isOpened = false
+    public private(set) var isOpened = false
     private var drawView: ChestDrawView?
 
     public init(floorPos: CGPoint, onOpened: @escaping () -> Void) {
@@ -28,7 +28,7 @@ public final class ChestEntityWindow: EntityWindow {
         SoundAndEffectsManager.shared.play(.pop)
     }
 
-    public override func mouseDown(with event: NSEvent) {
+    public func openChest() {
         guard !isOpened else { return }
         isOpened = true
         drawView?.isOpened = true
@@ -44,6 +44,10 @@ public final class ChestEntityWindow: EntityWindow {
                 self?.close()
             }
         }
+    }
+
+    public override func mouseDown(with event: NSEvent) {
+        openChest()
     }
 }
 

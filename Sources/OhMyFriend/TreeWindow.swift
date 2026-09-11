@@ -18,9 +18,10 @@ public final class TreeWindow: EntityWindow {
     private var growTimer: Timer?
     private var appleTimer: Timer?
     private var elapsed: TimeInterval = 0
-    private let stageDuration: TimeInterval = 30.0
+    private var matureElapsed: TimeInterval = 0
+    private let stageDuration: TimeInterval = 4.5
     private let maxStage: Int = 3
-    private let appleInterval: TimeInterval = 15.0
+    private let appleInterval: TimeInterval = 3.5
     private let maxApples = 3
     private var apples: [AppleWindow] = []
     private var drawView: TreeDrawView?
@@ -38,6 +39,7 @@ public final class TreeWindow: EntityWindow {
             height: size.height
         )
         super.init(contentRect: frame, ignoresMouse: false)
+        self.autoDismissDuration = 0
         let view = TreeDrawView(frame: NSRect(origin: .zero, size: size))
         self.drawView = view
         contentView = view
@@ -59,6 +61,13 @@ public final class TreeWindow: EntityWindow {
                 self.drawView?.stage = next
                 self.drawView?.needsDisplay = true
                 SoundAndEffectsManager.shared.play(.pop)
+            }
+            if self.isMature {
+                self.matureElapsed += 1.0
+                if self.matureElapsed >= 15.0 {
+                    self.treeDelegate?.treeWindowDidChop(logs: 3, apples: 1)
+                    self.close()
+                }
             }
         }
         RunLoop.main.add(growTimer!, forMode: .common)
@@ -154,6 +163,10 @@ public final class AppleWindow: EntityWindow {
     public func place() {
         orderFrontRegardless()
         SoundAndEffectsManager.shared.play(.pop)
+        scheduleAutoDismiss(after: 8.0) { [weak self] in
+            guard let self = self else { return }
+            self.onTap(self)
+        }
     }
 
     public override func mouseDown(with event: NSEvent) {

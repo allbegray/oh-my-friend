@@ -47,6 +47,10 @@ public final class BreadWindow: EntityWindow {
                 self.drawView?.isBaked = true
                 self.drawView?.needsDisplay = true
                 SoundAndEffectsManager.shared.play(.pop)
+                self.scheduleAutoDismiss(after: 8.0) { [weak self] in
+                    guard let self = self else { return }
+                    self.onEaten(self.isPumpkinPie)
+                }
             }
         }
         if let bakeTimer = bakeTimer {

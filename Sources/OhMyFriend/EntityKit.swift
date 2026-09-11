@@ -59,23 +59,37 @@ public struct Cooldown {
 // 토글 슬롯: 스폰/해제 쌍을 한 줄로. 창 수명주기는 슬롯이 소유한다.
 public final class ToggleSlot<W: EntityWindow> {
     private var window: W?
+    private var autoTimer: Timer?
+    public var autoCloseDuration: TimeInterval?
 
-    public init() {}
+    public init(autoCloseDuration: TimeInterval? = 12.0) {
+        self.autoCloseDuration = autoCloseDuration
+    }
 
     public var isActive: Bool { window != nil }
 
     public func toggle(make: () -> W, start: (W) -> Void) {
-        if let w = window {
-            w.close()
-            window = nil
+        if let _ = window {
+            clear()
         } else {
             let w = make()
             window = w
             start(w)
+            if let duration = autoCloseDuration {
+                autoTimer?.invalidate()
+                let t = Timer.scheduledTimer(withTimeInterval: duration, repeats: false) { [weak self, weak w] _ in
+                    guard let self = self, let w = w, self.window === w else { return }
+                    self.clear()
+                }
+                RunLoop.main.add(t, forMode: .common)
+                self.autoTimer = t
+            }
         }
     }
 
     public func clear() {
+        autoTimer?.invalidate()
+        autoTimer = nil
         window?.close()
         window = nil
     }

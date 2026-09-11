@@ -2,11 +2,14 @@ import AppKit
 import CoreGraphics
 
 public final class CakeWindow: EntityWindow {
+    public let floorPos: CGPoint
+    public var slicesCount: Int { slicesLeft }
     private let onSlice: () -> Void
     private var slicesLeft = 7
     private var drawView: CakeDrawView?
 
     public init(floorPos: CGPoint, onSlice: @escaping () -> Void) {
+        self.floorPos = floorPos
         self.onSlice = onSlice
         let size = NSSize(width: 84, height: 56)
         super.init(contentRect: NSRect(
@@ -23,9 +26,10 @@ public final class CakeWindow: EntityWindow {
     public func place() {
         orderFrontRegardless()
         SoundAndEffectsManager.shared.play(.pop)
+        scheduleAutoDismiss(after: 14.0)
     }
 
-    public override func mouseDown(with event: NSEvent) {
+    public func eatSlice() {
         guard slicesLeft > 0 else { return }
         slicesLeft -= 1
         drawView?.slicesLeft = slicesLeft
@@ -36,6 +40,10 @@ public final class CakeWindow: EntityWindow {
                 self?.close()
             }
         }
+    }
+
+    public override func mouseDown(with event: NSEvent) {
+        eatSlice()
     }
 }
 

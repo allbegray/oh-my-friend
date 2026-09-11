@@ -33,6 +33,7 @@ public final class AxolotlWindow: EntityWindow {
     public func perch() {
         orderFrontRegardless()
         SoundAndEffectsManager.shared.play(.splash)
+        scheduleAutoDismiss(after: 15.0)
         followTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 30.0, repeats: true) { [weak self] _ in
             guard let self = self else { return }
             self.phase += 1.0 / 30.0

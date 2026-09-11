@@ -12,8 +12,8 @@ public final class WeatherManager {
     public private(set) var state: WeatherState = .clear
 
     private var stateTimer: TimeInterval = 0
-    private var nextChange: TimeInterval = 150.0
-    public private(set) var thunderStrikeTimer: TimeInterval = 8.0
+    private var nextChange: TimeInterval = 25.0
+    public private(set) var thunderStrikeTimer: TimeInterval = 4.0
     public var shouldStrike: Bool = false
 
     private init() {}
@@ -23,7 +23,7 @@ public final class WeatherManager {
         stateTimer += dt
         if stateTimer >= nextChange {
             stateTimer = 0
-            nextChange = Double.random(in: 150.0...300.0)
+            nextChange = Double.random(in: 20.0...30.0)
             let roll = Double.random(in: 0...1)
             switch state {
             case .clear:
@@ -34,13 +34,13 @@ public final class WeatherManager {
                 state = roll < 0.6 ? .rain : .clear
             }
             if state == .thunderstorm {
-                thunderStrikeTimer = 3.0
+                thunderStrikeTimer = 2.0
             }
         }
         if state == .thunderstorm {
             thunderStrikeTimer -= dt
             if thunderStrikeTimer <= 0 {
-                thunderStrikeTimer = Double.random(in: 6.0...12.0)
+                thunderStrikeTimer = Double.random(in: 3.0...5.0)
                 shouldStrike = true
             }
         }

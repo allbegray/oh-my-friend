@@ -1,9 +1,41 @@
 import AppKit
 import CoreGraphics
 
+public struct ExtraMenuEntry {
+    public let title: () -> String
+    public let run: () -> Void
+    public let keyEquivalent: String
+    public let isEnabled: () -> Bool
+    public init(
+        _ title: @escaping () -> String,
+        _ run: @escaping () -> Void,
+        keyEquivalent: String = "",
+        isEnabled: @escaping () -> Bool = { true }
+    ) {
+        self.title = title
+        self.run = run
+        self.keyEquivalent = keyEquivalent
+        self.isEnabled = isEnabled
+    }
+}
+
+public final class ClosureMenuItem: NSMenuItem {
+    private let run: () -> Void
+    public init(title: String, run: @escaping () -> Void, keyEquivalent: String = "", isEnabled: Bool = true) {
+        self.run = run
+        super.init(title: title, action: #selector(fire), keyEquivalent: keyEquivalent)
+        self.target = self
+        self.isEnabled = isEnabled
+    }
+    public convenience init(_ entry: ExtraMenuEntry) {
+        self.init(title: entry.title(), run: entry.run, keyEquivalent: entry.keyEquivalent, isEnabled: entry.isEnabled())
+    }
+    public required init(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+    @objc private func fire() { run() }
+}
+
 // 메뉴 구축 전담 빌더: AppController.buildContextMenu() 본문을 그대로 옮긴 것이다.
 // 게임 로직(didSelect/didToggle/물리/엔티티)은 AppController에 두고, 메뉴 조립만 담당한다.
-// ExtraMenus.swift의 `extension AppController`와 동일 모듈이므로 internal 멤버에 직접 접근한다.
 struct MenuBuilder {
     unowned let app: AppController
 
@@ -163,8 +195,7 @@ struct MenuBuilder {
         )
         shieldItem.target = app
         shieldItem.state = app.window.characterView.characterNode.isShieldEquipped ? .on : .off
-        settingsMenu.addItem(shieldItem)
-
+        lookMenu.addItem(shieldItem)
 
         // Elytra Toggle
         let elytraItem = NSMenuItem(
@@ -174,7 +205,17 @@ struct MenuBuilder {
         )
         elytraItem.target = app
         elytraItem.state = app.window.characterView.characterNode.isElytraEquipped ? .on : .off
-        settingsMenu.addItem(elytraItem)
+        lookMenu.addItem(elytraItem)
+
+        // L3. Enchantment Glint Toggle
+        let glintItem = NSMenuItem(
+            title: "🔮 무기 인챈트 광택 (Enchantment Glint)",
+            action: #selector(AppController.didToggleEnchantmentGlint(_:)),
+            keyEquivalent: ""
+        )
+        glintItem.target = app
+        glintItem.state = app.window.characterView.characterNode.isEnchantedGlintEnabled ? .on : .off
+        lookMenu.addItem(glintItem)
         // Pet Companion Submenu
         let petMenu = NSMenu()
         for kind in PetKind.allCases {
@@ -256,11 +297,9 @@ struct MenuBuilder {
             ExtraMenuEntry({ "🦎 아홀로틀 데려오기 (Axolotl)" }, { [weak app] in app?.didSelectAxolotl() }),
             ExtraMenuEntry({ "🐑 양 소환 (Spawn Sheep)" }, { [weak app] in app?.didSelectSpawnSheep() }),
             ExtraMenuEntry({ "🔔 종 울리기 (Bell)" }, { [weak app] in app?.didSelectRingBell() }),
-            ExtraMenuEntry({ "🦇 박쥐 부르기 (Bat)" }, { [weak app] in app?.didSelectBat() }),
             ExtraMenuEntry({ "🐔 닭 소환 (Chicken)" }, { [weak app] in app?.didSelectSpawnChicken() }),
             ExtraMenuEntry({ "🍄 무쉬룸 소환 (Mooshroom)" }, { [weak app] in app?.didSelectSpawnMooshroom() }),
             ExtraMenuEntry({ "🧶 리드줄 묶기/풀기 (Lead)" }, { [weak app] in app?.didSelectToggleLead() }),
-            ExtraMenuEntry({ "🐼 판다 소환 (Panda)" }, { [weak app] in app?.didSelectSpawnPanda() }),
             ExtraMenuEntry({ "🧭 스폰 나침반 (Compass)" }, { [weak app] in app?.didSelectCompass() }),
         ]
         let moveEntries: [ExtraMenuEntry] = [
@@ -278,7 +317,6 @@ struct MenuBuilder {
             ExtraMenuEntry({ "🟣 지옥문 열기 (Nether Portal)" }, { [weak app] in app?.didSelectPortal() }),
             ExtraMenuEntry({ "🛒 광산 수레 타기 (Minecart)" }, { [weak app] in app?.didSelectMinecart() }),
             ExtraMenuEntry({ "🏆 발전 과제 (\(AdvancementManager.shared.unlockedCount)/\(AdvancementID.allCases.count))" }, { [weak app] in app?.didSelectAdvancements() }),
-            ExtraMenuEntry({ "🐲 드래곤 플라이바이 (Dragon)" }, { [weak app] in app?.didSelectDragonFlyby() }),
         ]
         let combatEntries: [ExtraMenuEntry] = [
             ExtraMenuEntry({ "🔱 삼지창 던지기 (Throw Trident)" }, { [weak app] in app?.didSelectThrowTrident() }),
@@ -314,11 +352,6 @@ struct MenuBuilder {
             findActItem(in: actSubmenuItem.submenu, matching: { $0.hasPrefix("🏹 디펜스전 모드") })?.state = .on
         }
 
-        let extraSubmenuItem = makeSearchableMenu(title: "🎉 추가 모션", groups: app.extraGroups())
-        menu.addItem(extraSubmenuItem)
-
-        let extra2SubmenuItem = makeSearchableMenu(title: "✨ 신규 100선", groups: app.extraGroups2())
-        menu.addItem(extra2SubmenuItem)
         // 4. Scale Submenu
         let scaleMenu = NSMenu()
         let scales: [(String, CGFloat)] = [
@@ -521,15 +554,6 @@ struct MenuBuilder {
         )
         nagToggleItem.target = app
 
-        // L3. Enchantment Glint Toggle
-        let glintItem = NSMenuItem(
-            title: "🔮 무기 인챈트 광택 (Enchantment Glint)",
-            action: #selector(AppController.didToggleEnchantmentGlint(_:)),
-            keyEquivalent: ""
-        )
-        glintItem.target = app
-        glintItem.state = app.window.characterView.characterNode.isEnchantedGlintEnabled ? .on : .off
-        settingsMenu.addItem(glintItem)
 
         // CPU Power Mode Toggle
         let powerModeItem = NSMenuItem(

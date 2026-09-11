@@ -10,13 +10,14 @@ public final class PumpkinWard {
 }
 
 public final class PumpkinWindow: EntityWindow {
-    private let plantPos: CGPoint
+    public let plantPos: CGPoint
     private let onHarvest: () -> Void
     private var stage: Int = 0
     private var growTimer: Timer?
     private var elapsed: TimeInterval = 0
-    private let stageDuration: TimeInterval = 15.0
+    private let stageDuration: TimeInterval = 4.0
     private let maxStage: Int = 3
+    private var matureElapsed: TimeInterval = 0
     private var drawView: PumpkinDrawView?
 
     public var isMature: Bool { stage >= maxStage }
@@ -24,7 +25,7 @@ public final class PumpkinWindow: EntityWindow {
     public init(plantPos: CGPoint, onHarvest: @escaping () -> Void) {
         self.plantPos = plantPos
         self.onHarvest = onHarvest
-        let size = NSSize(width: 64, height: 76)
+        let size = NSSize(width: 64, height: 72)
         let frame = NSRect(
             x: plantPos.x - size.width / 2.0,
             y: plantPos.y,
@@ -32,6 +33,7 @@ public final class PumpkinWindow: EntityWindow {
             height: size.height
         )
         super.init(contentRect: frame, ignoresMouse: false)
+        self.autoDismissDuration = 0
         let view = PumpkinDrawView(frame: NSRect(origin: .zero, size: size))
         self.drawView = view
         contentView = view
@@ -54,15 +56,18 @@ public final class PumpkinWindow: EntityWindow {
                 self.drawView?.needsDisplay = true
                 SoundAndEffectsManager.shared.play(.pop)
             }
+            if self.isMature {
+                self.matureElapsed += 1.0
+                if self.matureElapsed >= 8.0 {
+                    self.harvest()
+                }
+            }
         }
         RunLoop.main.add(growTimer!, forMode: .common)
     }
 
-    public override func mouseDown(with event: NSEvent) {
-        if isMature {
-            onHarvest()
-            close()
-        } else {
+    public func harvest() {
+        guard isMature else {
             drawView?.showHint = true
             drawView?.needsDisplay = true
             SoundAndEffectsManager.shared.play(.pop)
@@ -70,7 +75,16 @@ public final class PumpkinWindow: EntityWindow {
                 self?.drawView?.showHint = false
                 self?.drawView?.needsDisplay = true
             }
+            return
         }
+        growTimer?.invalidate()
+        growTimer = nil
+        onHarvest()
+        close()
+    }
+
+    public override func mouseDown(with event: NSEvent) {
+        harvest()
     }
 
     public override func close() {

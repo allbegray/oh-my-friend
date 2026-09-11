@@ -20,6 +20,8 @@ public final class MooshroomWindow: EntityWindow {
     private var rig: QuadRig?
     private var mooNode: SCNNode?
     private var heartNode: SCNNode?
+    private var lifeTimer: TimeInterval = 0
+    private let maxLife: TimeInterval = 12.0
 
     public init(startPos: CGPoint, delegate: MooshroomWindowDelegate) {
         self.position = startPos
@@ -88,6 +90,11 @@ public final class MooshroomWindow: EntityWindow {
         wanderTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] t in
             guard let self = self else { t.invalidate(); return }
             self.phase += 1.0 / 60.0
+            self.lifeTimer += 1.0 / 60.0
+            if self.lifeTimer >= self.maxLife {
+                self.close()
+                return
+            }
             self.mooCooldown -= 1.0 / 60.0
             if Int(self.phase) % 5 == 0 && Int(self.phase * 60.0) % 300 == 0 {
                 self.dir = Bool.random() ? 1 : -1

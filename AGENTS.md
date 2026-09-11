@@ -72,48 +72,25 @@ Sources/OhMyFriend/
 ├── AxolotlWindow.swift                 # 어깨 아홀로틀(전투 +1 엄호)
 ├── SheepWindow.swift                   # 양(배회·가위 털깎기·60초 재생)
 ├── GolemWindow.swift                   # 눈 골렘(3초 간격 근접몹 눈덩이 엄호)
-├── CakeWindow.swift                    # 7조각 케이크(클릭 나눔·펫 확률 나눔)
-├── DragonShadowWindow.swift            # 상공 드래곤 그림자 플라이바이(전원 경계)
+├── CakeWindow.swift                    # 7조각 케이크(클릭 나눔·캐릭터 직접 섭취 연동)
 ├── WitchWindow.swift                   # 마녀(둔화 투척·우유 정화·2타 격퇴)
 ├── CampfireWindow.swift                # 모닥불(휴식 오라·펫 호감 회복)
-├── TargetAndBatWindow.swift            # 양궁 과녁(점수제) + 선회 박쥐 관상펫
+├── TargetAndBatWindow.swift            # 양궁 과녁(점수제 및 캐릭터 활 사격 연동)
 ├── ChickenWindow.swift                 # 닭(배회·20초 산란·알 30% 병아리 부화) + EggWindow
 ├── MooshroomWindow.swift               # 빨간 무쉬룸 소(빈양동이 스튜 짜기·+2XP)
 ├── LeadWindow.swift                    # 리드줄(펫 묶기·풀기 갈색 줄 오버레이 + LeadManager)
-├── PandaWindow.swift                   # 판다(대나무 뒹굴·25~40초 재채기 쿵)
 ├── CompassWindow.swift                 # 스폰 나침반(스폰 저장·펫/친구 귀환 토스트 + SpawnCompass)
-├── PotatoWindow.swift                  # 감자(25초/단계·구운감자 보너스·20% 썩은감자 꽝)
-├── MelonWindow.swift                   # 수박(덩굴·슬라이스 파티·25% 반짝임 양조 증폭)
-├── PumpkinWindow.swift                 # 호박(15초/단계·호박 쓰기 면역 + PumpkinWard)
+├── PotatoWindow.swift                  # 감자(자율 수확·구운감자 보너스·20% 썩은감자 꽝)
+├── MelonWindow.swift                   # 수박(덩굴·자율 수확·25% 반짝임 양조 증폭)
+├── PumpkinWindow.swift                 # 호박(자율 수확·호박 쓰기 면역 + PumpkinWard)
 ├── TreeWindow.swift                    # 사과나무(묘목 성장·15초 낙과·도끼 벌목) + AppleWindow
 ├── BreadWindow.swift                   # 빵 굽기(밀 3개·5초 굽기·호박파이 체인)
-├── ExtraBacklog.swift                  # 9~17차 공용 허브(RewardCenter·ExtraMenuEntry·ClosureMenuItem)
-├── ExtraMenus.swift                    # 중앙 서브메뉴("🎉 추가 모션 9~17차" 9종)
-├── Extra9Wildlife.swift                # 9차 야생동물 5종 + WildlifeManager
-├── Extra10DarkNether.swift             # 10차 어둠네더 5종 + DarkNetherManager
-├── Extra11Water.swift                  # 11차 물과비 5종 + WaterManager
-├── Extra12Social.swift                 # 12차 소셜 4종 + SocialManager
-├── Extra13Redstone.swift               # 13차 레드스톤 5종 + RedstoneManager
-├── Extra14Winter.swift                 # 14차 겨울 5종 + WinterManager
-├── Extra15Caravan.swift                # 15차 사막 5종 + CaravanManager
-├── Extra16End.swift                    # 16차 엔드 5종 + EndManager
-├── Extra17Events.swift                 # 17차 이벤트 5종 + EventManager(+MobHeadWard)
-├── ExtraAMobs.swift                    # A 신규몹 10종 + MobsAManager
-├── ExtraBNether.swift                  # B 네더확장 10종 + NetherBManager
-├── ExtraCEnd.swift                     # C 엔드확장 10종 + EndCManager
-├── ExtraDSea.swift                     # D 바다 10종 + SeaDManager
-├── ExtraEAnimals.swift                 # E 동물사육 10종 + AnimalsEManager
-├── ExtraFRedstone.swift                # F 레드스톤 10종 + RedstoneFManager
-├── ExtraGDecor.swift                   # G 건축꾸미기 10종 + DecorGManager
-├── ExtraHMagic.swift                   # H 마법전투 10종 + MagicHManager
-├── ExtraIStructures.swift              # I 구조물보스 10종 + StructuresIManager
-├── ExtraJMeta.swift                    # J 생활메타 10종 + MetaJManager
 ├── EntityWindow.swift                  # 전 패널 공용 베이스(투명 무테 플로팅 상용구)
 ├── EntityKit.swift                     # 배회·타격·쿨다운·토글 순수 타입 + 슬롯
 ├── PlayerState.swift                   # 플레이어 재화·버프·강화 13필드
 ├── MenuBuilder.swift                   # 메뉴 구축 521줄 분리(선언적 entries)
-├── MobDirector.swift                   # 앰비언트 몹 자동 스폰 6종 분리
-├── MenuSearch.swift                    # 검색 내장 메뉴(3대 대형 메뉴 실시간 필터)
+├── MobDirector.swift                   # 앰비언트 몹 자동 스폰 분리
+├── MenuSearch.swift                    # 검색 내장 메뉴(실시간 필터)
 ├── VoxelMobKit.swift                   # 3D 복셀 릭 4종 + SceneKit 몹 뷰
 ├── StageBrightness.swift               # 화면 밝기 프리셋 및 광원 효과 on/off 중앙 관리자
 └── UpdateManager.swift                 # GitHub Releases 연동 자동 업데이트 및 인플레이스 교체/재시작
@@ -127,6 +104,11 @@ Sources/OhMyFriend/
 ## 실행 기록
 
 ### 2026-09-11
+- **[메뉴 재배치] 외형 장비 메뉴 일원화**: '⚙️ 설정' 메뉴에 흩어져 있던 방패 착용(`Off-hand Shield`), 겉날개 착용(`Equip Elytra`), 무기 인챈트 광택(`Enchantment Glint`)을 캐릭터 외형 관련 항목인 '👕 외형 꾸미기' 서브메뉴로 이전 통합하여 설정과 외형 기능의 의미적 분리 완성. 검증: 번들 빌드 및 스모크 테스트 정상 통과.
+- **[인터랙션 강화 및 비상호작용 요소 정리]**: 캐릭터와 상호작용이 없는 단순 팝업/독립 개체 정리 및 핵심 오브젝트 직접 상호작용 구현.
+  - 상호작용 연동: 과녁 활 사격 모션·화살 발사·피격 흔들림, 케이크 다가가서 한 입 베어먹기, 보물 상자 다가가 손 뻗어 열기, 슬라임 접근 시 검 뽑아 능동 돌격 사냥, 성숙 농작물(밀·감자·수박·호박) 자율 접근 수확 연동.
+  - 사용자 승인 후 삭제: 100종 독립 팝업('✨ 신규 100선', 파일 10개), 44종 서브메뉴('🎉 추가 모션 9~17차', 파일 11개), 드래곤 플라이바이, 동굴 박쥐, 판다 제거. 검증: 번들 빌드 및 스모크 테스트 정상 통과.
+- **[소환물·오브젝트 지속 시간 및 수명 대폭 최적화]**: 펫 6종(`PetWindow`), 3대 몬스터(`CreeperWindow`, `SkeletonWindow`, `EndermanWindow`), 메인 캐릭터(`CharacterWindow`), 사다리 오버레이는 `autoDismissDuration = 0`으로 영구 체류 유지. `EntityWindow` 기본 12초 자동 소멸(`scheduleAutoDismiss`) 및 `ToggleSlot` 기본 12초 타임아웃을 적용하여 100여 종의 소환물/구조물/장식물 자동 정리. 농작물 5종 단계당 4초(총 12초 성숙) 및 8~15초 미수확 시 자동 수확. 일반 몹 15종 7~15초 수명 및 행동 주기 단축. 날씨 20~30초 전환, 디버프 4~5초 단축. 검증: 번들 빌드 및 스모크 테스트 정상 통과.
 - **[자동 업데이트 기능 구축]**: `UpdateManager.swift` 신규 도입. GitHub Releases API(`api.github.com/.../releases/latest`)와 연동하여 최신 버전 및 바이너리(`OhMyFriend-macOS-arm64.zip`) 자동 감지. 시맨틱 버전 비교(isVersion greaterThan)로 업데이트 여부 판별. 백그라운드 다운로드(`URLSession`), macOS 내장 `ditto -xk` 압축 해제, 독립 셸 스크립트를 통한 무중단 인플레이스 교체/격리해제(`xattr -cr`)/재실행 파이프라인 구현. 메뉴바 및 ⚙️ 설정에 `🔄 업데이트 확인 (v\(version))...` 항목(단축키 Cmd+U) 배치 및 앱 시작 3초 후 조용한 백그라운드 확인 연동. `build_app.sh`의 `CFBundleShortVersionString` 동적 주입 연동. 검증: 번들 빌드, API 통신 확인 및 스모크 테스트 정상 통과.
 - **[전투 AI 버그 수정] 쓰러진 스켈레톤 계속 타격 오류 수정**: 스켈레톤 및 몹에 생존 판정 플래그(`isAlive`) 도입. 쓰러짐(사망 진행 중, `hp <= 0` 또는 `.dying`) 시 `guard isAlive`로 추가 피격 차단, 주인공의 Aggro 타이머(`skeletonAggroTimer = 0`), 무기 공격 모션 해제, 돌격 중단(`behavior.stopCharging()`)을 즉시 연동하여 쓰러진 몹을 계속 타격하며 사망 타이머가 리셋되던 문제 완전 해결. 크리퍼·엔더맨에도 동일 생존 가드 적용. 검증: 번들 빌드 및 스모크 테스트 정상 통과.
 - **[스켈레톤 좌우 버벅임 완화 및 100% 밝기 기준 승격]**: 스켈레톤의 `turnCooldown`(1.5초) 도입, 낮 시간대 창문 그늘(`currentShade`) 내부 순찰 가드, 햇빛 도피(`fleeingSun`) 후 그늘 진입 시 불필요한 역방향 반전 버그 수정으로 초고속 좌우 진동 현상 해결. 기존 150%("매우 밝게") 광량을 새로운 100%("보통", 기본값) 기준으로 승격(`effectiveLvl = lvl * 1.50`)하여 충분한 기본 시인성 확보. 검증: 번들 빌드 및 스모크 테스트 정상 통과.

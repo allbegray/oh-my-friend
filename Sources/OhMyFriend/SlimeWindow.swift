@@ -49,6 +49,8 @@ public final class SlimeWindow: EntityWindow {
     private var direction: CGFloat = 1
     private var rig: CubeRig?
     private var isDead = false
+    private var lifeTimer: TimeInterval = 0
+    private let maxLife: TimeInterval = 12.0
 
     public init(size: SlimeSize, startPos: CGPoint, delegate: SlimeWindowDelegate) {
         self.slimeSize = size
@@ -92,8 +94,22 @@ public final class SlimeWindow: EntityWindow {
             let s = self.slimeSize.panelSize
             self.setFrameOrigin(NSPoint(x: self.position.x - s / 2.0, y: self.position.y + hopHeight))
             self.rig?.squash(hopCycle < 0.45 ? 0.05 : 0.45)
+            self.lifeTimer += 1.0 / 60.0
+            if self.lifeTimer >= self.maxLife {
+                self.despawnNaturally()
+            }
         }
         RunLoop.main.add(hopTimer!, forMode: .common)
+    }
+
+    private func despawnNaturally() {
+        guard !isDead else { return }
+        isDead = true
+        hopTimer?.invalidate()
+        hopTimer = nil
+        SoundAndEffectsManager.shared.play(.pop)
+        slimeDelegate?.slimeWindowDidDespawn(self)
+        close()
     }
 
     public override func mouseDown(with event: NSEvent) {

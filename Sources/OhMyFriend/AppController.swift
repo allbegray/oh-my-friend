@@ -3,7 +3,7 @@ import CoreGraphics
 import SceneKit
 import UniformTypeIdentifiers
 
-public final class AppController: NSObject, CharacterViewDelegate, PetViewDelegate, CreeperViewDelegate, EndermanViewDelegate, SkeletonViewDelegate, SlimeWindowDelegate, FoxWindowDelegate, PhantomWindowDelegate, SpiderWindowDelegate, GhastWindowDelegate, ZombieWindowDelegate, SheepWindowDelegate, ChickenWindowDelegate, MooshroomWindowDelegate, PandaWindowDelegate, TreeWindowDelegate, NSMenuDelegate {
+public final class AppController: NSObject, CharacterViewDelegate, PetViewDelegate, CreeperViewDelegate, EndermanViewDelegate, SkeletonViewDelegate, SlimeWindowDelegate, FoxWindowDelegate, PhantomWindowDelegate, SpiderWindowDelegate, GhastWindowDelegate, ZombieWindowDelegate, SheepWindowDelegate, ChickenWindowDelegate, MooshroomWindowDelegate, TreeWindowDelegate, NSMenuDelegate {
     var window: CharacterWindow!
     private var physics: PhysicsEngine!
     var behavior = CharacterBehaviorController()
@@ -88,26 +88,6 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
 
     public override init() {
         super.init()
-        RewardCenter.onReward = { [weak self] xp, emoji in
-            guard let self = self else { return }
-            if xp > 0 { self.player.playerXP += xp }
-            self.window.characterView.characterNode.showOverheadEmoji(emoji, duration: 2.0)
-            SoundAndEffectsManager.shared.play(xp > 0 ? .heart : .pop)
-            self.statusItem?.menu = self.buildContextMenu()
-        }
-        RewardCenter.playerPos = { [weak self] in self?.physics.position ?? .zero }
-        RewardCenter.movePlayer = { [weak self] pos in
-            self?.physics.position = pos
-            self?.physics.velocity = .zero
-        }
-        RewardCenter.friendPos = { [weak self] in
-            if let b = self?.buddyPhysics.first { return b.position }
-            if let p = self?.petPhysics { return p.position }
-            return nil
-        }
-        RewardCenter.heldItemName = { [weak self] in
-            self?.window.characterView.characterNode.currentHeldItem.rawValue ?? ""
-        }
     }
 
     public func start() {
@@ -443,11 +423,19 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
             }
         }
 
-        // M3. Slime proximity auto-attack + occasional spawn
+        // M3. Slime proximity auto-attack + active hunting
         for slime in slimeWindows {
-            let dist = hypot(slime.position.x - physics.position.x, slime.position.y - physics.position.y)
+            let dx = slime.position.x - physics.position.x
+            let dy = abs(slime.position.y - physics.position.y)
+            let dist = hypot(dx, dy)
             if dist < 90.0 && player.playerAttackTimer <= 0 {
                 attackSlime(slime)
+            } else if dist < 220.0 && dy < 45.0 && skeletonAggroTimer <= 0 && creeperWindow == nil {
+                let char = window.characterView.characterNode
+                if char.currentHeldItem == .none {
+                    char.currentHeldItem = .diamondSword
+                }
+                behavior.chargeAt(targetX: slime.position.x, speed: 140.0, duration: 0.3, physics: physics, characterNode: char)
             }
         }
         // L3. Nether portal entry check + M4 baby pet follow
@@ -471,6 +459,7 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
         updateGolemAnchor()
         updateWitch()
         updateCampfire(dt: dt)
+        updateCropsAutoHarvest(dt: dt)
 
         // H4. Day/Night cycle (every ~5s)
         dayNightTimer += dt
@@ -1915,6 +1904,57 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
         window.characterView.characterNode.showOverheadEmoji("🌱 밀 심기!", duration: 1.6)
     }
 
+    private var cropHarvestCooldown: TimeInterval = 0
+    private func updateCropsAutoHarvest(dt: TimeInterval) {
+        if cropHarvestCooldown > 0 {
+            cropHarvestCooldown -= dt
+            return
+        }
+        guard skeletonAggroTimer <= 0, creeperWindow == nil, !behavior.isClimbing else { return }
+
+        // 밀 성숙 확인
+        if let matureCrop = cropWindows.first(where: { $0.isMature && $0.isVisible }) {
+            handleAutoHarvest(targetPos: matureCrop.plantPos) { matureCrop.harvest() }
+            return
+        }
+        // 감자 성숙 확인
+        if let maturePotato = potatoWindows.first(where: { $0.isMature && $0.isVisible }) {
+            handleAutoHarvest(targetPos: maturePotato.plantPos) { maturePotato.harvest() }
+            return
+        }
+        // 수박 성숙 확인
+        if let matureMelon = melonWindows.first(where: { $0.isMature && $0.isVisible }) {
+            handleAutoHarvest(targetPos: matureMelon.plantPos) { matureMelon.harvest() }
+            return
+        }
+        // 호박 성숙 확인
+        if let maturePumpkin = pumpkinWindows.first(where: { $0.isMature && $0.isVisible }) {
+            handleAutoHarvest(targetPos: maturePumpkin.plantPos) { maturePumpkin.harvest() }
+            return
+        }
+    }
+
+    private func handleAutoHarvest(targetPos: CGPoint, onArrivalHarvest: @escaping () -> Void) {
+        let dx = targetPos.x - physics.position.x
+        let dy = abs(targetPos.y - physics.position.y)
+        let dist = hypot(dx, dy)
+        guard dist < 240.0 && dy < 45.0 else { return }
+
+        let char = window.characterView.characterNode
+        if dist < 48.0 {
+            cropHarvestCooldown = 2.0
+            let dir: CGFloat = dx >= 0 ? 1.0 : -1.0
+            char.modelRoot.eulerAngles.y = dir > 0 ? (CGFloat.pi / 2.0) : (-CGFloat.pi / 2.0)
+            char.isAttackingWeapon = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak char] in
+                char?.isAttackingWeapon = false
+            }
+            onArrivalHarvest()
+        } else {
+            behavior.chargeAt(targetX: targetPos.x - (dx >= 0 ? 32 : -32), speed: 120.0, duration: 0.3, physics: physics, characterNode: char)
+        }
+    }
+
     // MARK: - Taming (야생 늑대 길들이기)
     private var wildWolfWindow: PetWindow?
     private var wildWolfDir: CGFloat = 1
@@ -2000,6 +2040,12 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
     }
 
     private func updateBees() {
+        if let hive = beehiveWindow, !hive.isVisible {
+            for bee in beeWindows { bee.close() }
+            beeWindows = []
+            beehiveWindow = nil
+            return
+        }
         guard !beeWindows.isEmpty else { return }
         let excited = window.characterView.characterNode.currentHeldItem == .flower
         for bee in beeWindows {
@@ -2463,6 +2509,9 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
     }
 
     private func updateGoat() {
+        if let g = goatWindow, !g.isVisible {
+            goatWindow = nil
+        }
         goatWindow?.targetX = physics.position.x
     }
 
@@ -2692,6 +2741,9 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
     }
 
     private func updateGhast() {
+        if let ghast = ghastWindow, !ghast.isVisible {
+            ghastWindow = nil
+        }
         guard let ghast = ghastWindow else { return }
         ghast.anchor = CGPoint(x: physics.position.x - 160, y: physics.position.y + 60)
         fireballs.removeAll { !$0.isVisible }
@@ -2796,6 +2848,10 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
     }
 
     private func updateAxolotl() {
+        if let ax = axolotlWindow, !ax.isVisible {
+            axolotlWindow = nil
+            return
+        }
         guard let ax = axolotlWindow else { return }
         let facing = window.characterView.characterNode.modelRoot.eulerAngles.y >= 0
         ax.moveToShoulder(playerPos: physics.position, facingRight: facing)
@@ -2972,10 +3028,11 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
             cakeWindow = nil
             return
         }
-        let pos = CGPoint(x: physics.position.x + 100, y: physics.position.y)
+        let dir: CGFloat = 1.0
+        let pos = CGPoint(x: physics.position.x + dir * 85, y: physics.position.y)
         let cake = CakeWindow(floorPos: pos) { [weak self] in
             guard let self = self else { return }
-            self.window.characterView.characterNode.showOverheadEmoji("🍰 한 입!", duration: 1.4)
+            self.window.characterView.characterNode.showOverheadEmoji("🍰 냠냠! 달콤해!", duration: 1.6)
             SoundAndEffectsManager.shared.play(.gulp)
             if let petNode = self.petWindow?.petView.petNode, Bool.random() {
                 petNode.showOverheadEmoji("🍰 냠!", duration: 1.4)
@@ -2983,30 +3040,19 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
         }
         cakeWindow = cake
         cake.place()
-        window.characterView.characterNode.showOverheadEmoji("🎂 케이크 파티!", duration: 2.0)
-    }
+        let char = window.characterView.characterNode
+        char.showOverheadEmoji("🎂 케이크 발견!", duration: 1.6)
 
-    // MARK: - Dragon (엔더드래곤 플라이바이)
-    var dragonWindow: DragonShadowWindow?
-
-    @objc func didSelectDragonFlyby() {
-        flyDragon()
-    }
-
-    func flyDragon() {
-        guard dragonWindow == nil else { return }
-        let screen = ScreenEnvironment.shared.screen(for: physics.position)
-        let dragon = DragonShadowWindow(screen: screen)
-        dragonWindow = dragon
-        dragon.flyby()
-        window.characterView.characterNode.showOverheadEmoji("🐲 꺄악! 드래곤이다!", duration: 3.0)
-        SoundAndEffectsManager.shared.play(.alert)
-        petWindow?.petView.petNode.showOverheadEmoji("😱!", duration: 2.0)
-        for bw in buddyWindows {
-            bw.characterView.characterNode.showOverheadEmoji("🐲!!", duration: 2.5)
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 6.5) { [weak self] in
-            self?.dragonWindow = nil
+        // 캐릭터가 케이크로 다가가서 냠냠 먹는 인터랙션
+        let targetX = pos.x - 32.0
+        behavior.chargeAt(targetX: targetX, speed: 110.0, duration: 0.8, physics: physics, characterNode: char)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self, weak cake] in
+            guard let self = self, let cake = cake, cake.isVisible else { return }
+            char.isEating = true
+            cake.eatSlice()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak char] in
+                char?.isEating = false
+            }
         }
     }
 
@@ -3024,8 +3070,8 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
             startPos: pos,
             onThrow: { [weak self] in
                 guard let self = self else { return }
-                self.player.witchSlowTimer = 20.0
-                self.window.characterView.characterNode.showOverheadEmoji("🧙‍♀️ 어지러워...! (우유 마셔!)", duration: 2.5)
+                self.player.witchSlowTimer = 5.0
+                self.window.characterView.characterNode.showOverheadEmoji("🧙‍♀️ 어지러워...! (우유 마셔!)", duration: 2.0)
                 SoundAndEffectsManager.shared.play(.splash)
             },
             onDefeat: { [weak self] in
@@ -3043,6 +3089,9 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
     }
 
     private func updateWitch() {
+        if let w = witchWindow, !w.isVisible {
+            witchWindow = nil
+        }
         witchWindow?.anchor = CGPoint(x: physics.position.x + 200, y: physics.position.y)
         if player.witchSlowTimer > 0 {
             behavior.walkSpeed = 40.0
@@ -3069,6 +3118,10 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
     }
 
     private func updateCampfire(dt: TimeInterval) {
+        if let fire = campfireWindow, !fire.isVisible {
+            campfireWindow = nil
+            return
+        }
         guard campfireWindow != nil else { return }
         campfireAuraTimer += dt
         if campfireAuraTimer < 5.0 { return }
@@ -3088,11 +3141,12 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
     var archeryScore: Int = 0
 
     @objc func didSelectPlaceTarget() {
-        if let target = targetWindow {
+        if let target = targetWindow, target.isVisible {
             target.close()
             targetWindow = nil
             return
         }
+        targetWindow = nil
         let pos = CGPoint(x: physics.position.x + 260, y: physics.position.y + 40)
         let target = TargetWindow(centerPos: pos)
         targetWindow = target
@@ -3109,6 +3163,15 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
         if charNode.currentHeldItem != .bow {
             charNode.currentHeldItem = .bow
         }
+
+        // 과녁을 향해 캐릭터 몸통 회전 및 조준
+        let aimDir: CGFloat = target.centerPos.x >= physics.position.x ? 1.0 : -1.0
+        charNode.modelRoot.eulerAngles.y = aimDir > 0 ? (CGFloat.pi / 2.0) : (-CGFloat.pi / 2.0)
+        charNode.isAttackingWeapon = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak charNode] in
+            charNode?.isAttackingWeapon = false
+        }
+
         let angle = Double.random(in: 0...(Double.pi * 2))
         let miss = Double.random(in: 0...38)
         let hit = CGPoint(
@@ -3134,18 +3197,20 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
             score = 1
             label = "⚪ 1점..."
         }
+        let arrowStart = CGPoint(x: physics.position.x + aimDir * 24.0, y: physics.position.y + 35.0)
         let arrow = ArrowEntityWindow(
-            startPos: physics.position,
+            startPos: arrowStart,
             targetPos: hit,
             checkGuarding: { false },
-            onHit: { [weak self] _ in
+            onHit: { [weak self, weak target] _ in
                 guard let self = self else { return }
+                target?.shake()
                 self.archeryScore += score
                 self.player.playerXP += score / 5
                 self.window.characterView.characterNode.showOverheadEmoji(
                     "\(label) (합계 \(self.archeryScore))", duration: 2.2
                 )
-                SoundAndEffectsManager.shared.play(.heart)
+                SoundAndEffectsManager.shared.play(score >= 7 ? .chime : .heart)
                 self.statusItem?.menu = self.buildContextMenu()
             }
         )
@@ -3154,22 +3219,6 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
         SoundAndEffectsManager.shared.play(.whoosh)
     }
 
-    // MARK: - Bat (동굴 박쥐)
-    private var batWindow: BatWindow?
-
-    @objc func didSelectBat() {
-        if let bat = batWindow {
-            bat.close()
-            batWindow = nil
-            return
-        }
-        let bat = BatWindow(anchorProvider: { [weak self] in
-            self?.physics.position ?? .zero
-        })
-        batWindow = bat
-        bat.start()
-        window.characterView.characterNode.showOverheadEmoji("🦇 찍찍! 박쥐다!", duration: 2.0)
-    }
 
     // MARK: - 고증 7차: 닭·달걀 (Chicken & Eggs)
     private var chickenWindows: [ChickenWindow] = []
@@ -3252,35 +3301,6 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
         statusItem?.menu = buildContextMenu()
     }
 
-    // MARK: - 고증 7차: 판다 뒹굴 (Panda)
-    private var pandaWindow: PandaWindow?
-
-    @objc func didSelectSpawnPanda() {
-        if let p = pandaWindow {
-            p.close()
-            pandaWindow = nil
-            return
-        }
-        let pos = CGPoint(x: physics.position.x + 180, y: physics.position.y)
-        let panda = PandaWindow(startPos: pos, delegate: self)
-        panda.isBambooNearby = window.characterView.characterNode.currentHeldItem == .bamboo
-        pandaWindow = panda
-        panda.start()
-        window.characterView.characterNode.showOverheadEmoji("🐼 판다다! 뒹굴어!", duration: 2.0)
-    }
-
-    public func pandaWindowDidClick(_ window: PandaWindow) {
-        let charNode = self.window.characterView.characterNode
-        if charNode.currentHeldItem == .bamboo {
-            window.isBambooNearby = true
-            charNode.showOverheadEmoji("🎍 대나무 냠! 뒹굴~!", duration: 2.0)
-            SoundAndEffectsManager.shared.play(.gulp)
-            player.playerXP += 1
-        } else {
-            charNode.showOverheadEmoji("🐼 대나무를 들어봐! 🎍", duration: 1.8)
-            SoundAndEffectsManager.shared.play(.pop)
-        }
-    }
 
     // MARK: - 고증 7차: 스폰 나침반 (Compass)
     @objc func didSelectCompass() {
@@ -3571,17 +3591,31 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
     private var chestWindow: ChestEntityWindow?
     @objc func didSelectChest() {
         if chestWindow != nil { return }
-        let pos = CGPoint(x: physics.position.x + 110, y: physics.position.y)
+        let pos = CGPoint(x: physics.position.x + 85, y: physics.position.y)
         let chest = ChestEntityWindow(floorPos: pos) { [weak self] in
             guard let self = self else { return }
             self.chestWindow = nil
             self.player.playerEmeralds += 2
             self.window.characterView.characterNode.showOverheadEmoji("💎 대박! +에메랄드 2!", duration: 2.5)
             SoundAndEffectsManager.shared.play(.heart)
+            self.physics.jump(impulse: 320)
         }
         chestWindow = chest
         chest.spawn()
-        window.characterView.characterNode.showOverheadEmoji("📦 오! 상자다!", duration: 1.8)
+        let char = window.characterView.characterNode
+        char.showOverheadEmoji("📦 오! 보물상자다!", duration: 1.6)
+
+        // 캐릭터가 상자로 다가가서 뚜껑을 여는 상호작용
+        let targetX = pos.x - 34.0
+        behavior.chargeAt(targetX: targetX, speed: 110.0, duration: 0.8, physics: physics, characterNode: char)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self, weak chest] in
+            guard let self = self, let chest = chest, chest.isVisible else { return }
+            char.isPoking = true
+            chest.openChest()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak char] in
+                char?.isPoking = false
+            }
+        }
     }
 
     // MARK: - M2 Totem (불사의 토템)
@@ -3701,8 +3735,13 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
 
     public func attackSlime(_ slime: SlimeWindow) {
         let charNode = window.characterView.characterNode
+        let dir: CGFloat = slime.position.x >= physics.position.x ? 1.0 : -1.0
+        charNode.modelRoot.eulerAngles.y = dir > 0 ? (CGFloat.pi / 2.0) : (-CGFloat.pi / 2.0)
         charNode.isAttackingWeapon = true
         player.playerAttackTimer = 0.35
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak charNode] in
+            charNode?.isAttackingWeapon = false
+        }
         charNode.showOverheadEmoji("🗡️ 퐁!", duration: 1.2)
         SoundAndEffectsManager.shared.play(.splash)
         slime.takeHit()
@@ -3746,6 +3785,10 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
     }
 
     public func checkPortalEntry() {
+        if let portal = portalOverlay, !portal.isVisible {
+            portalOverlay = nil
+            return
+        }
         guard let portal = portalOverlay, !portal.hasEntered else { return }
         let dx = abs(physics.position.x - portal.floorPos.x)
         if dx < 45 && abs(physics.position.y - portal.floorPos.y) < 60 {

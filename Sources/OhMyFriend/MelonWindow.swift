@@ -2,13 +2,14 @@ import AppKit
 import CoreGraphics
 
 public final class MelonWindow: EntityWindow {
-    private let plantPos: CGPoint
+    public let plantPos: CGPoint
     private let onSlice: (Bool) -> Void
     private var stage: Int = 0
     private var growTimer: Timer?
     private var elapsed: TimeInterval = 0
-    private let stageDuration: TimeInterval = 20.0
+    private let stageDuration: TimeInterval = 4.0
     private let maxStage: Int = 3
+    private var matureElapsed: TimeInterval = 0
     private var drawView: MelonDrawView?
 
     public var isMature: Bool { stage >= maxStage }
@@ -16,7 +17,7 @@ public final class MelonWindow: EntityWindow {
     public init(plantPos: CGPoint, onSlice: @escaping (Bool) -> Void) {
         self.plantPos = plantPos
         self.onSlice = onSlice
-        let size = NSSize(width: 72, height: 80)
+        let size = NSSize(width: 64, height: 72)
         let frame = NSRect(
             x: plantPos.x - size.width / 2.0,
             y: plantPos.y,
@@ -24,6 +25,7 @@ public final class MelonWindow: EntityWindow {
             height: size.height
         )
         super.init(contentRect: frame, ignoresMouse: false)
+        self.autoDismissDuration = 0
         let view = MelonDrawView(frame: NSRect(origin: .zero, size: size))
         self.drawView = view
         contentView = view
@@ -46,17 +48,18 @@ public final class MelonWindow: EntityWindow {
                 self.drawView?.needsDisplay = true
                 SoundAndEffectsManager.shared.play(.pop)
             }
+            if self.isMature {
+                self.matureElapsed += 1.0
+                if self.matureElapsed >= 8.0 {
+                    self.harvest()
+                }
+            }
         }
         RunLoop.main.add(growTimer!, forMode: .common)
     }
 
-    public override func mouseDown(with event: NSEvent) {
-        if isMature {
-            let isGlistering = Double.random(in: 0..<1) < 0.25
-            SoundAndEffectsManager.shared.play(.splash)
-            onSlice(isGlistering)
-            close()
-        } else {
+    public func harvest() {
+        guard isMature else {
             drawView?.showHint = true
             drawView?.needsDisplay = true
             SoundAndEffectsManager.shared.play(.pop)
@@ -64,7 +67,18 @@ public final class MelonWindow: EntityWindow {
                 self?.drawView?.showHint = false
                 self?.drawView?.needsDisplay = true
             }
+            return
         }
+        growTimer?.invalidate()
+        growTimer = nil
+        let isGlistering = Double.random(in: 0..<1) < 0.25
+        SoundAndEffectsManager.shared.play(.splash)
+        onSlice(isGlistering)
+        close()
+    }
+
+    public override func mouseDown(with event: NSEvent) {
+        harvest()
     }
 
     public override func close() {

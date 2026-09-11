@@ -73,7 +73,8 @@ public final class BeehiveEntityWindow: EntityWindow {
     public func place() {
         orderFrontRegardless()
         SoundAndEffectsManager.shared.play(.pop)
-        honeyTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: false) { [weak self] _ in
+        scheduleAutoDismiss(after: 14.0)
+        honeyTimer = Timer.scheduledTimer(withTimeInterval: 6.0, repeats: false) { [weak self] _ in
             guard let self = self else { return }
             self.honeyReady = true
             self.drawView?.honeyReady = true
@@ -89,7 +90,7 @@ public final class BeehiveEntityWindow: EntityWindow {
             drawView?.honeyReady = false
             drawView?.needsDisplay = true
             onCollect()
-            honeyTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: false) { [weak self] _ in
+            honeyTimer = Timer.scheduledTimer(withTimeInterval: 6.0, repeats: false) { [weak self] _ in
                 guard let self = self else { return }
                 self.honeyReady = true
                 self.drawView?.honeyReady = true

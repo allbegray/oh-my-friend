@@ -10,6 +10,7 @@ public final class RainOverlayWindow: EntityWindow {
 
     public init(screen: NSScreen) {
         super.init(contentRect: screen.frame, ignoresMouse: true, level: NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.floatingWindow)) - 2))
+        self.autoDismissDuration = 0
         let view = RainDrawView(frame: NSRect(origin: .zero, size: screen.frame.size))
         self.drawView = view
         contentView = view

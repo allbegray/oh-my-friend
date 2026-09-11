@@ -2,13 +2,14 @@ import AppKit
 import CoreGraphics
 
 public final class PotatoWindow: EntityWindow {
-    private let plantPos: CGPoint
+    public let plantPos: CGPoint
     private let onHarvest: (Bool) -> Void
     private var stage: Int = 0
     private var growTimer: Timer?
     private var elapsed: TimeInterval = 0
-    private let stageDuration: TimeInterval = 25.0
+    private let stageDuration: TimeInterval = 4.0
     private let maxStage: Int = 3
+    private var matureElapsed: TimeInterval = 0
     private var drawView: PotatoDrawView?
 
     public var isMature: Bool { stage >= maxStage }
@@ -24,6 +25,7 @@ public final class PotatoWindow: EntityWindow {
             height: size.height
         )
         super.init(contentRect: frame, ignoresMouse: false)
+        self.autoDismissDuration = 0
         let view = PotatoDrawView(frame: NSRect(origin: .zero, size: size))
         self.drawView = view
         contentView = view
@@ -46,18 +48,18 @@ public final class PotatoWindow: EntityWindow {
                 self.drawView?.needsDisplay = true
                 SoundAndEffectsManager.shared.play(.pop)
             }
+            if self.isMature {
+                self.matureElapsed += 1.0
+                if self.matureElapsed >= 8.0 {
+                    self.harvest()
+                }
+            }
         }
         RunLoop.main.add(growTimer!, forMode: .common)
     }
 
-    public override func mouseDown(with event: NSEvent) {
-        if isMature {
-            let isRotten = Double.random(in: 0..<1) < 0.2
-            drawView?.isRotten = isRotten
-            drawView?.needsDisplay = true
-            onHarvest(isRotten)
-            close()
-        } else {
+    public func harvest() {
+        guard isMature else {
             drawView?.showHint = true
             drawView?.needsDisplay = true
             SoundAndEffectsManager.shared.play(.pop)
@@ -65,7 +67,19 @@ public final class PotatoWindow: EntityWindow {
                 self?.drawView?.showHint = false
                 self?.drawView?.needsDisplay = true
             }
+            return
         }
+        growTimer?.invalidate()
+        growTimer = nil
+        let isRotten = Double.random(in: 0..<1) < 0.2
+        drawView?.isRotten = isRotten
+        drawView?.needsDisplay = true
+        onHarvest(isRotten)
+        close()
+    }
+
+    public override func mouseDown(with event: NSEvent) {
+        harvest()
     }
 
     public override func close() {

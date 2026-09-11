@@ -14,7 +14,9 @@ public final class GhastWindow: EntityWindow {
     private var hp = 3
     private var flyTimer: Timer?
     private var phase: TimeInterval = 0
-    private var shootTimer: TimeInterval = 5.0
+    private var shootTimer: TimeInterval = 3.0
+    private var lifeTimer: TimeInterval = 0
+    private let maxLife: TimeInterval = 15.0
     private let onShoot: (CGPoint) -> Void
     private var sceneView: MobSceneView?
     private var rig: FlyerRig?
@@ -67,6 +69,11 @@ public final class GhastWindow: EntityWindow {
         flyTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] t in
             guard let self = self else { t.invalidate(); return }
             self.phase += 1.0 / 60.0
+            self.lifeTimer += 1.0 / 60.0
+            if self.lifeTimer >= self.maxLife {
+                self.disappear(defeated: false)
+                return
+            }
             self.shootTimer -= 1.0 / 60.0
             let cx = self.anchor.x + sin(self.phase * 0.7) * 90.0
             let cy = self.anchor.y + 130 + sin(self.phase * 1.1) * 20.0
@@ -74,7 +81,7 @@ public final class GhastWindow: EntityWindow {
             self.rig?.flap(1.0 / 60.0)
             self.mouthNode?.isHidden = self.shootTimer >= 0.8
             if self.shootTimer <= 0 {
-                self.shootTimer = Double.random(in: 4.0...6.5)
+                self.shootTimer = Double.random(in: 3.5...5.0)
                 self.onShoot(CGPoint(x: cx, y: cy))
             }
         }

@@ -20,6 +20,22 @@ public final class TargetWindow: EntityWindow {
     public func place() {
         orderFrontRegardless()
         SoundAndEffectsManager.shared.play(.pop)
+        scheduleAutoDismiss(after: 12.0)
+    }
+
+    public func shake() {
+        let orig = frame.origin
+        NSAnimationContext.runAnimationGroup({ ctx in
+            ctx.duration = 0.05
+            self.animator().setFrameOrigin(NSPoint(x: orig.x + 5, y: orig.y))
+        }, completionHandler: {
+            NSAnimationContext.runAnimationGroup({ ctx in
+                ctx.duration = 0.05
+                self.animator().setFrameOrigin(NSPoint(x: orig.x - 4, y: orig.y))
+            }, completionHandler: {
+                self.setFrameOrigin(orig)
+            })
+        })
     }
 }
 
@@ -42,63 +58,3 @@ private final class TargetDrawView: NSView {
     }
 }
 
-public final class BatWindow: EntityWindow {
-    public var anchor: CGPoint = .zero
-    private var flyTimer: Timer?
-    private var phase: TimeInterval = 0
-    private var squeakTimer: TimeInterval = 6.0
-    private let anchorProvider: () -> CGPoint
-    private var rig: FlyerRig?
-
-    public init(anchorProvider: @escaping () -> CGPoint) {
-        self.anchorProvider = anchorProvider
-        self.anchor = anchorProvider()
-        let size = NSSize(width: 40, height: 30)
-        super.init(contentRect: NSRect(x: anchor.x, y: anchor.y + 120, width: size.width, height: size.height), ignoresMouse: true)
-        let view = MobSceneView(frame: NSRect(origin: .zero, size: size))
-        let rig = FlyerRig(
-            bodyColor: .rgb(0.25, 0.20, 0.28),
-            wingColor: .rgb(0.25, 0.20, 0.28)
-        )
-        for x in [-0.10, 0.10] as [CGFloat] {
-            let ear = vbox(0.10, 0.18, 0.06, .rgb(0.25, 0.20, 0.28))
-            ear.position = SCNVector3(x, 0.30, 0)
-            rig.body.addChildNode(ear)
-        }
-        for x in [-0.08, 0.08] as [CGFloat] {
-            let eye = vbox(0.06, 0.08, 0.02, .glow(0.95, 0.20, 0.30))
-            eye.position = SCNVector3(x, 0.05, 0.17)
-            rig.body.addChildNode(eye)
-        }
-        rig.addTo(view.scene!, scale: 0.9)
-        view.setSubject(rig)
-        self.rig = rig
-        contentView = view
-    }
-
-    public func start() {
-        orderFrontRegardless()
-        SoundAndEffectsManager.shared.play(.pop)
-        flyTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] t in
-            guard let self = self else { t.invalidate(); return }
-            self.phase += 1.0 / 60.0
-            self.anchor = self.anchorProvider()
-            let cx = self.anchor.x + cos(self.phase * 1.4) * 90.0
-            let cy = self.anchor.y + 130 + sin(self.phase * 2.3) * 30.0
-            self.setFrameOrigin(NSPoint(x: cx - 20, y: cy))
-            self.rig?.flap(1.0 / 60.0)
-            self.squeakTimer -= 1.0 / 60.0
-            if self.squeakTimer <= 0 {
-                self.squeakTimer = Double.random(in: 8.0...15.0)
-                SoundAndEffectsManager.shared.play(.heart)
-            }
-        }
-        RunLoop.main.add(flyTimer!, forMode: .common)
-    }
-
-    public override func close() {
-        flyTimer?.invalidate()
-        flyTimer = nil
-        super.close()
-    }
-}

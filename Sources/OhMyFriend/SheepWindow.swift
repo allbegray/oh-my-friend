@@ -15,7 +15,9 @@ public final class SheepWindow: EntityWindow {
     private var phase: TimeInterval = 0
     private var dir: CGFloat = 1
     private var regrowTimer: TimeInterval = 0
-    private let regrowDuration: TimeInterval = 60.0
+    private let regrowDuration: TimeInterval = 6.0
+    private var lifeTimer: TimeInterval = 0
+    private let maxLife: TimeInterval = 12.0
     private let woolScale: CGFloat = 1.35
     private var sceneView: MobSceneView?
     private var rig: QuadRig?
@@ -53,6 +55,11 @@ public final class SheepWindow: EntityWindow {
         grazeTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] t in
             guard let self = self else { t.invalidate(); return }
             self.phase += 1.0 / 60.0
+            self.lifeTimer += 1.0 / 60.0
+            if self.lifeTimer >= self.maxLife {
+                self.close()
+                return
+            }
             if Int(self.phase) % 4 == 0 && Int(self.phase * 60.0) % 60 == 0 {
                 self.dir = Bool.random() ? 1 : -1
             }

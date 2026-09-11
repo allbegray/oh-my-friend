@@ -7,6 +7,8 @@ public final class GolemWindow: EntityWindow {
     private var guardTimer: Timer?
     private var phase: TimeInterval = 0
     private var throwCooldown: TimeInterval = 0
+    private var lifeTimer: TimeInterval = 0
+    private let maxLife: TimeInterval = 12.0
     private let onThrow: (CGPoint) -> Void
     private var sceneView: MobSceneView?
     private var rig: BipedRig?
@@ -42,11 +44,16 @@ public final class GolemWindow: EntityWindow {
         guardTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] t in
             guard let self = self else { t.invalidate(); return }
             self.phase += 1.0 / 60.0
+            self.lifeTimer += 1.0 / 60.0
+            if self.lifeTimer >= self.maxLife {
+                self.close()
+                return
+            }
             self.throwCooldown -= 1.0 / 60.0
             self.setFrameOrigin(NSPoint(x: self.anchor.x - 32, y: self.anchor.y))
             self.rig?.walk(1.0 / 60.0)
             if self.throwCooldown <= 0 {
-                self.throwCooldown = 3.0
+                self.throwCooldown = 2.0
                 self.onThrow(CGPoint(x: self.anchor.x, y: self.anchor.y + 60))
             }
         }

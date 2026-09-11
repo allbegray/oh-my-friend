@@ -17,7 +17,6 @@ final class MobDirector {
     var endermanSpawnTimer: TimeInterval = 0
     var slimeSpawnTimer: TimeInterval = 0
     var foxSpawnTimer: TimeInterval = 0
-    var dragonTimer: TimeInterval = 0
 
     init(app: AppController) {
         self.app = app
@@ -60,17 +59,6 @@ final class MobDirector {
         if slimeSpawnTimer >= app.slimeSpawnInterval && app.slimeWindows.isEmpty {
             slimeSpawnTimer = 0
             app.spawnSlime(size: .big, at: nil)
-        }
-
-        // Dragon flyby (300초, 50% 확률) — 원본 updateDragon 본문 그대로
-        if app.dragonWindow == nil {
-            dragonTimer += dt
-            if dragonTimer >= 300.0 {
-                dragonTimer = 0
-                if Bool.random() {
-                    app.flyDragon()
-                }
-            }
         }
 
         // Fox: 밤에만 가끔 출현

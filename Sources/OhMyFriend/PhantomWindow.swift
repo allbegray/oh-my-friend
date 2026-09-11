@@ -17,9 +17,9 @@ public final class PhantomWindow: EntityWindow {
     private var flyTimer: Timer?
     private var phase: TimeInterval = 0
     private var swooping = false
-    private var swoopTimer: TimeInterval = 4.0
+    private var swoopTimer: TimeInterval = 2.5
     private var lifeTimer: TimeInterval = 0
-    private let maxLife: TimeInterval = 60.0
+    private let maxLife: TimeInterval = 12.0
     private var rig: FlyerRig?
     private var isGone = false
 

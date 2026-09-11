@@ -14,6 +14,8 @@ public final class ZombieWindow: EntityWindow {
     private var hp = 2
     private var chaseTimer: Timer?
     private var phase: TimeInterval = 0
+    private var lifeTimer: TimeInterval = 0
+    private let maxLife: TimeInterval = 14.0
     private var rig: BipedRig?
     private var isGone = false
     public var target: CGPoint = .zero
@@ -51,6 +53,11 @@ public final class ZombieWindow: EntityWindow {
         chaseTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] t in
             guard let self = self else { t.invalidate(); return }
             self.phase += 1.0 / 60.0
+            self.lifeTimer += 1.0 / 60.0
+            if self.lifeTimer >= self.maxLife {
+                self.dismiss()
+                return
+            }
             let dx = self.target.x - self.position.x
             let dir: CGFloat = dx >= 0 ? 1 : -1
             if abs(dx) > 34 {

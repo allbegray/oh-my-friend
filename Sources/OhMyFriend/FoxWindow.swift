@@ -14,7 +14,7 @@ public final class FoxWindow: EntityWindow {
 
     private var dartTimer: Timer?
     private var lifeTimer: TimeInterval = 0
-    private let maxLife: TimeInterval = 14.0
+    private let maxLife: TimeInterval = 7.0
     private var dir: CGFloat = 1
     private var sceneView: MobSceneView?
     private var rig: QuadRig?

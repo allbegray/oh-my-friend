@@ -13,6 +13,7 @@ public final class EndermanWindow: EntityWindow {
 
         super.init(contentRect: frame, ignoresMouse: false)
 
+        self.autoDismissDuration = 0
         self.isReleasedWhenClosed = false
 
         contentView = endermanView

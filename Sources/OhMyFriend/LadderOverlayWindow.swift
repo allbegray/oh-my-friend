@@ -15,6 +15,7 @@ public final class LadderOverlayWindow: EntityWindow {
         super.init(contentRect: ladderRect, ignoresMouse: true, level: NSWindow.Level(rawValue: NSWindow.Level.floating.rawValue - 1))
 
         // 등반하는 캐릭터 창(.floating)보다 한 단계 아래, 대상 앱 창보다는 위
+        self.autoDismissDuration = 0
         isReleasedWhenClosed = false
 
         contentView = ladderView

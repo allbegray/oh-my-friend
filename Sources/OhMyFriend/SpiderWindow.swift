@@ -17,6 +17,8 @@ public final class SpiderWindow: EntityWindow {
     private var crawlTimer: Timer?
     private var dir: CGFloat = 1
     private var phase: TimeInterval = 0
+    private var lifeTimer: TimeInterval = 0
+    private let maxLife: TimeInterval = 14.0
     private var rig: QuadRig?
     private var isGone = false
 
@@ -57,6 +59,11 @@ public final class SpiderWindow: EntityWindow {
         crawlTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] t in
             guard let self = self else { t.invalidate(); return }
             self.phase += 1.0 / 60.0
+            self.lifeTimer += 1.0 / 60.0
+            if self.lifeTimer >= self.maxLife {
+                self.disappear(defeated: false)
+                return
+            }
             self.position.y += self.dir * 70.0 / 60.0
             if self.position.y >= self.surfaceTop {
                 self.position.y = self.surfaceTop

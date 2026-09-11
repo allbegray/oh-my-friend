@@ -7,7 +7,9 @@ public final class WitchWindow: EntityWindow {
     private var hp = 2
     private var flyTimer: Timer?
     private var phase: TimeInterval = 0
-    private var throwTimer: TimeInterval = 5.0
+    private var throwTimer: TimeInterval = 2.5
+    private var lifeTimer: TimeInterval = 0
+    private let maxLife: TimeInterval = 12.0
     private let onThrow: () -> Void
     private let onDefeat: () -> Void
     private var sceneView: MobSceneView?
@@ -59,13 +61,18 @@ public final class WitchWindow: EntityWindow {
         flyTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] t in
             guard let self = self else { t.invalidate(); return }
             self.phase += 1.0 / 60.0
+            self.lifeTimer += 1.0 / 60.0
+            if self.lifeTimer >= self.maxLife {
+                self.dismiss()
+                return
+            }
             self.throwTimer -= 1.0 / 60.0
             let cy = self.anchor.y + 60 + sin(self.phase * 1.3) * 14.0
             self.setFrameOrigin(NSPoint(x: self.anchor.x - 28, y: cy))
             self.rig?.walk(1.0 / 60.0)
             self.rig?.position.y = CGFloat(sin(self.phase * 5.0)) * 0.05
             if self.throwTimer <= 0 {
-                self.throwTimer = Double.random(in: 6.0...9.0)
+                self.throwTimer = Double.random(in: 3.5...5.0)
                 self.onThrow()
             }
         }

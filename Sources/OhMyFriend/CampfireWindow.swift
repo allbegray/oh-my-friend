@@ -22,6 +22,7 @@ public final class CampfireWindow: EntityWindow {
     public func place() {
         orderFrontRegardless()
         SoundAndEffectsManager.shared.play(.ignite)
+        scheduleAutoDismiss(after: 14.0)
         flickerTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 12.0, repeats: true) { [weak self] _ in
             guard let self = self else { return }
             self.phase += 1.0 / 12.0

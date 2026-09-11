@@ -15,6 +15,8 @@ public final class GoatWindow: EntityWindow {
     private var rig: QuadRig?
     private var isAiming = false
     private var didHitThisCharge = false
+    private var lifeTimer: TimeInterval = 0
+    private let maxLife: TimeInterval = 12.0
 
     private enum GoatPhase {
         case graze
@@ -68,6 +70,11 @@ public final class GoatWindow: EntityWindow {
         aiTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] t in
             guard let self = self else { t.invalidate(); return }
             self.phaseTimer -= 1.0 / 60.0
+            self.lifeTimer += 1.0 / 60.0
+            if self.lifeTimer >= self.maxLife {
+                self.close()
+                return
+            }
             switch self.phase {
             case .graze:
                 if self.phaseTimer <= 0 {
