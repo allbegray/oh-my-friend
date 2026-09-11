@@ -582,6 +582,8 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
             desc = "우유 꿀꺽 정화 중 🥛"
         case .charge:
             desc = "적대적 몹을 향해 맹렬히 돌격 중! ⚔️"
+        case .emote(let kind, _):
+            desc = "\(kind.name) 중 \(kind.emoji)"
         case .climb(_, _, let isUp):
             desc = isUp ? "🪜 사다리 타고 창문 올라가는 중" : "🪜 사다리 타고 창문 내려가는 중"
         case .fall:
@@ -1223,6 +1225,11 @@ public final class AppController: NSObject, CharacterViewDelegate, PetViewDelega
 
     @objc func didSelectNag() {
         behavior.triggerNag(characterNode: window.characterView.characterNode)
+    }
+
+    /// 감정 표현(장식 모션) 실행 — 메뉴·자율 행동이 공유하는 단일 진입점
+    public func runEmote(_ kind: CharacterEmote) {
+        behavior.triggerEmote(kind, characterNode: window.characterView.characterNode)
     }
 
     @objc func didToggleNotificationNag(_ sender: NSMenuItem) {

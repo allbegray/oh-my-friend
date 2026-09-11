@@ -97,6 +97,7 @@ Sources/OhMyFriend/
 ```
 
 - **렌더링 & 애니메이션 파이프라인**: `CharacterView` 내부의 `SCNScene`에서 `MinecraftCharacterNode`가 관절 피벗(목, 어깨, 골반)을 기반으로 회전 및 위치를 실시간 보간합니다.
+- **감정 표현 파이프라인**: `CharacterEmote`(8종)가 이름·이모지·효과음·유지시간을, `MinecraftCharacterNode.applyEmotePose`가 자세를 소유합니다. `CharacterBehaviorController`의 `.emote` 상태가 노드의 `emote` 프로퍼티를 구동하고, 자세 분기는 `update`의 다른 자세 분기보다 앞에서 조기 반환합니다. `waistBend(a)`가 허리(y=1.2)를 축으로 몸통·목·양어깨를 같은 원호 위로 옮기며, FSM이 `.emote`를 벗어나면 노드 자세를 매 프레임 정리해 누적 회전·뒤집힘·허리 숙임이 다음 상태로 새지 않습니다.
 - **물리 & 윈도우 추적**: `ScreenEnvironment`가 0.5초 주기로 활성 앱 윈도우 타이틀바의 Cocoa 좌표계 상단을 스캔하여 발판(`Platform`) 목록을 갱신하고, `PhysicsEngine`이 중력 가속도와 착지 판정을 처리합니다.
 - **등반 연출 파이프라인**: `CharacterBehaviorController`가 매 프레임 등반 스냅샷(사다리 사각형 + 진행률)을 만들고, `AppController.syncLadderOverlay()`가 `LadderOverlayWindow`를 생성·갱신·정리합니다. 사다리는 창문 면을 따라(내려갈 때는 창문 위쪽 끝→창 아래 끝, 올라갈 때는 놓인 자리→창문 위쪽 끝) 생성되어 화면 좌표계에 고정되고(창이 움직이면 따라 이동), 캐릭터 창보다 한 단계 아래 레벨(`floating - 1`)에 그려집니다.
 - **스킨 파이프라인**: 로컬 파일, 기본 내장 픽셀아트 생성기, 온라인 다운로더(Mojang/Minotar)를 통해 64x64 PNG 데이터를 확보하고, 각 면(Front, Right, Back, Left, Top, Bottom)을 슬라이스하여 Nearest-neighbor 재질로 큐브에 매핑합니다.
@@ -104,6 +105,7 @@ Sources/OhMyFriend/
 ## 실행 기록
 
 ### 2026-09-11
+- **[감정 표현] 장식 모션 8종 추가(v0.39.0)**: `CharacterEmote` 레지스트리(이름·별칭·이모지·효과음·유지시간 + `MinecraftCharacterNode.applyEmotePose` 자세) 신설 — 박수 갈채·빙글빙글 회전·기지개 스트레칭·팔벌려뛰기·제자리 달리기·가부좌 명상·정중한 인사·물구나무서기. `.emote(kind:timeLeft:)` FSM 상태 + `triggerEmote` + 자유 배회 밴드 12% 편입, '✨ 재미있는 모션 실행'의 '🙌 감정 표현' 그룹 8종 노출, 상태바 문구 실시간 표시. TNT와 같은 자세 불변식 감시(FSM 이탈 시 노드 자세 정리) 및 드래그·낙하·등반·수면 전환 시 자세 해제, 감정 표현 중 커서 근접 인사(Wave) 차단. 허리 힌지 `waistBend`로 몸통·목·양어깨를 함께 옮겨 '절'·'기지개'·'달리기'에서 머리와 팔이 몸통을 따라간다. 검증: 헤드리스 FSM 드라이버 101체크×4회, 오프스크린 포즈 렌더 52체크(관절 투영으로 물구나무 Δ78px 뒤집힘·가부좌 41px 하강·절 머리 전방 1.04), 실제 번들 앱 접근성 E2E 17체크(메뉴 8종 확인→클릭→상태 문구 전이·복귀), `screencapture -l` 실시간 패널 캡처 5종 육안 확인, 번들 빌드 및 스모크 테스트 정상 통과.
 - **[설정] 날씨 모드 기본값 OFF**: 비·뇌우로 인한 시각적 방해를 최소화하기 위해 날씨 모드(`isWeatherEnabled`) 기본값을 OFF로 변경하고 `UserDefaults` 영속 저장 연동. 검증: 번들 빌드 및 스모크 테스트 정상 통과.
 - **[메뉴 재배치] 외형 장비 메뉴 일원화**: '⚙️ 설정' 메뉴에 흩어져 있던 방패 착용(`Off-hand Shield`), 겉날개 착용(`Equip Elytra`), 무기 인챈트 광택(`Enchantment Glint`)을 캐릭터 외형 관련 항목인 '👕 외형 꾸미기' 서브메뉴로 이전 통합하여 설정과 외형 기능의 의미적 분리 완성. 검증: 번들 빌드 및 스모크 테스트 정상 통과.
 - **[인터랙션 강화 및 비상호작용 요소 정리]**: 캐릭터와 상호작용이 없는 단순 팝업/독립 개체 정리 및 핵심 오브젝트 직접 상호작용 구현.

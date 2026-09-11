@@ -16,13 +16,13 @@ public struct GitHubReleaseInfo: Sendable {
 public final class UpdateManager: @unchecked Sendable {
     public static let shared = UpdateManager()
 
-    /// 현재 앱의 번들 버전 (CFBundleShortVersionString 기준, 개발/CLI fallback: 0.35.0)
+    /// 현재 앱의 번들 버전 (CFBundleShortVersionString 기준, 개발/CLI fallback: 0.39.0)
     public static var currentVersion: String {
         if let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String,
            !v.isEmpty, v != "1.0.0" {
             return v
         }
-        return "0.38.0"
+        return "0.39.0"
     }
 
     /// GitHub 최신 릴리스 확인 엔드포인트

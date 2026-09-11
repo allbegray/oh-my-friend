@@ -328,11 +328,15 @@ struct MenuBuilder {
             ExtraMenuEntry({ "🎯 과녁 설치 (Target)" }, { [weak app] in app?.didSelectPlaceTarget() }),
             ExtraMenuEntry({ [weak app] in "🏹 과녁 쏘기 (점수: \(app?.archeryScore ?? 0))" }, { [weak app] in app?.didSelectShootTarget() }, isEnabled: { [weak app] in app?.targetWindow != nil }),
         ]
+        let emoteEntries: [ExtraMenuEntry] = CharacterEmote.allCases.map { emote in
+            ExtraMenuEntry({ emote.menuTitle }, { [weak app] in app?.runEmote(emote) })
+        }
         let actSubmenuItem = makeSearchableMenu(title: "✨ 재미있는 모션 실행", groups: [
             ("👾 몹 소환", mobEntries),
             ("🌾 농장·음식", farmEntries),
             ("🐾 펫·동물", petActionEntries),
             ("🤸 액션·이동", moveEntries),
+            ("🙌 감정 표현", emoteEntries),
             ("⚔️ 전투·도구", combatEntries),
         ])
         menu.addItem(actSubmenuItem)

@@ -34,6 +34,7 @@ public final class CharacterBehaviorController {
         case jukebox(timeLeft: TimeInterval, beatTimer: TimeInterval)
         case drinkMilk(timeLeft: TimeInterval)
         case charge(targetX: CGFloat, speed: CGFloat, duration: TimeInterval)
+        case emote(kind: CharacterEmote, timeLeft: TimeInterval)
     }
 
     public private(set) var state: State = .idle(timeLeft: 2.0)
@@ -110,7 +111,7 @@ public final class CharacterBehaviorController {
     }
 
     public func triggerWave(characterNode: MinecraftCharacterNode) {
-        guard !isClimbing, !isTNTActive else { return }
+        guard !isClimbing, !isTNTActive, !isEmoting else { return }
         characterNode.showOverheadEmoji("👋", duration: 2.0)
         SoundAndEffectsManager.shared.play(.heart)
         state = .wave(timeLeft: 2.5)
@@ -266,6 +267,24 @@ public final class CharacterBehaviorController {
     public var isTNTActive: Bool {
         if case .tnt = state { return true }
         return false
+    }
+
+    // MARK: - 감정 표현 (Emote)
+    /// 감정 표현 진행 중인지 (자세 감시·암시적 트리거 가드용)
+    public var isEmoting: Bool {
+        if case .emote = state { return true }
+        return false
+    }
+
+    /// 장식 모션(감정 표현) 실행. 등반·TNT 중에는 무시된다.
+    @discardableResult
+    public func triggerEmote(_ kind: CharacterEmote, characterNode: MinecraftCharacterNode) -> Bool {
+        guard !isClimbing, !isTNTActive else { return false }
+        characterNode.emote = kind
+        characterNode.showOverheadEmoji(kind.emoji, duration: min(kind.duration, 2.2))
+        SoundAndEffectsManager.shared.play(kind.sound)
+        state = .emote(kind: kind, timeLeft: kind.duration)
+        return true
     }
 
     /// 도화선 진행 0...1 (점화 시점부터 폭발까지), TNT 연출 중이 아니면 nil
@@ -516,6 +535,7 @@ public final class CharacterBehaviorController {
         if case .dragged = physics.state {
             interruptTNTIfActive()
             cancelClimbIfActive()
+            characterNode.emote = nil
             state = .dragged
             characterNode.isBeingDragged = true
             characterNode.isClimbing = false
@@ -540,6 +560,7 @@ public final class CharacterBehaviorController {
         if case .airborne = physics.state {
             interruptTNTIfActive()
             cancelClimbIfActive()
+            characterNode.emote = nil
 
             // 겉날개 활공: 겉날개 착용 중이고 낙하 중이면 활공 모드 돌입!
             if characterNode.isElytraEquipped && physics.velocity.y < -80 {
@@ -729,6 +750,26 @@ public final class CharacterBehaviorController {
                 chooseNextState(physics: physics, platforms: platforms, screen: screen, cursorPos: cursorPos, characterNode: characterNode)
             } else {
                 state = .drinkMilk(timeLeft: timeLeft)
+            }
+
+        case .emote(let kind, var timeLeft):
+            timeLeft -= dt
+            characterNode.walkSpeed = 0
+            characterNode.emote = kind // 매 프레임 재지정: 같은 값이라 재생 시간은 이어진다
+            characterNode.isSitting = false
+            characterNode.isPoking = false
+            characterNode.isWaving = false
+            characterNode.isSneaking = false
+            characterNode.isSleeping = false
+            characterNode.isEating = false
+            characterNode.isCheering = false
+            characterNode.isNagging = false
+
+            if timeLeft <= 0 {
+                characterNode.emote = nil
+                chooseNextState(physics: physics, platforms: platforms, screen: screen, cursorPos: cursorPos, characterNode: characterNode)
+            } else {
+                state = .emote(kind: kind, timeLeft: timeLeft)
             }
 
         case .charge(let targetX, let speed, var duration):
@@ -1158,6 +1199,12 @@ public final class CharacterBehaviorController {
         if wasTNTActive && !isTNTActive && tntCompletion != nil {
             finishTNT(platform: nil)
         }
+
+        // 감정 표현 자세도 같은 불변식을 지킨다: FSM이 .emote 를 벗어났는데 노드에 자세가 남아 있으면
+        // 노드가 자세 분기에서 조기 반환해 이후의 걷기·낙하·수면이 영영 그려지지 않는다.
+        if characterNode.emote != nil && !isEmoting {
+            characterNode.emote = nil
+        }
     }
 
     private func interruptTNTIfActive() {
@@ -1230,30 +1277,35 @@ public final class CharacterBehaviorController {
 
         let canDescend = ladderCooldown <= 0 && Self.canDescend(from: platform)
 
-        if canDescend && roll < 9 {
+        if canDescend && roll < 8 {
             // Ladder descent (사다리 타고 창문 내려가기)
             startLadderDescent(
                 physics: physics,
                 characterNode: characterNode,
                 from: platform
             )
-        } else if roll < 15 {
+        } else if roll < 14 {
             // Place and mine a block!
             triggerPlaceAndMine(characterNode: characterNode)
-        } else if roll < 26 {
+        } else if roll < 24 {
             // Eat snack / apple
             triggerEating(characterNode: characterNode)
-        } else if roll < 38 {
+        } else if roll < 34 {
             // Minecraft Sneak Twerk Dance!
             triggerSneakDance(characterNode: characterNode)
-        } else if roll < 52 {
+        } else if roll < 46 {
+            // 감정 표현 (박수·기지개·명상 등 장식 모션)
+            if let emote = CharacterEmote.allCases.randomElement() {
+                triggerEmote(emote, characterNode: characterNode)
+            }
+        } else if roll < 58 {
             // Poke Dock or window
             let label = (platform.kind == .dock) ? "Dock 아이콘 툭툭 건드리기" : "창문 노크하기"
             state = .poke(timeLeft: Double.random(in: 1.5...3.0), label: label)
-        } else if roll < 68 {
+        } else if roll < 70 {
             // Sit down and rest
             state = .sit(timeLeft: Double.random(in: 3.5...7.0))
-        } else if roll < 82 {
+        } else if roll < 84 {
             // Look around
             let randomYaw = CGFloat.random(in: -0.8...0.8)
             state = .lookAround(timeLeft: Double.random(in: 1.5...3.0), targetYaw: randomYaw)

@@ -40,6 +40,93 @@ public struct ItemSpec {
     public let makeModel: () -> SCNNode
 }
 
+// MARK: - 감정 표현(Emote) 레지스트리
+/// 캐릭터가 취하는 장식 모션 1종. 자율 행동·메뉴·FSM·자세 렌더가 모두 이 어휘 하나를 공유한다.
+/// 새 모션 추가 = case 1개 + 아래 표 1행 + `applyEmotePose` 분기 1개 (switch 가 exhaustive 라 누락은 컴파일 에러).
+public enum CharacterEmote: String, CaseIterable {
+    case clap          // 박수 갈채
+    case spin          // 빙글빙글 회전
+    case stretch       // 기지개 스트레칭
+    case jumpingJacks  // 팔벌려뛰기
+    case jogInPlace    // 제자리 달리기
+    case meditate      // 가부좌 명상
+    case bow           // 정중한 인사
+    case handstand     // 물구나무서기
+
+    /// 메뉴·말풍선에 쓰는 이름
+    public var name: String {
+        switch self {
+        case .clap: return "박수 갈채"
+        case .spin: return "빙글빙글 회전"
+        case .stretch: return "기지개 스트레칭"
+        case .jumpingJacks: return "팔벌려뛰기"
+        case .jogInPlace: return "제자리 달리기"
+        case .meditate: return "가부좌 명상"
+        case .bow: return "정중한 인사"
+        case .handstand: return "물구나무서기"
+        }
+    }
+
+    /// 메뉴에 병기하는 영문 별칭
+    public var alias: String {
+        switch self {
+        case .clap: return "Clap"
+        case .spin: return "Spin"
+        case .stretch: return "Stretch"
+        case .jumpingJacks: return "Jumping Jacks"
+        case .jogInPlace: return "Jog in Place"
+        case .meditate: return "Meditate"
+        case .bow: return "Bow"
+        case .handstand: return "Handstand"
+        }
+    }
+
+    /// 머리 위 말풍선 이모지
+    public var emoji: String {
+        switch self {
+        case .clap: return "👏"
+        case .spin: return "🌀"
+        case .stretch: return "🙆"
+        case .jumpingJacks: return "🤸"
+        case .jogInPlace: return "🏃"
+        case .meditate: return "🧘"
+        case .bow: return "🙇"
+        case .handstand: return "🙃"
+        }
+    }
+
+    /// 시작 효과음
+    public var sound: SoundEffect {
+        switch self {
+        case .clap: return .heart
+        case .spin: return .whoosh
+        case .stretch: return .pop
+        case .jumpingJacks: return .jump
+        case .jogInPlace: return .jump
+        case .meditate: return .chime
+        case .bow: return .heart
+        case .handstand: return .pop
+        }
+    }
+
+    /// 동작 유지 시간(초)
+    public var duration: TimeInterval {
+        switch self {
+        case .clap: return 2.8
+        case .spin: return 2.8
+        case .stretch: return 3.0
+        case .jumpingJacks: return 3.0
+        case .jogInPlace: return 3.0
+        case .meditate: return 5.0
+        case .bow: return 2.4
+        case .handstand: return 2.6
+        }
+    }
+
+    /// 컨텍스트 메뉴 제목
+    public var menuTitle: String { "\(emoji) \(name) (\(alias))" }
+}
+
 public final class MinecraftCharacterNode: SCNNode {
     // Root container
     public let modelRoot = SCNNode()
@@ -153,6 +240,27 @@ public final class MinecraftCharacterNode: SCNNode {
     public var isJukeboxDancing: Bool = false
     public var isThrowingTrident: Bool = false
     public var isReviving: Bool = false
+
+    /// 감정 표현(Emote) — FSM이 지정한 장식 모션을 매 프레임 재생한다.
+    /// 같은 값을 다시 넣으면 재생 시간이 이어지고(전환 없음), nil 로 내리면 원자세로 복구한다.
+    public var emote: CharacterEmote? {
+        didSet {
+            guard emote != oldValue else { return }
+            emoteTime = 0
+            if emote == nil {
+                // 누적 회전(스핀)·뒤집힘(물구나무)·낮아진 몸통·허리 숙임이 다음 상태로 새지 않게 복구
+                modelRoot.eulerAngles = SCNVector3(0, 0, 0)
+                bodyAnchor.eulerAngles = SCNVector3(0, 0, 0)
+                bodyAnchor.position = SCNVector3(0, 0, 0)
+                torsoNode.eulerAngles = SCNVector3(0, 0, 0)
+                torsoNode.position = SCNVector3(0, 1.8, 0)
+                headJoint.position = SCNVector3(0, 2.4, 0)
+                rightArmJoint.position = SCNVector3(-0.6, 2.4, 0)
+                leftArmJoint.position = SCNVector3(0.6, 2.4, 0)
+            }
+        }
+    }
+    private var emoteTime: CGFloat = 0
 
     // Ladder climbing (사다리 등반)
     public var isClimbing: Bool = false {
@@ -1132,6 +1240,12 @@ public final class MinecraftCharacterNode: SCNNode {
             bodyAnchor.eulerAngles = SCNVector3(0, 0, 0)
         }
 
+        if let emote = emote {
+            emoteTime += dt
+            applyEmotePose(emote)
+            return
+        }
+
         if isClimbing {
             // Climbing: 창문을 마주보고(등을 보이며) 양팔 교차로 위를 움켜쥐고 다리를 교차로 디디며 오르내린다
             let cycle = sin(animTime * 5.0) * (climbUp ? -1.0 : 1.0)
@@ -1371,6 +1485,142 @@ public final class MinecraftCharacterNode: SCNNode {
                 rightArmJoint.eulerAngles = SCNVector3(breath * 2.0, 0, 0.05)
                 leftArmJoint.eulerAngles = SCNVector3(breath * 2.0, 0, -0.05)
             }
+        }
+    }
+
+    // MARK: - 감정 표현 자세 (Emote Poses)
+    /// 허리(요추, y=1.2)를 축으로 상체를 앞뒤로 숙인다. `a > 0` = 앞으로(+z) 숙임.
+    ///
+    /// 몸통은 자기 중심에서 도는 게 아니라 **허리에서 접혀야** 하므로 중심을 원호 위로 옮기고,
+    /// 목·양어깨도 같은 원호를 따라 함께 옮긴다(머리·팔이 몸통을 따라가지 않으면 '절'이 아니라
+    /// 몸통 상자만 제자리에서 기울어 보인다). 회전은 각 부위의 기준각에 얹도록 호출부가 계산한다.
+    private func waistBend(_ a: CGFloat) {
+        let cosA = cos(a), sinA = sin(a)
+        torsoNode.eulerAngles.x = -a
+        torsoNode.position = SCNVector3(0, 1.2 + 0.6 * cosA, 0.6 * sinA)
+        let shoulderY = 1.2 + 1.2 * cosA
+        let shoulderZ = 1.2 * sinA
+        headJoint.position = SCNVector3(0, shoulderY, shoulderZ)
+        rightArmJoint.position = SCNVector3(-0.6, shoulderY, shoulderZ)
+        leftArmJoint.position = SCNVector3(0.6, shoulderY, shoulderZ)
+    }
+
+    /// `emoteTime`(초) 기준으로 장식 모션 1종의 자세를 적용한다.
+    /// 모든 분기가 머리·양팔·양다리를 전부 덮어써야 한다(이전 자세의 관절 각도가 남지 않도록).
+    /// 좌표 규약: +z = 캐릭터 정면, 관절 X회전 +는 뒤로 / -는 앞으로, Z회전은 좌우로 벌림.
+    private func applyEmotePose(_ emote: CharacterEmote) {
+        let t = emoteTime
+
+        switch emote {
+        case .clap:
+            // 박수 갈채: 양팔을 앞으로 모아 리듬에 맞춰 마주치고, 칠 때마다 살짝 뜬다
+            let beat = abs(sin(t * 7.5))
+            let spread = 0.62 - beat * 0.55
+            modelRoot.eulerAngles = SCNVector3(0, 0, 0)
+            bodyAnchor.position = SCNVector3(0, beat * 0.07, 0)
+            waistBend(0.05 + beat * 0.05)
+            headJoint.eulerAngles = SCNVector3(0.06 + beat * 0.10, 0, 0)
+            rightArmJoint.eulerAngles = SCNVector3(-1.30, 0, spread)
+            leftArmJoint.eulerAngles = SCNVector3(-1.30, 0, -spread)
+            rightLegJoint.eulerAngles = SCNVector3(0, 0, 0)
+            leftLegJoint.eulerAngles = SCNVector3(0, 0, 0)
+
+        case .spin:
+            // 빙글빙글 회전: 팔을 수평으로 벌리고 제자리에서 두 바퀴 돈다
+            let progress = min(1, t / CGFloat(emote.duration))
+            modelRoot.eulerAngles = SCNVector3(0, progress * CGFloat.pi * 4.0, 0)
+            bodyAnchor.position = SCNVector3(0, abs(sin(t * 4.0)) * 0.06, 0)
+            waistBend(0)
+            headJoint.eulerAngles = SCNVector3(-0.05, 0, 0)
+            rightArmJoint.eulerAngles = SCNVector3(0, 0, -1.45)
+            leftArmJoint.eulerAngles = SCNVector3(0, 0, 1.45)
+            rightLegJoint.eulerAngles = SCNVector3(0, 0, 0.02)
+            leftLegJoint.eulerAngles = SCNVector3(0, 0, -0.02)
+
+        case .stretch:
+            // 기지개: 두 팔을 위로 뻗고 상체를 뒤로 젖히며 까치발로 선다
+            let rise = min(1, t / 0.7)
+            let ease = rise * rise * (3 - 2 * rise)
+            let sway = sin(t * 1.5) * 0.10
+            let lean = -0.26 * ease // 뒤로 젖힘
+            modelRoot.eulerAngles = SCNVector3(0, 0, 0)
+            bodyAnchor.position = SCNVector3(0, 0.10 * ease, 0)
+            waistBend(lean)
+            headJoint.eulerAngles = SCNVector3(-lean - 0.18 * ease, sway * 0.6, 0)
+            rightArmJoint.eulerAngles = SCNVector3(-CGFloat.pi + 0.22 - lean, 0, 0.30 + sway)
+            leftArmJoint.eulerAngles = SCNVector3(-CGFloat.pi + 0.22 - lean, 0, -0.30 + sway)
+            rightLegJoint.eulerAngles = SCNVector3(0.06, 0, 0)
+            leftLegJoint.eulerAngles = SCNVector3(0.06, 0, 0)
+
+        case .jumpingJacks:
+            // 팔벌려뛰기: 0.55초 주기로 팔·다리를 벌렸다 모으고 그 사이에 뜬다
+            let phase = CGFloat(fmod(t, 0.55)) / 0.55
+            let open = phase < 0.5 ? phase * 2 : (2 - phase * 2)
+            let hop = abs(sin(t * 11.4))
+            modelRoot.eulerAngles = SCNVector3(0, 0, 0)
+            bodyAnchor.position = SCNVector3(0, hop * 0.20, 0)
+            waistBend(0)
+            headJoint.eulerAngles = SCNVector3(-0.06, 0, 0)
+            rightArmJoint.eulerAngles = SCNVector3(0, 0, -CGFloat.pi * open * 0.92)
+            leftArmJoint.eulerAngles = SCNVector3(0, 0, CGFloat.pi * open * 0.92)
+            // 다리는 좌우로 크게 벌려 정면에서도 '벌렸다'가 읽히게 한다
+            rightLegJoint.eulerAngles = SCNVector3(0, 0, -0.62 * open)
+            leftLegJoint.eulerAngles = SCNVector3(0, 0, 0.62 * open)
+
+        case .jogInPlace:
+            // 제자리 달리기: 무릎을 빠르게 번갈아 앞으로 들고 팔을 앞뒤로 젓는다 (x 이동 없음)
+            let cycle = t * 9.0
+            let stride = sin(cycle)
+            modelRoot.eulerAngles = SCNVector3(0, 0, 0)
+            bodyAnchor.position = SCNVector3(0, abs(sin(cycle)) * 0.16, 0)
+            waistBend(0.20)
+            headJoint.eulerAngles = SCNVector3(-0.14, 0, 0)
+            rightLegJoint.eulerAngles = SCNVector3(-1.05 + stride * 0.95, 0, -0.14)
+            leftLegJoint.eulerAngles = SCNVector3(-1.05 - stride * 0.95, 0, 0.14)
+            rightArmJoint.eulerAngles = SCNVector3(-0.35 - stride * 1.05, 0, 0.10)
+            leftArmJoint.eulerAngles = SCNVector3(-0.35 + stride * 1.05, 0, -0.10)
+
+        case .meditate:
+            // 가부좌 명상: 넓적다리를 앞·바깥으로 접어 앉고(정강이가 허벅지 아래로) 몸을 낮춰 호흡한다
+            let breath = sin(t * 1.5)
+            modelRoot.eulerAngles = SCNVector3(0, 0, 0)
+            bodyAnchor.position = SCNVector3(0, -0.62 + breath * 0.03, 0)
+            waistBend(0.12)
+            headJoint.eulerAngles = SCNVector3(-0.06, 0, 0)
+            rightArmJoint.eulerAngles = SCNVector3(0.55, 0, -0.40)
+            leftArmJoint.eulerAngles = SCNVector3(0.55, 0, 0.40)
+            rightLegJoint.eulerAngles = SCNVector3(-1.42, 0, -1.02)
+            leftLegJoint.eulerAngles = SCNVector3(-1.42, 0, 1.02)
+
+        case .bow:
+            // 정중한 인사: 허리를 접어 상체를 숙이고 두 팔을 앞으로 모았다가 천천히 되돌린다
+            let rise = min(1, t / 0.45)
+            let fall = min(1, (CGFloat(emote.duration) - t) / 0.45)
+            let amount = max(0, min(rise, fall))
+            let bend = 1.05 * amount
+            modelRoot.eulerAngles = SCNVector3(0, 0, 0)
+            bodyAnchor.position = SCNVector3(0, 0, 0)
+            waistBend(bend)
+            headJoint.eulerAngles = SCNVector3(-bend + 0.30 * amount, 0, 0)
+            rightArmJoint.eulerAngles = SCNVector3(-bend - 0.35 * amount, 0, 0.30 * amount)
+            leftArmJoint.eulerAngles = SCNVector3(-bend - 0.35 * amount, 0, -0.30 * amount)
+            rightLegJoint.eulerAngles = SCNVector3(0.05, 0, 0)
+            leftLegJoint.eulerAngles = SCNVector3(0.05, 0, 0)
+
+        case .handstand:
+            // 물구나무서기: 몸을 뒤집어 손으로 바닥을 짚고 다리를 하늘로 뻗는다 (몸통 2.8 → 바닥 높이 3.6)
+            let wobble = sin(t * 5.0)
+            modelRoot.eulerAngles = SCNVector3(0, 0, 0)
+            bodyAnchor.eulerAngles = SCNVector3(CGFloat.pi, 0, 0)
+            bodyAnchor.position = SCNVector3(wobble * 0.06, 3.60, 0)
+            headJoint.position = SCNVector3(0, 2.4, 0)
+            headJoint.eulerAngles = SCNVector3(0.25, wobble * 0.10, 0)
+            rightArmJoint.position = SCNVector3(-0.6, 2.4, 0)
+            leftArmJoint.position = SCNVector3(0.6, 2.4, 0)
+            rightArmJoint.eulerAngles = SCNVector3(CGFloat.pi, 0, 0.10)
+            leftArmJoint.eulerAngles = SCNVector3(CGFloat.pi, 0, -0.10)
+            rightLegJoint.eulerAngles = SCNVector3(0, 0, 0.16)
+            leftLegJoint.eulerAngles = SCNVector3(0, 0, -0.16)
         }
     }
 }
